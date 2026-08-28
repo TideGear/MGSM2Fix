@@ -19,6 +19,11 @@ typedef struct {
 	std::vector<Ketchup_VersionInfo> versions;
 } Ketchup_TitleInfo;
 
+typedef struct {
+	unsigned int address;
+	std::vector<unsigned char> data;
+} Ketchup_RamPatch;
+
 template <Squirk Q = Squirk::Standard>
 class Ketchup
 {
@@ -26,6 +31,11 @@ public:
 	Ketchup() {}
 
 	static bool Process(HSQUIRRELVM<Q> v);
+
+	// Applies, and keeps applying, the RAM half of the patch set. Writing it at
+	// the time the CD-ROM patch is entered does not survive; see ApplyBlock().
+	// Safe to call every frame - it only verifies periodically.
+	static void Update();
 
 	constexpr static unsigned int PSX_ImageBase = 0x10000;
 	constexpr static unsigned int PSX_SectorSize = 0x800;
@@ -50,4 +60,11 @@ private:
 	static bool ProcessDisk(HSQUIRRELVM<Q> v, Ketchup_TitleInfo &title, Ketchup_VersionInfo &version, Ketchup_DiskInfo &disk);
 	static bool ProcessVersion(HSQUIRRELVM<Q> v, Ketchup_TitleInfo &title, Ketchup_VersionInfo &version);
 	static bool ProcessTitle(HSQUIRRELVM<Q> v, Ketchup_TitleInfo &title);
+
+	// Deferred RAM writes, coalesced into contiguous runs, rebuilt on each
+	// disk patch setup. Verified periodically rather than every frame.
+	static inline std::vector<Ketchup_RamPatch> RamPatches = {};
+	static inline unsigned int RamTick = 0;
+	static inline unsigned int RamApplies = 0;
+	constexpr static unsigned int RamCheckInterval = 30;
 };
