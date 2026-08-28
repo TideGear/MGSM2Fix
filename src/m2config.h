@@ -58,6 +58,7 @@ public:
     static inline bool bLauncherSkipNotice;
     static inline bool bLauncherStartGame;
     static inline bool bGameStageSelect;
+    static inline bool bGameEnglishText;
     static inline bool bPatchesDisableRAM;
     static inline bool bPatchesDisableCDROM;
     static inline bool bPatchesDisableFont;

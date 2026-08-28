@@ -69,6 +69,15 @@ void MGS1::SQOnMemoryDefine()
 {
     MGS1_GlobalsPTR = SQTitleProf<Squirk::Standard>::GetMemoryDefine("scene_name");
     spdlog::info("[MGS 1] mgs_stage is 0x{:x}.", MGS1_GlobalsPTR);
+
+    // Only Integral and the VR disk define these; everything else reads back 0.
+    MGS1_LanguagePTR = SQTitleProf<Squirk::Standard>::GetMemoryDefine("language_setting");
+    MGS1_LanguageMask = SQTitleProf<Squirk::Standard>::GetMemoryDefine("language_setting_mask");
+    MGS1_LanguageDone = false;
+    if (MGS1_LanguagePTR != 0) {
+        spdlog::info("[MGS 1] language_setting is 0x{:x}, mask is 0x{:x}.",
+            MGS1_LanguagePTR, MGS1_LanguageMask);
+    }
 }
 
 void MGS1::SQOnUpdateGadgets()
@@ -86,6 +95,24 @@ void MGS1::SQOnUpdateGadgets()
                 strcpy(MGS1_LoaderName, "select");
                 SQEmuTask<Squirk::Standard>::RamCopy(MGS1_LoaderPTR, MGS1_LoaderName, sizeof(MGS1_LoaderName));
                 spdlog::info("[MGS 1] Set mgs_loader_stage to \"{}\".", MGS1_LoaderName);
+            }
+        }
+
+        // Integral selects Japanese text in its own option screen by default.
+        // Hold the language bit set while we are still on the title screens, so
+        // English is what a new game starts with; once a stage is actually
+        // running we stop touching it, leaving the in-game option free again.
+        if (M2Config::bGameEnglishText && !MGS1_LanguageDone
+            && MGS1_LanguagePTR != 0 && MGS1_LanguageMask != 0) {
+            SQInteger setting = SQEmuTask<Squirk::Standard>::GetRamValue(CHAR_BIT, MGS1_LanguagePTR);
+            if ((setting & MGS1_LanguageMask) == 0) {
+                SQEmuTask<Squirk::Standard>::SetRamValue(CHAR_BIT, MGS1_LanguagePTR,
+                    setting | MGS1_LanguageMask);
+                spdlog::info("[MGS 1] Selected English text (0x{:x}: 0x{:02x} -> 0x{:02x}).",
+                    MGS1_LanguagePTR, setting, setting | MGS1_LanguageMask);
+            }
+            if (MGS1_StageName[0] != '\0' && strcmp(MGS1_StageName, "title") != 0) {
+                MGS1_LanguageDone = true;
             }
         }
     }

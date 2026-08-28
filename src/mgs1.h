@@ -154,6 +154,9 @@ public:
 private:
     uintptr_t MGS1_GlobalsPTR = 0;
     uintptr_t MGS1_LoaderPTR = 0;
+    uintptr_t MGS1_LanguagePTR = 0;
+    unsigned MGS1_LanguageMask = 0;
+    bool MGS1_LanguageDone = false;
     static inline HSQOBJECT<Squirk::Standard> SQ_EmuTask_getHeight = {};
 
 #ifndef _WIN64
