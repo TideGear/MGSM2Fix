@@ -10,7 +10,7 @@ if "%PLAT%"=="" set "PLAT=x64"
 
 REM --- Locate Zydis project file ---
 set "ZY_PROJECT=%~dp0src\zydis\msvc\zydis\Zydis.vcxproj"
-if not exist %ZY_PROJECT% (
+if not exist "%ZY_PROJECT%" (
     echo ERROR: Zydis project file not found at %ZY_PROJECT%
     exit /b 1
 )
@@ -53,7 +53,7 @@ if exist "%HASH_FILE%" (
 REM --- Build if needed ---
 if "%NEED_BUILD%"=="1" (
     echo [Zydis] Building Release MT %PLAT%
-    msbuild %ZY_PROJECT% %MSBUILD_ARGS%
+    msbuild "%ZY_PROJECT%" %MSBUILD_ARGS%
     if errorlevel 1 (
         echo ERROR: Zydis Release MT %PLAT% build failed
         exit /b 1
