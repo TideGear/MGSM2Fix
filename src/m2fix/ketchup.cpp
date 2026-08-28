@@ -22,25 +22,79 @@ bool Ketchup<Q>::ApplyBlock(HSQUIRRELVM<Q> v,
 #endif
 	spdlog::info("[SQ] [Ketchup] CD-ROM write 0x{:08x} with {} bytes.", offset, size);
 
-	// If tray is open this isn't a cold boot, so we can skip this.
-	while (!SQHook<Q>::IsCdRomShellOpen() && size != 0) {
-		if (offset >= disk.ram_base && offset < (disk.ram_base + disk.ram_range)) {
-			unsigned int address = static_cast<unsigned int>(offset) - disk.ram_base;
-			unsigned int sector = address / PSX_SectorRange;
-			unsigned int pos = address % PSX_SectorRange;
+	// The CD-ROM write above is enough for anything the game reads off the disc
+	// at runtime (stage overlays, RADIO.DAT and friends), but not for the boot
+	// executable: the Master Collection never reads that from the disc, it
+	// preloads it from a ROM snapshot. Those bytes have to be written straight
+	// to machine memory instead - and writing them here does not stick, because
+	// the Master Collection finishes setting up machine memory *after* the disk
+	// patch is entered and discards most of it. So collect the mapped writes
+	// and let Update() apply them once the machine is actually up.
+	for (size_t i = 0; i < size; i++) {
+		uint64_t position = offset + i;
+		if (position < disk.ram_base || position >= (disk.ram_base + disk.ram_range))
+			continue;
 
-			if (pos < PSX_SectorSize) {
-				address = (sector * PSX_SectorSize) + pos;
-				SQEmuTask<Q>::SetRamValue(CHAR_BIT, PSX_ImageBase + address, *data);
-				spdlog::info("[SQ] [Ketchup] Mapped RAM write 0x{:08x} [0x{:08x}] with value 0x{:02x}.",
-					PSX_ImageBase + address, offset, *data);
+		unsigned int address = static_cast<unsigned int>(position - disk.ram_base);
+		unsigned int sector = address / PSX_SectorRange;
+		unsigned int pos = address % PSX_SectorRange;
+		if (pos >= PSX_SectorSize) continue;
+
+		unsigned int ram = PSX_ImageBase + (sector * PSX_SectorSize) + pos;
+
+		// Coalesce runs so verification stays cheap.
+		if (!RamPatches.empty()) {
+			auto &last = RamPatches.back();
+			if (last.address + last.data.size() == ram) {
+				last.data.push_back(data[i]);
+				continue;
 			}
 		}
-
-		size--; data++; offset++;
+		RamPatches.push_back({ ram, { data[i] } });
 	}
 
 	return true;
+}
+
+template <Squirk Q>
+void Ketchup<Q>::Update()
+{
+	if (RamPatches.empty()) return;
+
+	// Mid disc swap - the image is being torn down, leave it alone.
+	if (SQHook<Q>::IsCdRomShellOpen()) return;
+
+	// Back off if it refuses to stick, so a pathological case degrades into a
+	// slow retry instead of rewriting the image several times a second.
+	unsigned int interval = RamCheckInterval * (RamApplies < 8 ? 1 : 16);
+	if (RamTick++ % interval != 0) return;
+
+	// Cheap check: one byte per run. Anything wrong and we rewrite the lot.
+	// GetRamValue is masked because the value arrives widened, and comparing
+	// the raw result against a byte does not reliably hold.
+	bool intact = true;
+	for (auto &patch : RamPatches) {
+		if ((SQEmuTask<Q>::GetRamValue(CHAR_BIT, patch.address) & 0xFF) != patch.data.front()) {
+			intact = false;
+			break;
+		}
+	}
+	if (intact) return;
+
+	size_t bytes = 0;
+	for (auto &patch : RamPatches) {
+		for (size_t i = 0; i < patch.data.size(); i++) {
+			SQEmuTask<Q>::SetRamValue(CHAR_BIT, patch.address + i, patch.data[i]);
+		}
+		bytes += patch.data.size();
+	}
+
+	// Only worth logging the first few; after that it is a reapply loop and the
+	// log would drown in it.
+	if (++RamApplies <= 4) {
+		spdlog::info("[SQ] [Ketchup] Applied {} bytes of RAM patches in {} blocks (pass {}).",
+			bytes, RamPatches.size(), RamApplies);
+	}
 }
 
 template <Squirk Q>
@@ -186,6 +240,12 @@ bool Ketchup<Q>::ProcessTitle(HSQUIRRELVM<Q> v, Ketchup_TitleInfo &title)
 template <Squirk Q>
 bool Ketchup<Q>::Process(HSQUIRRELVM<Q> v)
 {
+	// Rebuilt from scratch on every disk patch setup, so a title or disk change
+	// cannot leave stale writes aimed at the previous image.
+	RamPatches.clear();
+	RamTick = 0;
+	RamApplies = 0;
+
 	auto *titles = M2Fix::GameInstance().SQKetchupHook();
 	if (!titles) return false;
 
@@ -201,3 +261,8 @@ template bool Ketchup<Squirk::Standard>::Process(HSQUIRRELVM<Squirk::Standard> v
 template bool Ketchup<Squirk::AlignObject>::Process(HSQUIRRELVM<Squirk::AlignObject> v);
 template bool Ketchup<Squirk::StandardShared>::Process(HSQUIRRELVM<Squirk::StandardShared> v);
 template bool Ketchup<Squirk::AlignObjectShared>::Process(HSQUIRRELVM<Squirk::AlignObjectShared> v);
+
+template void Ketchup<Squirk::Standard>::Update();
+template void Ketchup<Squirk::AlignObject>::Update();
+template void Ketchup<Squirk::StandardShared>::Update();
+template void Ketchup<Squirk::AlignObjectShared>::Update();
