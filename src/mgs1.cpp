@@ -74,6 +74,7 @@ void MGS1::SQOnMemoryDefine()
     MGS1_LanguagePTR = SQTitleProf<Squirk::Standard>::GetMemoryDefine("language_setting");
     MGS1_LanguageMask = SQTitleProf<Squirk::Standard>::GetMemoryDefine("language_setting_mask");
     MGS1_LanguageDone = false;
+    MGS1_LanguageHeld = 0;
     if (MGS1_LanguagePTR != 0) {
         spdlog::info("[MGS 1] language_setting is 0x{:x}, mask is 0x{:x}.",
             MGS1_LanguagePTR, MGS1_LanguageMask);
@@ -99,9 +100,15 @@ void MGS1::SQOnUpdateGadgets()
         }
 
         // Integral selects Japanese text in its own option screen by default.
-        // Hold the language bit set while we are still on the title screens, so
-        // English is what a new game starts with; once a stage is actually
-        // running we stop touching it, leaving the in-game option free again.
+        // Hold the language bit set until it survives on its own, then stop, so
+        // English is what a new game starts with while the in-game option stays
+        // free to choose Japanese afterwards.
+        //
+        // Waiting for the title screen specifically matters: the setting is
+        // restored from the memory card as the title loads, which overwrites an
+        // earlier write. Anything set during "init" is gone by the time a player
+        // could see it, so the hold has to span every pre-gameplay stage and end
+        // only once the value has stayed put for a while on the title itself.
         if (M2Config::bGameEnglishText && !MGS1_LanguageDone
             && MGS1_LanguagePTR != 0 && MGS1_LanguageMask != 0) {
             SQInteger setting = SQEmuTask<Squirk::Standard>::GetRamValue(CHAR_BIT, MGS1_LanguagePTR);
@@ -110,9 +117,12 @@ void MGS1::SQOnUpdateGadgets()
                     setting | MGS1_LanguageMask);
                 spdlog::info("[MGS 1] Selected English text (0x{:x}: 0x{:02x} -> 0x{:02x}).",
                     MGS1_LanguagePTR, setting, setting | MGS1_LanguageMask);
+                MGS1_LanguageHeld = 0;
             }
-            if (MGS1_StageName[0] != '\0' && strcmp(MGS1_StageName, "title") != 0) {
+            else if (!strcmp(MGS1_StageName, "title")
+                && ++MGS1_LanguageHeld >= MGS1_LanguageHoldFrames) {
                 MGS1_LanguageDone = true;
+                spdlog::info("[MGS 1] English text is set; leaving language_setting alone.");
             }
         }
     }
