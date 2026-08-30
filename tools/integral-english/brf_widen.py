@@ -107,14 +107,30 @@ ROW_H_ADDR, ROW_H_OLD, ROW_H = 0x800C69D0, 13, 20
 S00_ADDR = 0x800C7658
 S00_OLD = [0x00051040, 0x00451021, 0x00021080, 0x00451021, 0x00021080]
 S00_NEW = [0x00050940, 0x00051180, 0x00411021, 0x00050880, 0x00411021]
-# Row advance (the `h` argument to brf_800C69B4, `addiu a3, zero, N` in the
-# call's delay slot or just before it).  Integral's br_s02/br_s12/br_s13 are
-# ONE-line Japanese labels; USA's are two lines, so USA advances ~28 where
-# Integral advances 17-20 and the English art overruns the next row.  Measured
-# from USA screenshots: br_s12 243 px / 8.75 = 27.8, br_s02 244 / 8.75 = 27.9.
-ADVANCE = [(0x800C7008, 20, 28, 'br_s02'),      # person in charge of the operation
-           (0x800C7240, 17, 28, 'br_s12'),      # next-generation / special force unit
-           (0x800C7278, 17, 28, 'br_s13')]      # the reason for unanimous approval
+# Row advance: read USA's own constants, never guessed.  Rows are laid out by
+# accumulating the positioner's return value y + h, where h is its 4th argument.
+# USA reworked that function - it takes the box extents as extra stack arguments
+# where Integral hardcodes 13 - but the call structure is identical, so USA's
+# advances transfer directly.  Both tables are extracted by simulating the
+# registers over each overlay (see rowargs.py), so this follows the discs.
+INT_FN, USA_BASE, USA_FN = 0x800C69B4, 0x800C5970, 0x800C9194
+
+def advance_patches(int_ovl, usa_ovl):
+    from rowargs import run_bytes
+    usa = {idx: adv for _, idx, adv, _, _ in run_bytes(usa_ovl, USA_BASE, USA_FN)}
+    usa[11] = 20      # br_s02: inherited in a3; the positioner never writes a3
+    W = list(struct.unpack('<%dI' % (len(int_ovl)//4), int_ovl[:len(int_ovl)//4*4]))
+    def at(a): return W[(a - BASEADDR)//4]
+    out = []
+    for a, idx, adv, _, _ in run_bytes(int_ovl, BASEADDR, INT_FN):
+        want = usa.get(idx)
+        if want is None or want == adv: continue
+        for x in [a+4] + list(range(a, a-0x80, -4)):        # incl. the delay slot
+            w = at(x); op = w >> 26
+            if op == 9 and ((w >> 16) & 31) == 7: out.append((x, adv, want, idx)); break
+            if op == 0 and (w & 0x3F) == 0x21 and ((w >> 11) & 31) == 7:
+                out.append((x, adv, want, idx)); break
+    return out      # the reason for unanimous approval
 gid = {}
 for n, g in quads.items(): gid.setdefault(g['xr'][1], []).append(n)
 newimm = {addr: max(quads[n]['xl'][0] + geo(U[strcode(n)])['w'] for n in members)
