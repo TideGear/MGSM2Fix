@@ -79,6 +79,25 @@ nu = [k for k, t in enumerate(tu) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])
 U = {e[0]: e[3] for e in eu}
 quads = json.load(open('work/brf_quads_all.json'))
+
+# Horizontal: Integral's whole briefing panel sits 20 game px right of USA's
+# (the vertical rule measures x 2101 vs 1921, 180 display px / 9). The label xl
+# constants differ by only 16-17, so the labels sit ~4 px left of where USA has
+# them relative to their own rule. Setting xl = USA's xl + that offset puts them
+# exactly where USA has them; xr follows because the canvas is xl + USA's width.
+LINE_DELTA = 20
+S00_X_ADDRS = (0x800C7674, 0x800C76A4)      # br_s00's animated x0 and x1 base
+
+def xl_patches(int_ovl, usa_ovl):
+    from quadscan import scan
+    U = {n: xl for a, n, xl, yt, xr, yb, sa in scan(usa_ovl, 0x800C5970, 0x800CC1D8) if n}
+    out = {}
+    for a, n, xl, yt, xr, yb, sa in scan(int_ovl, BASEADDR, 0x800C983C):
+        if not n or not n.startswith('br_s') or n == 'br_s00': continue
+        if xl is None or sa is None or U.get(n) is None: continue
+        new = U[n] + LINE_DELTA
+        if new != xl: out[n] = (sa, xl, new)
+    return out
 WIDEN = {strcode(n): n for n in quads}
 for t in WIDEN: assert t in U, 'missing %s in USA archive' % WIDEN[t]
 I0 = {e[0]: e[3] for e in ei}
@@ -118,7 +137,6 @@ INT_FN, USA_BASE, USA_FN = 0x800C69B4, 0x800C5970, 0x800C9194
 def advance_patches(int_ovl, usa_ovl):
     from rowargs import run_bytes
     usa = {idx: adv for _, idx, adv, _, _ in run_bytes(usa_ovl, USA_BASE, USA_FN)}
-    usa[11] = 20      # br_s02: inherited in a3; the positioner never writes a3
     W = list(struct.unpack('<%dI' % (len(int_ovl)//4), int_ovl[:len(int_ovl)//4*4]))
     def at(a): return W[(a - BASEADDR)//4]
     out = []
@@ -131,6 +149,10 @@ def advance_patches(int_ovl, usa_ovl):
             if op == 0 and (w & 0x3F) == 0x21 and ((w >> 11) & 31) == 7:
                 out.append((x, adv, want, idx)); break
     return out      # the reason for unanimous approval
+XL = xl_patches(pi[0], pu[0])
+for n, (addr, old, new) in XL.items():
+    if n in quads: quads[n]['xl'] = [new, addr]     # xr is derived from this
+
 gid = {}
 for n, g in quads.items(): gid.setdefault(g['xr'][1], []).append(n)
 newimm = {addr: max(quads[n]['xl'][0] + geo(U[strcode(n)])['w'] for n in members)

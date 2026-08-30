@@ -17,7 +17,8 @@ import pcx4
 from PIL import Image
 from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BASEADDR,
                        ROW_H_ADDR, ROW_H_OLD, ROW_H, S00_ADDR, S00_OLD, S00_NEW,
-                       advance_patches, INT_FN)
+                       advance_patches, INT_FN, xl_patches, S00_X_ADDRS, LINE_DELTA,
+                       quads)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -25,7 +26,6 @@ ni = [k for k, t in enumerate(ti) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 nu = [k for k, t in enumerate(tu) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])
 U = {e[0]: e[3] for e in eu}
-quads  = json.load(open('work/brf_quads_all.json'))
 target = {int(k, 16): tuple(v) for k, v in json.load(open('work/brf_target.json')).items()}
 place  = {int(k, 16): tuple(v) for k, v in json.load(open('work/brf_widen.json')).items()}
 newimm = {int(k, 16): v for k, v in json.load(open('work/brf_imm.json')).items()}
@@ -63,6 +63,19 @@ _have = list(struct.unpack('<5I', ovl[_o:_o+20]))
 assert _have == S00_OLD, 'br_s00 width chain not at %08X: %s' % (S00_ADDR, [hex(x) for x in _have])
 struct.pack_into('<5I', ovl, _o, *S00_NEW)
 print('br_s00 width chain @%08X: 52n -> 100n  (x1 = w*n/6 + 26)' % S00_ADDR)
+for n, (addr, old_v, new_v) in sorted(xl_patches(bytes(pi[0]), pu[0]).items()):
+    o = addr - BASEADDR
+    w = struct.unpack('<I', ovl[o:o+4])[0]
+    assert (w >> 26) == 9 and (w & 0xFFFF) == old_v, 'xl %08X: %08X' % (addr, w)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
+    print('label xl  @%08X: %2d -> %-2d  %s' % (addr, old_v, new_v, n))
+for addr in S00_X_ADDRS:                     # br_s00's animated x, same shift
+    o = addr - BASEADDR
+    w = struct.unpack('<I', ovl[o:o+4])[0]
+    assert (w >> 26) == 9 and (w & 0xFFFF) == 26, 'br_s00 x @%08X: %08X' % (addr, w)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | 30)
+    print('label xl  @%08X: 26 -> 30  br_s00 (animated)' % addr)
+
 NM = {9+i: 'br_s%02d' % i for i in range(16)}
 for addr, old_v, new_v, idx in advance_patches(bytes(pi[0]), pu[0]):
     o = addr - BASEADDR
