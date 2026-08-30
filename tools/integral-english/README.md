@@ -145,3 +145,40 @@ Two constraints learned the hard way while trying:
   4bpp; the large background panels are deeper. Computing free VRAM as
   `ceil(w / 4)` for all 51 textures underestimates their footprint, and labels
   packed into "free" space land on the background art and show through it.
+
+### The label quads ARE patchable (found 2026-08-30)
+
+Correcting the note above: the draw rects are **hardcoded immediates in
+`GetResources`** (`asm/overlays/brf/brf_800C99C0.s`, 53 calls to
+`brf_800C983C`), and they can be patched. Example, `br_s07` = `hostages`:
+
+    800CA084  addiu a3,zero,26     xl = 26
+    800CA088  addiu v0,zero,-67    yt = -67   (sw v0,16(sp))
+    800CA090  addiu v0,zero,54     xr = 54    (sw v0,20(sp))
+    800CA098  addiu v0,zero,-54    yb = -54   (sw v0,24(sp))
+
+giving a 28x13 quad - exactly Integral's texture size. Each call site is
+preceded by a `lui/addiu` pair loading the resource-name string, so call sites
+map to labels by reading that string out of the overlay (load address
+0x800C3208).
+
+`brf_quads.json` holds 9 of the 16 extracted by linear register simulation,
+including every label visible in the detailed-information submenu:
+
+    br_s02 60x13   br_s04 88x13   br_s06 60x13   br_s07 28x13   br_s08 36x13
+    br_s09 96x13   br_s11 96x13   br_s12 88x13   br_s14 104x13
+
+All nine equal their Integral texture dimensions. The other seven keep their
+values in registers across call sites and need proper dataflow analysis.
+
+**To finish:** patch `xr = xl + usa_w` and `yb = yt + usa_h` for each label
+(the immediates are in the overlay at `addr - 0x800C3208`, no code size change),
+and give each texture room in VRAM. Checked with correct colour depths - the
+archive is **47 textures at 4bpp and 4 at 8bpp**, and VRAM units are
+`ceil(w * bpp / 16)`, not `ceil(w / 4)`:
+
+    br_s04, br_s06, br_s07, br_s14   can widen where they are
+    br_s02, br_s08, br_s09, br_s11, br_s12   need relocating first
+
+Both edits must land together: a widened quad with an unwidened texture (or the
+reverse) will stretch or clip.
