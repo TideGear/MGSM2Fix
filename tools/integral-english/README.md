@@ -190,6 +190,28 @@ transparent rows at the tightest advance, which is invisible.
 
 Result: **all 20 labels carry USA's artwork at 1:1 pixel size.**
 
+### Row advance: Integral's one-line labels are two lines in English
+
+The rows are laid out by accumulating `brf_800C69B4`'s return value `y + h`,
+where `h` is its fourth argument — an immediate in the call's delay slot or
+just before it. Integral's `br_s02` (作戦責任者), `br_s12` (次世代特殊部隊) and
+`br_s13` (全員賛同の理由) are **one** line; USA's are **two**
+(`person in charge / of the operation`, `next-generation / special force unit`,
+`the reason for unanimous approval`). Integral advances 17–20 for them, so the
+English art overruns the following row — `unit FOX-HOUND` ended up 81 px too
+high, almost touching `special force unit`.
+
+Measured from USA screenshots, USA advances ~28 for those rows
+(`br_s12` 243 px / 8.75 px-per-texel = 27.8, `br_s02` 244 / 8.75 = 27.9), so:
+
+    800C7008   20 -> 28   br_s02
+    800C7240   17 -> 28   br_s12
+    800C7278   17 -> 28   br_s13
+
+Read the delay slot when locating these. A `jal` at A takes its arguments from
+A+4 as well, so scanning only backwards mis-attributes them by one call — that
+first pointed `br_s12`'s advance at `800C7228`, which is really `br_s10`'s.
+
 ### Constraints that must all hold
 
 `pcx4.py` decodes/encodes the format: standard PCX, 1bpp × 4 planes, 128-byte

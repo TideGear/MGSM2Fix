@@ -107,6 +107,14 @@ ROW_H_ADDR, ROW_H_OLD, ROW_H = 0x800C69D0, 13, 20
 S00_ADDR = 0x800C7658
 S00_OLD = [0x00051040, 0x00451021, 0x00021080, 0x00451021, 0x00021080]
 S00_NEW = [0x00050940, 0x00051180, 0x00411021, 0x00050880, 0x00411021]
+# Row advance (the `h` argument to brf_800C69B4, `addiu a3, zero, N` in the
+# call's delay slot or just before it).  Integral's br_s02/br_s12/br_s13 are
+# ONE-line Japanese labels; USA's are two lines, so USA advances ~28 where
+# Integral advances 17-20 and the English art overruns the next row.  Measured
+# from USA screenshots: br_s12 243 px / 8.75 = 27.8, br_s02 244 / 8.75 = 27.9.
+ADVANCE = [(0x800C7008, 20, 28, 'br_s02'),      # person in charge of the operation
+           (0x800C7240, 17, 28, 'br_s12'),      # next-generation / special force unit
+           (0x800C7278, 17, 28, 'br_s13')]      # the reason for unanimous approval
 gid = {}
 for n, g in quads.items(): gid.setdefault(g['xr'][1], []).append(n)
 newimm = {addr: max(quads[n]['xl'][0] + geo(U[strcode(n)])['w'] for n in members)
