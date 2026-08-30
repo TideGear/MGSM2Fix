@@ -190,29 +190,46 @@ transparent rows at the tightest advance, which is invisible.
 
 Result: **all 20 labels carry USA's artwork at 1:1 pixel size.**
 
-### Row advance: Integral's one-line labels are two lines in English
+### Row advance: read USA's constants, do not measure them
 
-The rows are laid out by accumulating `brf_800C69B4`'s return value `y + h`,
-where `h` is its fourth argument — an immediate in the call's delay slot or
-just before it. Integral's `br_s02` (作戦責任者), `br_s12` (次世代特殊部隊) and
-`br_s13` (全員賛同の理由) are **one** line; USA's are **two**
-(`person in charge / of the operation`, `next-generation / special force unit`,
-`the reason for unanimous approval`). Integral advances 17–20 for them, so the
-English art overruns the following row — `unit FOX-HOUND` ended up 81 px too
-high, almost touching `special force unit`.
+Rows are laid out by accumulating the positioner's return value `y + h`, where
+`h` is its fourth argument. **USA reworked that function**: it takes the box
+extents as extra stack arguments —
 
-Measured from USA screenshots, USA advances ~28 for those rows
-(`br_s12` 243 px / 8.75 px-per-texel = 27.8, `br_s02` 244 / 8.75 = 27.9), so:
+    subu v1, a2, v1        top    = y - arg4   (16(sp))
+    addiu a0, a0, 5
+    addu  a0, a2, a0       bottom = y + arg5 + 5  (20(sp))
 
-    800C7008   20 -> 28   br_s02
-    800C7240   17 -> 28   br_s12
-    800C7278   17 -> 28   br_s13
+— where Integral hardcodes 13. Every USA box height (`above + below + 5`)
+equals that label's texture height exactly, which is how USA renders each row
+at its own size.
 
-Read the delay slot when locating these. A `jal` at A takes its arguments from
-A+4 as well, so scanning only backwards mis-attributes them by one call — that
-first pointed `br_s12`'s advance at `800C7228`, which is really `br_s10`'s.
+The call structure is identical in both, so USA's advances transfer directly.
+Read them out of USA's own overlay rather than measuring screenshots
+(`rowargs.py` simulates the registers over an overlay and reports each call's
+arguments; `brf_widen.advance_patches()` diffs the two and emits the patch
+list, so the build follows the discs instead of hardcoded numbers):
 
-### Constraints that must all hold
+| | s00 | s01 | s02 | s03 | s04 | s05 | s06 | s07 | s08 | s11 | s09 | s10 | s12 | s13 | s14 | s15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| Integral | 20 | 20 | 20 | 20 | 20 | 20 | 20 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 |
+| USA | 20 | 20 | 20 | 17 | 17 | 17 | 17 | 16 | 16 | 16 | 16 | 16 | 26 | 26 | 16 | 16 |
+
+`br_s12`/`br_s13` get 26 because they are two lines in English and one in
+Japanese. `br_s02` is also two lines but keeps 20 in both — its `a3` is
+inherited from the previous call, and the positioner never writes `a3`.
+
+Two traps here. **Read the delay slot**: a `jal` takes arguments from A+4 as
+well, so scanning only backwards mis-attributes them by one call — that first
+pointed `br_s12`'s advance at `800C7228`, which is really `br_s10`'s. And
+`br_s08`'s advance is `addu a3, a1, zero`, reusing its own poly index 17 as the
+advance, so it becomes `addiu a3, zero, 16` rather than an immediate edit.
+
+Estimating these from screenshots gave 28 for `br_s12` and 28 for `br_s02`;
+the binaries say 26 and 20. Measure to find a discrepancy, then read the disc
+for the value.
+
+### Constraints that must all hold### Constraints that must all hold
 
 `pcx4.py` decodes/encodes the format: standard PCX, 1bpp × 4 planes, 128-byte
 header, RLE where `code > 0xC0` is a run of `code - 0xC0`. The RLE stream is
