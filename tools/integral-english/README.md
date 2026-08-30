@@ -164,8 +164,22 @@ before each one. Args are `a3=xl, 16(sp)=yt, 20(sp)=xr, 24(sp)=yb, 28(sp)=abe,
 
 **B — indented rows** (`br_s01 s03 s05 s10 s13 s15`): `xl=46`, `yt=yb=0`, one
 unique `xr`. `xr - xl` equals the Integral texture width exactly for all six.
-The y is set at runtime by `brf_800C69B4`, which forces **height 13**
-(`p[idx].y2 = y + 0xD`) and preserves x. Width patchable, height not.
+Width patchable, height not — see below.
+
+### Height is always 13, so the canvas must keep USA's native height
+
+`brf_800C69B4(work, idx, y, h)` sets `p[idx].y2 = y + 0xD` and preserves x. It
+has no caller in the decompiled C, but the overlay has **16 call sites, one per
+`br_sNN`** (`800C6F6C`–`800C72C4`, `a1` = poly index 9–24). So every submenu
+label is repositioned at runtime into a **13-row** quad, whatever `yb` says —
+the family-A `yb` patches are no-ops, and retail's family-A quads are all 13
+tall anyway.
+
+Every label is therefore stretched from its texture height to 13, **in USA
+too**. To match USA the canvas must carry USA's *native* height so the stretch
+ratio is identical; forcing the canvas to 13 would render the art smaller than
+USA's and resample it twice. The FILE labels are not in that set (polys 4–7,
+positioned in C at 17 rows, which already matches USA's 17).
 
 **C — the FILE labels** (`br_f00`–`br_f03`): a zero rect at the call site. They
 are positioned in decompiled C (`b_select.c`, `p[4]`–`p[7]`) as `x0 = -142`,
@@ -177,8 +191,10 @@ the overlay and are patchable at `800C6C44`, `800C6CC4`, `800C6D4C`,
 (`x1 = t0 + 26` from a division — an animated reveal), so it has no patchable
 quad and keeps Integral's slot.
 
-Result: 18 of 20 labels render at USA's exact pixel size. `br_s00` is scaled
-(100 → 52) and `br_s13` is squashed vertically (19 rows into the runtime's 13).
+Result: 19 of 20 labels carry USA's artwork with **no resampling at all** — 17
+exact, plus `br_s06` and `br_s09` padded because they share an immediate with a
+larger neighbour. Only `br_s00` is scaled, because its right edge is computed
+at runtime.
 
 ### Constraints that must all hold
 
@@ -195,9 +211,18 @@ runs cross plane boundaries.
 3. **4-byte alignment.** Every archive entry size must be a multiple of 4. An
    unaligned entry misaligns everything after it and the loader takes a wild
    jump (seen as `pc: 30824000`).
-4. **Texture pages.** At 4bpp a page is 64 units wide and a texture must fit
-   inside one: `(px % 64) + ceil(w * bpp / 16) <= 64`. Straddling makes the U
-   coordinate wrap and every label collapses into one cluster.
+4. **The U coordinate must not overflow.** `DG_SetTexture` keeps
+   `off_x = (px % 64) * (16 / bpp)` in **texels**, and `brf_800C983C` sets
+   `poly->u1 = off_x + w + 1` into a `u_char`. So the real limit is
+   `(px % 64) * (16 / bpp) + w + 1 <= 255`, which is stricter than the
+   unit-wise page test and supersedes it. Over 255 the U wraps and the quad
+   samples across the whole page as vertical stripes.
+
+   This was the navigation-order garble. `br_s09`/`br_s11` at `(928, …)` 128
+   wide gave `128 + 128 + 1 = 257`; the unit test `(928 % 64) + 32 <= 64`
+   passed because 32 + 32 = 64 exactly. They were the only two labels over the
+   limit and the only two that garbled. Moving them to `px = 896` (`off_x = 0`)
+   fixes it. Max across the build is now 249.
 5. **Occupancy needs real colour depth.** The archive is 47 textures at 4bpp and
    4 at 8bpp; VRAM units are `ceil(w * bpp / 16)`, not `ceil(w / 4)`.
 6. **CLUTs are on a 16-unit stride** and every label's is exclusive, so raising
@@ -208,15 +233,6 @@ runs cross plane boundaries.
 assert caught a real bug: `brf_quads_all.json` had recorded `br_s12`'s `yb` at
 `800CA214`, which is actually its `xl` (`addiu a3,zero,26`) — the patch had been
 moving br_s12's left edge, and both immediates being 26 hid it.
-
-### Open: garbling that depends on navigation order
-
-In one build `br_s09`/`br_s11` rendered cleanly when opened directly and garbled
-with vertical striping after visiting the other submenus first — same build,
-same data. Static analysis finds no texture or CLUT overlap. Since
-`brf_800C5350` loads resources by index from a `BrfResource` table, submenus may
-upload textures on demand, which would make VRAM reuse order-dependent. Not yet
-reproduced against the current layout.
 
 ## Audit against the decomp
 
