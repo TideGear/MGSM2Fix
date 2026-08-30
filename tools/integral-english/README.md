@@ -190,46 +190,64 @@ transparent rows at the tightest advance, which is invisible.
 
 Result: **all 20 labels carry USA's artwork at 1:1 pixel size.**
 
-### Row advance: read USA's constants, do not measure them
+### Read USA's constants; measure only to find discrepancies
 
-Rows are laid out by accumulating the positioner's return value `y + h`, where
-`h` is its fourth argument. **USA reworked that function**: it takes the box
-extents as extra stack arguments —
+USA reworked the row positioner. It takes the box extents as stack arguments —
 
     subu v1, a2, v1        top    = y - arg4   (16(sp))
     addiu a0, a0, 5
     addu  a0, a2, a0       bottom = y + arg5 + 5  (20(sp))
 
-— where Integral hardcodes 13. Every USA box height (`above + below + 5`)
-equals that label's texture height exactly, which is how USA renders each row
-at its own size.
+— where Integral hardcodes 13. **Every USA box height (`above + below + 5`)
+equals that label's texture height exactly**, which is both how USA renders each
+row at its own size and a self-check that the extraction is right.
 
-The call structure is identical in both, so USA's advances transfer directly.
-Read them out of USA's own overlay rather than measuring screenshots
-(`rowargs.py` simulates the registers over an overlay and reports each call's
-arguments; `brf_widen.advance_patches()` diffs the two and emits the patch
-list, so the build follows the discs instead of hardcoded numbers):
+The call structure is identical in both games, so USA's constants transfer.
+`rowargs.py` simulates registers over an overlay and reports each call's
+arguments; `quadscan.py` does the same for the label draws, labelling calls by
+the resource-name string; `brf_widen` diffs the two overlays and emits the patch
+lists, so the build follows the discs rather than any hardcoded number.
 
-| | s00 | s01 | s02 | s03 | s04 | s05 | s06 | s07 | s08 | s11 | s09 | s10 | s12 | s13 | s14 | s15 |
+| | s00 | s01 | s02 | s03 | s04 | s05 | s06 | s07 | s08 | s09 | s10 | s11 | s12 | s13 | s14 | s15 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Integral | 20 | 20 | 20 | 20 | 20 | 20 | 20 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 |
-| USA | 20 | 20 | 20 | 17 | 17 | 17 | 17 | 16 | 16 | 16 | 16 | 16 | 26 | 26 | 16 | 16 |
+| Integral adv | 20 | 20 | 20 | 20 | 20 | 20 | 20 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 |
+| USA adv | 20 | 20 | **27** | 17 | 17 | 17 | 17 | 16 | 16 | 16 | 16 | 16 | **26** | **26** | 16 | 16 |
+| USA xl | — | 29 | 10 | 29 | 10 | 29 | 10 | 10 | 10 | 10 | 29 | 10 | 10 | 29 | 10 | 29 |
+| Integral xl | — | 46 | 26 | 46 | 26 | 46 | 26 | 26 | 26 | 26 | 46 | 26 | 26 | 46 | 26 | 46 |
 
-`br_s12`/`br_s13` get 26 because they are two lines in English and one in
-Japanese. `br_s02` is also two lines but keeps 20 in both — its `a3` is
-inherited from the previous call, and the positioner never writes `a3`.
+**Horizontal.** Integral's whole panel sits 20 game px right of USA's — the
+vertical rule measures x 2101 vs 1921, 180 display px at 9 px per game px (the
+scale is 2160/240, not the 8.75 an ink-width estimate suggests). The `xl`
+constants differ by only 16–17, so the labels sat ~4 px left of where USA has
+them relative to their own rule. Setting `xl = USA's xl + 20` places them
+exactly; `xr` follows because the canvas is `xl + USA's width`. The rule itself
+is not a poly either game writes — it is panel art — so it cannot be moved.
 
-Two traps here. **Read the delay slot**: a `jal` takes arguments from A+4 as
-well, so scanning only backwards mis-attributes them by one call — that first
-pointed `br_s12`'s advance at `800C7228`, which is really `br_s10`'s. And
-`br_s08`'s advance is `addu a3, a1, zero`, reusing its own poly index 17 as the
-advance, so it becomes `addiu a3, zero, 16` rather than an immediate edit.
+**Traps, all of which produced a wrong answer first:**
 
-Estimating these from screenshots gave 28 for `br_s12` and 28 for `br_s02`;
-the binaries say 26 and 20. Measure to find a discrepancy, then read the disc
-for the value.
+- A `jal` takes arguments from its **delay slot**. Scanning only backwards
+  mis-attributes them by one call: that first put `br_s12`'s advance at
+  `800C7228`, which is really `br_s10`'s.
+- `br_s08`'s advance is `addu a3, a1, zero` — it reuses its own poly index 17
+  as the advance, so it needs a replaced instruction, not an edited immediate.
+- `br_s02`'s advance is `ori a3, s6, 10` = `17 | 10` = **27**. A simulator that
+  handles only addiu/addu reports it as inherited and invites a guess of 20.
+- Writing `$zero` in the simulator corrupts every later value; MIPS discards
+  those writes.
 
-### Constraints that must all hold### Constraints that must all hold
+Estimating from screenshots gave 28 for `br_s12` and 28 for `br_s02`; the
+binaries say 26 and 20→27, and that **every** single-line advance was off by
+1–3 as well. Measure to locate a discrepancy, then read the disc for the value.
+
+**Known residual.** USA's box top is `y - above` with `above` 2–4 per label;
+Integral's is `y`, so rows sit 2–4 px lower than USA's relative to the rule.
+Fixing it means making the box `[y-4, y+H]` and placing each label's art at
+canvas row `4 - above`. The positioner has a free slot for it — `sh a0, 8(v0)`
+writes x0 back unchanged — but the highlight box (`brf_800C6930`) derives its
+own geometry from the same `base_y` and would need the matching shift, so this
+is untested and deliberately not applied.
+
+### Constraints that must all hold### Constraints that must all hold### Constraints that must all hold
 
 `pcx4.py` decodes/encodes the format: standard PCX, 1bpp × 4 planes, 128-byte
 header, RLE where `code > 0xC0` is a run of `code - 0xC0`. The RLE stream is
