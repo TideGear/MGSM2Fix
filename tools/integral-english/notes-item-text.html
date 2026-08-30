@@ -1,0 +1,511 @@
+<title>Integral English Text Port</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:ital,wght@0,400;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#F5F6FA; --surface:#FFFFFF; --surface-2:#EDEFF6;
+    --ink:#16181F; --ink-2:#3A4053; --muted:#5C6275; --line:#DDE0EA; --line-2:#C9CEDD;
+    --accent:#3C4A9E; --accent-soft:#E6E8F6; --accent-on:#FFFFFF;
+    --donor:#1B6B5A; --donor-soft:#DFEFE9;
+    --target:#A33B2A; --target-soft:#F7E5E0;
+    --warn:#8A5A00; --warn-soft:#FBEFD6;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0F1116; --surface:#171A22; --surface-2:#1E222C;
+      --ink:#E8EAF0; --ink-2:#C3C8D6; --muted:#99A0B2; --line:#262A36; --line-2:#333949;
+      --accent:#8F9AEC; --accent-soft:#1D2140; --accent-on:#10121A;
+      --donor:#5CC9AD; --donor-soft:#10261F;
+      --target:#E9917A; --target-soft:#2C1A16;
+      --warn:#D9A94A; --warn-soft:#2A2110;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0F1116; --surface:#171A22; --surface-2:#1E222C;
+    --ink:#E8EAF0; --ink-2:#C3C8D6; --muted:#99A0B2; --line:#262A36; --line-2:#333949;
+    --accent:#8F9AEC; --accent-soft:#1D2140; --accent-on:#10121A;
+    --donor:#5CC9AD; --donor-soft:#10261F;
+    --target:#E9917A; --target-soft:#2C1A16;
+    --warn:#D9A94A; --warn-soft:#2A2110;
+  }
+
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:"IBM Plex Sans","Segoe UI",system-ui,sans-serif;
+    font-size:16px; line-height:1.62; -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:960px; margin:0 auto; padding:0 24px 96px}
+  a{color:var(--accent)}
+  a:focus-visible,summary:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+  code,.mono{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace}
+  code{font-size:.88em; background:var(--surface-2); padding:.1em .35em; border-radius:3px}
+
+  header.top{border-bottom:1px solid var(--line); padding:56px 0 32px; display:flex; flex-direction:column; gap:18px}
+  .eyebrow{font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+  h1{
+    font-family:"IBM Plex Serif",Georgia,serif; font-weight:600;
+    font-size:clamp(30px,4.6vw,46px); line-height:1.12; margin:0; text-wrap:balance; letter-spacing:-.015em;
+  }
+  .standfirst{font-family:"IBM Plex Serif",Georgia,serif; font-size:19px; line-height:1.55; color:var(--ink-2); max-width:60ch; margin:0}
+  .facts{display:flex; flex-wrap:wrap; gap:8px 10px}
+  .fact{font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.04em; color:var(--muted);
+        border:1px solid var(--line-2); border-radius:2px; padding:4px 9px}
+
+  .verdict{margin:36px 0 8px; border:1px solid var(--line-2); background:var(--surface); border-radius:4px; overflow:hidden}
+  .verdict h2{margin:0; padding:14px 20px; font-family:"IBM Plex Mono",monospace; font-size:11.5px;
+              letter-spacing:.16em; text-transform:uppercase; color:var(--accent-on); background:var(--accent); font-weight:500}
+  .verdict ol{margin:0; padding:6px 0; list-style:none; counter-reset:v}
+  .verdict li{counter-increment:v; display:grid; grid-template-columns:34px 1fr; gap:12px; padding:13px 20px; border-top:1px solid var(--line)}
+  .verdict li:first-of-type{border-top:0}
+  .verdict li::before{content:counter(v); font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--accent); padding-top:5px}
+
+  section{margin-top:56px}
+  h2.sec{font-family:"IBM Plex Serif",Georgia,serif; font-weight:600; font-size:25px; margin:0 0 6px; letter-spacing:-.01em; text-wrap:balance}
+  h3{font-family:"IBM Plex Sans",sans-serif; font-weight:600; font-size:15px; margin:30px 0 8px}
+  .lede{color:var(--muted); margin:0 0 22px; max-width:68ch}
+  p{max-width:68ch}
+
+  .scroll{overflow-x:auto; border:1px solid var(--line); border-radius:4px; background:var(--surface)}
+  table{border-collapse:collapse; width:100%; font-size:13.5px}
+  th,td{text-align:left; padding:9px 14px; border-bottom:1px solid var(--line); white-space:nowrap}
+  thead th{font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.13em; text-transform:uppercase;
+           color:var(--muted); background:var(--surface-2); font-weight:500}
+  tbody tr:last-child td{border-bottom:0}
+  td.hex{font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums}
+  .role{font-family:"IBM Plex Mono",monospace; font-size:10px; letter-spacing:.1em; text-transform:uppercase;
+        border-radius:2px; padding:2px 6px; white-space:nowrap}
+  .role.d{color:var(--donor); background:var(--donor-soft)}
+  .role.t{color:var(--target); background:var(--target-soft)}
+  caption{caption-side:bottom; text-align:left; padding:10px 14px; font-size:12.5px; color:var(--muted); white-space:normal}
+
+  .record{display:flex; flex-wrap:wrap; gap:6px; font-family:"IBM Plex Mono",monospace; font-size:12.5px; margin:14px 0 4px}
+  .tok{border:1px solid var(--line-2); border-radius:3px; padding:6px 9px; background:var(--surface)}
+  .tok.ctl{border-color:var(--accent); color:var(--accent); background:var(--accent-soft)}
+  .tok.txt{border-style:dashed; color:var(--ink-2)}
+  .tok.end{color:var(--muted)}
+
+  dl.codes{display:grid; grid-template-columns:auto 1fr; margin:16px 0 0; border:1px solid var(--line);
+           border-radius:4px; overflow:hidden; background:var(--surface)}
+  dl.codes dt{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--accent); padding:8px 14px;
+              border-bottom:1px solid var(--line); background:var(--surface-2); white-space:nowrap}
+  dl.codes dd{margin:0; padding:8px 14px; border-bottom:1px solid var(--line); font-size:13.5px}
+  dl.codes dt:last-of-type,dl.codes dd:last-of-type{border-bottom:0}
+
+  .map{display:flex; flex-direction:column; gap:3px; margin:18px 0 0}
+  .band{display:grid; grid-template-columns:minmax(150px,190px) 1fr auto; gap:14px; align-items:center;
+        border:1px solid var(--line-2); border-left-width:4px; border-radius:3px; padding:11px 14px; background:var(--surface)}
+  .band .addr{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums}
+  .band .what{font-size:14px}
+  .band .sz{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; text-align:right}
+  .band.pool{border-left-color:var(--accent)}
+  .band.hazard{border-left-color:var(--warn); background:var(--warn-soft)}
+  .band.keep{border-left-color:var(--line-2)}
+  @media (max-width:640px){ .band{grid-template-columns:1fr; gap:4px} .band .sz{text-align:left} }
+
+  ol.steps{list-style:none; counter-reset:s; padding:0; margin:18px 0 0}
+  ol.steps li{counter-increment:s; display:grid; grid-template-columns:30px 1fr; gap:14px; padding:14px 0; border-top:1px solid var(--line)}
+  ol.steps li:first-of-type{border-top:0}
+  ol.steps li::before{content:"0" counter(s); font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--accent); padding-top:4px}
+  ol.steps strong{display:block; margin-bottom:2px}
+  ol.steps p{margin:0; color:var(--ink-2); max-width:62ch}
+
+  pre{font-family:"IBM Plex Mono",monospace; font-size:12.5px; line-height:1.6; background:var(--surface);
+      border:1px solid var(--line); border-radius:4px; padding:14px 16px; overflow-x:auto; margin:14px 0 0; color:var(--ink-2)}
+  pre strong{color:var(--ink)}
+
+  ul.plain{padding-left:18px; margin:12px 0 0}
+  ul.plain li{margin:8px 0; max-width:66ch}
+
+  .checks{border:1px solid var(--line); border-radius:4px; background:var(--surface); overflow:hidden; margin-top:16px}
+  .checks > div{display:grid; grid-template-columns:22px 1fr; gap:12px; padding:12px 16px; border-top:1px solid var(--line); font-size:14px}
+  .checks > div:first-child{border-top:0}
+  .checks .mk{font-family:"IBM Plex Mono",monospace; font-size:13px; font-weight:600}
+  .checks .yes .mk{color:var(--donor)}
+  .checks .no .mk{color:var(--warn)}
+  .checks .body{color:var(--ink-2)}
+  .checks .body strong{color:var(--ink)}
+
+  footer{margin-top:64px; padding-top:22px; border-top:1px solid var(--line); font-size:13px; color:var(--muted)}
+  footer p{max-width:70ch}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">MGSM2Fix &middot; reverse-engineering note</div>
+  <h1>English text for Integral, discs 1 &amp; 2</h1>
+  <p class="standfirst">Every pause-menu weapon and item description in Metal Gear Solid lives in the boot executable, in two pointer tables. Integral&rsquo;s tables have the same shape as the USA release&rsquo;s, the same control codes, and more room than the English text needs &mdash; so the text itself is a data swap. Getting it into the running game is the hard part, and it is not a disc patch.</p>
+  <div class="facts">
+    <span class="fact">5 executables analysed</span>
+    <span class="fact">item text: confirmed in-game</span>
+    <span class="fact">stage container: solved</span>
+    <span class="fact">6 patches built</span>
+  </div>
+  </div>
+</header>
+
+<div class="verdict">
+  <h2>What the investigation found</h2>
+  <ol>
+    <li><strong>The text is only in the boot EXE.</strong> <code>SLPM_862.47</code> (disc 1) and <code>SLPM_862.48</code> (disc 2) are byte-identical, so one payload covers both discs. A scan of both STAGE.DIR archives (75 MB Integral, 72 MB USA) found zero records of this format &mdash; nothing to chase in the stage overlays.</li>
+    <li><strong>The record format is identical between builds.</strong> Same <code>B014</code>/<code>D015</code> field markers, same <code>807C</code> line break, same <code>90xx</code> button glyphs. Every escape code the English text uses already appears in Integral&rsquo;s own Japanese strings, so no font, glyph or renderer work is required.</li>
+    <li><strong>English is smaller than Japanese.</strong> 2,498 bytes of English against 2,982 bytes of Japanese. Repacking the two pools leaves 272 and 168 bytes spare.</li>
+    <li><strong>MGS1 (USA) alone covers all 36 records.</strong> VR Missions (USA) is not needed as a donor for discs 1&ndash;2 &mdash; it carries fewer strings. Its real value is elsewhere; see <a href="#vr">what VR Missions is actually for</a>.</li>
+    <li><strong>The PPF was always fine; the timing of Ketchup&rsquo;s RAM mirror was not.</strong> By the time any patch is applied the executable is already resident in RAM, loaded from a ROM snapshot rather than read off the CD, so patching the CD image changes nothing &mdash; and the mirror that <em>could</em> reach it fired too early and was discarded. Deferring that mirror fixes it, and the same PPF file then works unchanged. <strong>Done and confirmed in-game;</strong> see <a href="#delivery">getting bytes into the game</a>.</li>
+  </ol>
+</div>
+
+<section id="where">
+  <h2 class="sec">Where the text lives</h2>
+  <p class="lede">Two arrays of 32-bit pointers into the executable&rsquo;s data, plus one string reached directly from code. Addresses are PSX RAM; all five executables load at <code>0x80010000</code>, so file offset = address &minus; <code>0x80010000</code> + <code>0x800</code>.</p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr><th>Build</th><th>Role</th><th>Boot EXE</th><th>Item table</th><th>Weapon table</th><th>Special string</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>MGS1 (USA) disc 1 &amp; 2</td><td><span class="role d">donor</span></td><td class="mono">SLUS_005.94 / SLUS_007.76</td><td class="hex">800A0B38 &times;26</td><td class="hex">800A0D24 &times;10</td><td class="hex">800A0BA0</td></tr>
+        <tr><td>VR Missions (USA)</td><td><span class="role d">donor</span></td><td class="mono">SLUS_009.57</td><td class="hex">8009EEFC &times;120</td><td class="hex">8009F238 &times;50</td><td class="hex">&mdash;</td></tr>
+        <tr><td>Integral disc 1 &amp; 2</td><td><span class="role t">target</span></td><td class="mono">SLPM_862.47 / SLPM_862.48</td><td class="hex">8009E3E4 &times;26</td><td class="hex">8009E5CC &times;10</td><td class="hex">8009E44C</td></tr>
+      </tbody>
+      <caption>VR Missions&rsquo; tables are five language blocks deep &mdash; 5 &times; 24 items and 5 &times; 10 weapons, in the order Spanish, Italian, French, German, English. The special string is the &ldquo;cannot be used in HARD or EXTREME mode&rdquo; mine-detector message, which no table points to.</caption>
+    </table>
+  </div>
+  <p>Both disc pairs ship the same executable twice, verified byte-for-byte: Integral 641,024 bytes identical, USA 651,264 bytes identical. The tables therefore sit at the same addresses on disc 1 and disc 2.</p>
+</section>
+
+<section id="format">
+  <h2 class="sec">The record format</h2>
+  <p class="lede">One NUL-terminated record holds both the display name and the description. Bytes below <code>0x80</code> are literal ASCII; bytes at or above it open a two-byte code.</p>
+
+  <div class="record">
+    <span class="tok ctl">B0 14</span>
+    <span class="tok txt">&ldquo;Suppressor&rdquo;</span>
+    <span class="tok ctl">D0 15</span>
+    <span class="tok ctl">80 7C</span>
+    <span class="tok txt">&ldquo;For SOCOM pistol.&rdquo;</span>
+    <span class="tok ctl">80 7C</span>
+    <span class="tok txt">&ldquo;Muffles report, blast&rdquo;</span>
+    <span class="tok ctl">80 7C</span>
+    <span class="tok txt">&ldquo;and flash of it.&rdquo;</span>
+    <span class="tok end">00</span>
+  </div>
+
+  <dl class="codes">
+    <dt>B0 14</dt><dd>Opens the name field.</dd>
+    <dt>D0 15</dt><dd>Closes the name, opens the description.</dd>
+    <dt>80 7C</dt><dd>Line break. English hand-breaks every line; Japanese usually emits one and lets the box wrap &mdash; but Integral&rsquo;s own BANDANA record uses two, which is what proves the Integral renderer honours repeated breaks.</dd>
+    <dt>90 xx</dt><dd>Button glyphs: <code>901B</code>, <code>901D</code>, <code>9024</code>, <code>9018</code>.</dd>
+    <dt>80 23</dt><dd>Prefix that appears only in weapon records, immediately before a button glyph.</dd>
+    <dt>C0 3F</dt><dd>The &ldquo;?&rdquo; glyph used as the name of the unidentified item.</dd>
+    <dt>1F xx</dt><dd>Extended-Latin letters, used by VR Missions&rsquo; European text. Not needed for English.</dd>
+  </dl>
+
+  <h3>Why no font work is needed</h3>
+  <p>The English payload uses exactly nine distinct codes: <code>8023 807C 9018 901B 901D 9024 B014 C03F D015</code>. Integral&rsquo;s Japanese item text uses 322 distinct codes, and all nine are among them. Integral also already renders raw ASCII in this very box &mdash; its own mine-detector message reads <code>HARD, EXTREM</code> in plain Latin &mdash; and the HUD short-name pool (<code>STINGER</code>, <code>NO ITEM</code>, <code>C.BOX A</code>, <code>WEAPON</code>) is English in the Japanese build.</p>
+</section>
+
+<section id="budget">
+  <h2 class="sec">Byte budget, and the hazard in the middle</h2>
+  <p class="lede">The Japanese strings are not one clean run. A 116-byte island of unrelated data sits between the item and weapon pools, and the Integral-only <code>MP 5 SD</code> record sits immediately after the weapon pool. Both must survive.</p>
+
+  <div class="map">
+    <div class="band pool">
+      <span class="addr">80010EAC&ndash;80011674</span>
+      <span class="what">Item description pool &mdash; 26 records</span>
+      <span class="sz">2,000 B &middot; needs 1,684</span>
+    </div>
+    <div class="band hazard">
+      <span class="addr">80011674&ndash;800116E8</span>
+      <span class="what">Do not touch: <code>DIAZEPAM</code>, <code>MEDICINE</code>, a 15-entry pointer array, <code>PANEL MAKE Error</code>, <code>CLAYMORE</code></span>
+      <span class="sz">116 B</span>
+    </div>
+    <div class="band pool">
+      <span class="addr">800116E8&ndash;80011B04</span>
+      <span class="what">Weapon description pool &mdash; 10 records</span>
+      <span class="sz">1,052 B &middot; needs 874</span>
+    </div>
+    <div class="band keep">
+      <span class="addr">80011B04</span>
+      <span class="what">Leave in place: <code>MP 5 SD</code>, Integral-only, reached by a lone pointer and absent from both tables</span>
+      <span class="sz">104 B</span>
+    </div>
+  </div>
+
+  <h3>In-place overwrite is not quite enough</h3>
+  <p>29 of the 36 English records fit inside the Japanese slot they replace. The other seven overflow by 74 bytes in total &mdash; and the slack that would absorb them is scattered as padding across the pool, in fragments too small to take a 78-byte cardboard-box record. Repacking each pool from its base and rewriting all 36 pointers avoids the fragmentation entirely.</p>
+  <p>That repack is safe because nothing else reaches into the pools: a scan for <code>lui</code>/<code>addiu</code> address pairs across the whole executable found zero code references into either range. The one string that <em>is</em> code-referenced is the mine-detector HARD/EXTREME message, whose English form needs 60 bytes against a 56-byte slot &mdash; so it moves into the weapon pool&rsquo;s tail and its single <code>lui</code>/<code>addiu</code> pair at file <code>0x02BEB0</code>/<code>0x02BEB4</code> is repointed.</p>
+</section>
+
+<section id="delivery">
+  <h2 class="sec">Getting bytes into the game</h2>
+  <p class="lede">This is where the obvious approach fails. The address arithmetic below is correct, the PPF3 it produces is correct, Ketchup applies it and logs every byte &mdash; and the menu stays Japanese.</p>
+
+  <h3>The arithmetic, which is not the problem</h3>
+  <p>Ketchup&rsquo;s <code>ram_base</code> for each Integral disc is exactly the raw-image offset of RAM <code>0x80010000</code>. A 2,352-byte raw sector carries 2,048 bytes of user data, so every 2,048 bytes of executable advance 2,352 bytes of image:</p>
+  <pre>k = exe_file_offset - 0x800                 <strong># 0x800 = PS-EXE header</strong>
+image_offset = ram_base + (k / 2048) * 2352 + (k % 2048)
+
+ram_base:  <strong>0x131D2238</strong>  Integral disc 1   (/MGS/SLPM_862.47, LBA 136341)
+           <strong>0x0EB38078</strong>  Integral disc 2   (/MGS/SLPM_862.48, LBA 104865)</pre>
+  <p>Every one of the 62 resulting records was checked against an untouched retail image and matched the executable bytes exactly. Applied to a copy of that image, the re-extracted executable is identical to the intended output.</p>
+
+  <h3>Why the disc patch cannot work</h3>
+  <p>The Master Collection does not load MGS1&rsquo;s executable from the CD image. It preloads it from a ROM snapshot &mdash; <code>roms/mgs_integral_disc1-20230407.lz4a</code>, a RAM image carrying the PS-EXE header at <code>0xB070</code> and the program at <code>0x10000</code>. The CD image supplies the data files (<code>STAGE.DIR</code>, <code>RADIO.DAT</code>, <code>DEMO.DAT</code>&hellip;) and nothing else. That is why Konami&rsquo;s own patch schema carries two independent targets, <code>memory</code> and <code>disc</code>: anything code- or text-resident has to go through <code>memory</code>.</p>
+  <p>The executable in RAM was verified against the retail build to be sure this was not a revision mismatch: the accelerator checksum reported at boot, <code>0x7FD6F607</code>, is reproduced exactly by summing 256 words at file offset <code>0x800</code> of retail <code>SLPM_862.47</code>, and spot reads at four addresses match byte-for-byte. The one region that differs, around <code>0x9B000</code>, is the BIOS-library block the Master Collection strips to <code>0xFF</code> and replaces with its own <code>acc_lib*</code> accelerators.</p>
+
+  <h3>Ketchup&rsquo;s RAM mirror fires too early</h3>
+  <p>Ketchup does attempt a RAM mirror alongside each CD write, which is the only path that could work here. It issues all 3,068 writes and logs each one, spanning <code>0x10EAE</code>&ndash;<code>0x9E5EC</code>. Reading that RAM back once the game is playable, only <strong>365 bytes</strong> of the item pool survive; the rest has reverted to the original Japanese, while the pointer tables stick. The restore happens in the setup that runs immediately after Ketchup &mdash; <code>&gt;&gt;&gt;setMemoryPatch</code>, <code>### default patch MGS</code>, <code>EmuSRAM.capture_from_emu: success</code>.</p>
+  <p>Writing the same 3,068 bytes later, straight into emulated RAM through <code>g_emu_task.setRamValue</code>, sticks &mdash; and the menu turns English. The guard on that mirror, <code>while (!IsCdRomShellOpen())</code>, and its comment &mdash; &ldquo;if tray is open this isn&rsquo;t a cold boot, so we can skip this&rdquo; &mdash; show the design already anticipates a resident executable. Only the timing is wrong.</p>
+
+  <h3>The fix, and the result</h3>
+  <p><code>ApplyBlock()</code> no longer writes RAM. It maps each block to its RAM address exactly as before but collects the writes into coalesced runs; a new <code>Update()</code>, called from <code>_update_gadgets</code>, verifies one byte per run every 30 frames and rewrites the set if anything has been clobbered. That makes it self-healing without needing to know <em>what</em> discards the early writes &mdash; which was never established. The CD-ROM write is untouched, because stage overlays and <code>RADIO.DAT</code> genuinely are read from the disc and always worked.</p>
+  <pre>[Ketchup] loaded mods\INTEGRAL\INTEGRAL\0\INTEGRAL_disc1_en_items.ppf.
+[Ketchup] <strong>Applied 3068 bytes of RAM patches in 54 blocks (pass 1).</strong></pre>
+  <p>One pass, all 54 blocks, and no re-apply since &mdash; so nothing is fighting it. The item and weapon descriptions read English through a plain PPF in the mods folder, surviving an ordinary launch with no debugger attached. The same repair applies to every other PPF mod that touches executable-resident bytes, which were all silently half-applying before.</p>
+</section>
+
+<section id="pipeline">
+  <h2 class="sec">Build pipeline</h2>
+  <p class="lede">Each step below was run end-to-end against retail disc images; the numbering is the actual order of operations.</p>
+  <ol class="steps">
+    <li><strong>Extract the images</strong><p>chdman <code>extractcd</code> to raw 2,352-byte-sector <code>.bin</code> for Integral discs 1&ndash;2, MGS1 (USA) discs 1&ndash;2 and VR Missions (USA).</p></li>
+    <li><strong>Pull the boot executables</strong><p>Walk ISO 9660 over the Mode 2 Form 1 sectors and dump <code>SLPM_862.4x</code> and <code>SLUS_00x.xx</code>.</p></li>
+    <li><strong>Read the donor tables</strong><p>26 item pointers at <code>800A0B38</code> and 10 weapon pointers at <code>800A0D24</code> in the USA executable, plus the special string at <code>800A0BA0</code>.</p></li>
+    <li><strong>Repack into Integral&rsquo;s pools</strong><p>Write the English records from each pool&rsquo;s base in original address order, 4-byte aligned, zero-filling the remainder; then rewrite the 36 pointers and the one <code>lui</code>/<code>addiu</code> pair.</p></li>
+    <li><strong>Diff and emit</strong><p>Diff patched against original, split the changed runs on page and 255-byte limits, map each to an image offset, and write a PPF3 per disc. Result: 62 records, 3,068 patched bytes, a 3,686-byte patch file.</p></li>
+  </ol>
+</section>
+
+<section id="verified">
+  <h2 class="sec">What is proven, and what is not</h2>
+  <div class="checks">
+    <div class="yes"><span class="mk">&check;</span><span class="body"><strong>It renders.</strong> With the payload written into emulated RAM, Integral&rsquo;s pause menu draws the English names and descriptions correctly. No font, glyph or renderer work was needed &mdash; confirmed on a running Master Collection build.</span></div>
+    <div class="yes"><span class="mk">&check;</span><span class="body"><strong>The worst cases fit.</strong> The widest description line in the set is 29 characters (<code>Stinger Missile</code> &rarr; &ldquo;buttons and press &#9675; to fire.&rdquo;) and the longest name is 26 (<code>Remote-Controlled missile.</code>). Both were forced onto a live item slot by repointing the tables, and both display cleanly &mdash; so nothing else in the set can overflow.</span></div>
+    <div class="yes"><span class="mk">&check;</span><span class="body"><strong>The offsets are right.</strong> All 62 patch records matched the corresponding executable bytes in an untouched retail image, and the patch round-trips: the re-extracted <code>SLPM_862.47</code> is identical to the intended output.</span></div>
+    <div class="yes"><span class="mk">&check;</span><span class="body"><strong>Nothing else was clobbered.</strong> The island and the <code>MP 5 SD</code> record are untouched, no code references either pool, and RAM reads back byte-exact against the intended image across both pools and both tables.</span></div>
+    <div class="yes"><span class="mk">&check;</span><span class="body"><strong>Delivery is solved.</strong> With the deferred mirror in place the patch applies from an ordinary PPF in the mods folder and survives a normal launch, no debugger involved. Confirmed in-game on a built binary.</span></div>
+    <div class="no"><span class="mk">?</span><span class="body"><strong>The cause of the early discard was never identified.</strong> All 3,068 writes were issued and logged during disk-patch setup, and only 365 bytes survived &mdash; but the tray flag never flipped, so Ketchup&rsquo;s own guard was not responsible. The fix works around it rather than explaining it, which is why it verifies and re-applies rather than writing once.</span></div>
+    <div class="no"><span class="mk">?</span><span class="body"><strong>One record has no English source.</strong> Integral&rsquo;s <code>MP 5 SD</code> description exists in no localised build and stays Japanese unless it is written by hand. Its 104-byte slot is ample.</span></div>
+  </div>
+</section>
+
+<section id="engine">
+  <h2 class="sec">Three things that cost time</h2>
+  <p class="lede">Each of these is a trap in the tooling rather than in the data, and each fails silently.</p>
+  <ul class="plain">
+    <li><strong>Ketchup half-applies patches to executable-resident data.</strong> Its RAM mirror runs before the Master Collection finishes setting up machine memory, so most of it is discarded &mdash; but every byte is logged as written, so the log reports total success. Any PPF mod that touches the executable is affected, not just this one.</li>
+    <li><strong><code>sqdbg</code>&rsquo;s receive buffer is 1,024 bytes, not <code>MAX_MSG_LEN</code>.</strong> <code>sq_rdbg_update</code> reads into <code>char temp[1024]</code> and breaks at <code>size &gt;= sizeof(temp)-2</code>, so any <code>ev:</code> message over ~1,022 bytes is truncated and fails to compile. The reply is a bare XML header with no <code>&lt;eval&gt;</code> element &mdash; indistinguishable at a glance from an expression that returned nothing. The <code>MAX_MSG_LEN 2049</code> in the header is misleading.</li>
+    <li><strong>Integers returned from native calls fail <code>==</code>.</strong> <code>g_emu_task.getRamValue(16, 0x10EAE)</code> reports <code>typeof</code> &ldquo;integer&rdquo;, prints as <code>30035</code>, satisfies <code>&gt; 30034 &amp;&amp; &lt; 30036</code>, and <code>v - 30035</code> is <code>0</code> &mdash; yet <code>v == 30035</code> is <strong>false</strong>. Passing it through an arithmetic op first (<code>local w = v + 0</code>) restores <code>==</code>. It looks like upper bits surviving in the <code>SQInteger</code> on x64, and it quietly breaks every comparison written the obvious way &mdash; a RAM search that should have hit returns nothing at all.</li>
+  </ul>
+</section>
+
+<section id="menu">
+  <h2 class="sec">Menu text: the rules, and one difference you cannot fix</h2>
+  <p class="lede">Menu strings live in STAGE.DIR as GCL records &mdash; <code>07 &lt;length&gt; &lt;payload&gt; 00</code> &mdash; and are read from the disc at stage load, so a plain PPF reaches them. Four rules came out of getting one string wrong in four different ways.</p>
+  <ol class="steps">
+    <li><strong>Rewrite payload bytes only &mdash; unless you also fix the four fields that track the chain&rsquo;s size.</strong><p>Shrinking one record by 5 bytes once painted a row of dashes across <em>every</em> help line on the screen, including untouched ones. The cause is now known and is listed in full under <a href="#container">the stage container</a>: three container sizes in the script, listed in full under the stage container - and two fields that must be left exactly as retail. Fix those and a record can be grown safely; leave them and the script derails.</p></li>
+    <li><strong>Raw ASCII is fine &mdash; one byte per character.</strong><p>Integral mixes encodings: <code>NEW GAME</code> is raw ASCII while <code>OFF</code> two records away is fullwidth <code>804F 8046 8046</code>. Since English costs a byte a character, it comfortably fits slots sized for Japanese.</p></li>
+    <li><strong>Terminate with an embedded NUL; never pad the visible string.</strong><p>The renderer stops at the first NUL but the interpreter skips by the length byte, so writing <code>TEXT 00 &lt;filler&gt;</code> keeps the record's footprint while rendering the string unpadded. Padding is <em>not</em> ignored: every trailing space pushes the text about 18 px left, so five of them put a nine-character string 90 px out of place.</p></li>
+    <li><strong>Match slots by their Japanese bytes, not by index.</strong><p>The record order differs between stages <em>and</em> between builds: the same five disc-swap prompts appear in three different orders across <code>title</code>, <code>change</code> and <code>demosel</code>. Lifting the signature bytes out of the retail image and matching on the whole payload removes the guesswork &mdash; and catches prefix collisions, such as <code>Meryl</code>&rsquo;s slot also matching <code>Red Meril</code>&rsquo;s.</p></li>
+  </ol>
+
+  <h3>The help line is right-aligned, and the two builds disagree by 18 px</h3>
+  <p>The difficulty help text is not centred. It is pinned by its right edge, and the two releases pin it in different places:</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Build</th><th>Text span (4K)</th><th>Right edge</th></tr></thead>
+      <tbody>
+        <tr><td>Integral, original Japanese</td><td class="hex">1632&ndash;2252</td><td class="hex">2252</td></tr>
+        <tr><td>Integral, ported English (early NUL)</td><td class="hex">1623&ndash;2252</td><td class="hex">2252</td></tr>
+        <tr><td>Integral, ported English (5 trailing spaces)</td><td class="hex">1533&ndash;2162</td><td class="hex">2162</td></tr>
+        <tr><td>MGS1 (USA)</td><td class="hex">1641&ndash;2270</td><td class="hex">2270</td></tr>
+      </tbody>
+      <caption>Ported English lands on exactly the same right edge as Integral&rsquo;s own Japanese, which is the correct result: it sits level with the untouched lines beside it on the same menu.</caption>
+    </table>
+  </div>
+  <p>Against the USA release the ported line therefore reads 18 px left &mdash; 9 px at 1080p, under half a percent of screen width. That offset is a layout constant compiled into each build, not a property of the string, so no padding can close it. Matching USA exactly would mean patching the layout code, and would make the line <em>inconsistent</em> with the Japanese help lines directly above it. The mismatch is documented here rather than fixed, deliberately.</p>
+</section>
+
+<section id="container">
+  <h2 class="sec">The stage container and the GCL script format</h2>
+  <p class="lede">Making a string <em>longer</em> broke something else on screen every time until the script format was read out of <a href="https://github.com/FoxdieTeam/mgs_reversing">FoxdieTeam/mgs_reversing</a> rather than inferred. Everything below is from <code>source/libgcl</code>, checked against the executable&rsquo;s own decoder.</p>
+
+  <h3>STAGE.DIR and stages</h3>
+  <p>A <code>u32</code> header size, then 12-byte entries: an 8-byte name and a <code>u32</code> sector offset <em>relative to STAGE.DIR&rsquo;s first sector</em>. Integral disc 1 has 95 entries; the last, <code>ending</code>, begins at byte 1,132 and so runs past the declared header size &mdash; a <code>header_size / 12</code> walk stops at 94 and wrongly reports free space at EOF.</p>
+  <p>A stage is a 2048-byte header then chunks in header order, <strong>each padded to 2048</strong>; the span is exactly 2048 plus the sum of the padded sizes, on every stage checked. The header is <code>u16 flag</code>, <code>u16 size_in_sectors</code>, then 8-byte entries of <code>u32 size</code>, <code>u16 flags</code>, <code>char[2] tag</code>. Only <code>nd</code>, <code>ck</code>, <code>sw</code>, <code>se</code> and the zero-tag terminator hold inline data; <code>cl</code>/<code>ch</code>/<code>cg</code> carry sizes but no bytes.</p>
+  <p><code>stage_lookup</code> (<code>0x80022DCC</code>) returns <code>entry_offset + stagedir_base_lba</code> &mdash; a plain 32-bit add with <strong>no bound</strong>. Its caller reads one sector; the callback at <code>0x80023274</code> takes the sector count from <code>lh [header+2]</code> and reads the rest. A stage&rsquo;s length comes from its own header and nothing else.</p>
+
+  <h3>GCL values (parse.c, <code>GCL_GetNextValue</code>)</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Opcode</th><th>Type</th><th>Next value at</th></tr></thead>
+      <tbody>
+        <tr><td class="hex">0x10&ndash;0x1F</td><td><code>GCL_VAR</code></td><td><code>p + 4</code> (opcode is part of the BE32)</td></tr>
+        <tr><td class="hex">0x01</td><td><code>GCL_SHORT</code></td><td><code>p + 3</code></td></tr>
+        <tr><td class="hex">0x02&ndash;0x04</td><td><code>GCL_BYTE/CHAR/BOOL</code></td><td><code>p + 2</code></td></tr>
+        <tr><td class="hex">0x06, 0x08</td><td><code>GCL_STRID/PROCID</code></td><td><code>p + 3</code></td></tr>
+        <tr><td class="hex">0x07</td><td><code>GCL_STRING</code></td><td><code>p + 2 + p[1]</code> &mdash; the text records</td></tr>
+        <tr><td class="hex">0x09, 0x0A</td><td><code>GCL_INT/SYMBOL</code></td><td><code>p + 5</code></td></tr>
+        <tr><td class="hex">0x30</td><td><code>GCL_EXPR</code></td><td><code>p + 1 + p[1]</code></td></tr>
+        <tr><td class="hex">0x40</td><td><code>GCL_ARG</code></td><td><code>p + 1 + BE16(p+1)</code> &mdash; a <strong>block length</strong></td></tr>
+        <tr><td class="hex">0x50</td><td><code>GCL_OPTION</code></td><td><code>p + 2 + p[2]</code></td></tr>
+      </tbody>
+      <caption>Block level (<code>GCL_ExecBlock</code>): <code>0x60 GCL_COMMAND</code> with a BE16 size, <code>0x70 GCL_PROC</code> and <code>0x30 GCL_EXPR</code> with u8 sizes. The dispatcher at <code>0x8002069C</code> has only 12 real opcodes; everything else in its 81-entry table points at the <code>GCL:WRONG CODE</code> handler, which advances the PC by one &mdash; which is why a stray jump into text prints one line per letter.</caption>
+    </table>
+  </div>
+
+  <h3>What to change when a string grows</h3>
+  <p>Parse the script top-down and take the sized nodes whose span encloses the edit. For <code>option</code> and <code>preope</code> that is three fields, and their retail values differ between Integral and the USA build by exactly the chain-size delta:</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Field</th><th>At</th><th>option</th><th>preope</th></tr></thead>
+      <tbody>
+        <tr><td><code>script_len</code> u32</td><td class="hex">script+0x16E</td><td>712 &rarr; 722</td><td>8900 &rarr; 10247</td></tr>
+        <tr><td><code>GCL_ARG</code> size</td><td class="hex">script+0x173</td><td>711 &rarr; 721</td><td>8899 &rarr; 10246</td></tr>
+        <tr><td><code>GCL_COMMAND</code> size</td><td class="hex">script+0x1A7</td><td>617 &rarr; 627</td><td>8805 &rarr; 10152</td></tr>
+      </tbody>
+      <caption><code>GCL_ExecScript</code> checks that the script body starts with <code>GCL_ARG</code>, and <code>GCL_LoadScript</code> puts the font at <code>body + script_len</code> &mdash; which lands exactly on the <code>GCL_ARG</code> end, so the model is self-checking.</caption>
+    </table>
+  </div>
+  <p><strong>Two fields that must be left exactly as retail.</strong> The <code>GCL_OPTION</code> length byte at <code>script+0x1B4</code> should be <code>chain_span + 4</code> but is only 8 bits and has <em>already overflowed in the shipped game</em> (91 for a 599-byte chain, 154 for a 10,134-byte one). And for <code>option</code>, the stage header&rsquo;s chunk size: updating it is what crashed three separate builds. That chunk is the last in the stage, so nothing downstream depends on its declared length, and retail&rsquo;s value is the one that works.</p>
+  <p class="lede">Verify by re-parsing the patched bytes top-down and requiring a clean decode. Checking that the numbers match the USA build proves nothing &mdash; two builds passed that test and then crashed.</p>
+</section>
+
+<section id="decomp">
+  <h2 class="sec">The decompilation changes the approach</h2>
+  <p class="lede"><a href="https://github.com/FoxdieTeam/mgs_reversing">FoxdieTeam/mgs_reversing</a> targets <em>Metal Gear Solid Integral</em> specifically &mdash; <code>SLPM_862.47</code>/<code>.48</code>, the exact executables on these discs &mdash; and builds byte-matching output. That turns binary archaeology into source edits.</p>
+  <div class="checks">
+    <div class="yes"><span class="mk">&check;</span><span class="body"><strong>It reproduces the discs exactly.</strong> Built <code>preope.bin</code> (24,911 bytes) and <code>option.bin</code> (25,842 bytes) are <em>byte-for-byte identical</em> to the <code>nd</code> chunks on disc. That is the guarantee the whole approach rests on: from a verified baseline, any difference in output is provably only the change made.</span></div>
+    <div class="yes"><span class="mk">&check;</span><span class="body"><strong>The toolchain fails on long paths.</strong> <code>asmpsx.exe</code> is a 1990s tool that dies with an access violation (<code>0xC0000005</code>) at a fixed instruction with a garbage address when paths get long &mdash; which is why the project&rsquo;s CI clones to <code>c:\mgs</code>. From a ~150-character scratchpad path: 32 failures. From <code>D:\mgsbuild\d</code>: <strong>45/45, zero failures.</strong></span></div>
+    <div class="yes"><span class="mk">&check;</span><span class="body"><strong>Only the overlays you need have to build.</strong> <code>ninja ../obj/preope.bin ../obj/option.bin</code> skips the handful of files that still fail elsewhere in the tree.</span></div>
+  </div>
+</section>
+
+<section id="preope">
+  <h2 class="sec">Previous Operations: half of it fits</h2>
+  <p class="lede">The English recap is 9,441 characters against Integral&rsquo;s 8,214. It does not fit &mdash; but that is a space budget, not a bug, and once the budget is written down one half of the recap fits comfortably inside it.</p>
+
+  <h3>The page count is declared three times</h3>
+  <p>Two of them are the <code>PAGE_COUNT</code> defines; the third is easy to miss and was the cause of every crash:</p>
+  <pre class="code">#define PAGE_COUNT  9                     <strong>// pre_met1.c - Metal Gear</strong>
+#define PAGE_COUNT  14                    <strong>// pre_met2.c - Metal Gear 2</strong>
+
+Unknown field_714[72];                    <strong>// preope.c - AGAIN, as a literal</strong>
+Unknown field_4614[112];
+for (j = 0; j &lt; 9;  j++) ...              <strong>// and again in the parse loops</strong>
+for (j = 0; j &lt; 14; j++) ...</pre>
+  <p>Changing only the two defines leaves <code>preope.c</code> reading 72 + 112 strings out of a longer chain, and everything downstream misaligns. Fixing all three took the failure from 220 MB of <code>mainbus_read_l: bad addr</code> to <strong>zero</strong>.</p>
+  <p>The layouts also differ between builds: <strong>USA uses 7 lines per page</strong> (13 and 19 pages = 91 + 133 lines), <strong>Integral uses 8</strong> (9 and 14 = 72 + 112). At Integral&rsquo;s 8, the same English text needs 12 and 17 pages.</p>
+
+  <h3>The stage cannot grow</h3>
+  <p>Proven two ways. Empirically: byte-identical content with only the sector count changed 87&rarr;88 freezes, while the same content at 87 sectors relocated into <code>DUMMY3M.DAT</code> runs fine. And in the source:</p>
+  <pre class="code">buffer = GV_GetMaxFreeMemory( GV_NORMAL_MEMORY );   <strong>// largest free block</strong>
+task->size = datacnf-&gt;size * 512;                   <strong>// sb.size sectors, read into it</strong></pre>
+  <p>The stage is read into the largest free heap block, and 87 sectors evidently fills it. So relocation works but growth does not, and the chain can only expand into the script chunk&rsquo;s own 796 bytes of internal padding.</p>
+
+  <h3>The budget, and what fits</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Configuration</th><th>Pages</th><th>Chain bytes</th><th>vs 9,583 available</th></tr></thead>
+      <tbody>
+        <tr><td>Both English</td><td>12 + 17</td><td class="hex">10,317</td><td><span class="role t">over by 734</span></td></tr>
+        <tr><td><strong>Metal Gear English, MG2 Japanese</strong></td><td>12 + 14</td><td class="hex">9,533</td><td><span class="role d">fits</span></td></tr>
+        <tr><td>Metal Gear Japanese, MG2 English</td><td>9 + 17</td><td class="hex">9,571</td><td><span class="role d">fits</span></td></tr>
+        <tr><td>Retail</td><td>9 + 14</td><td class="hex">8,787</td><td><span class="role d">fits</span></td></tr>
+      </tbody>
+      <caption>9,583 = the retail chain plus the script chunk&rsquo;s 796 bytes of padding. Whole-recap English needs a further 2 KB, which means freeing a sector elsewhere: 1,076 bytes out of the 113,716-byte texture chunk is the cheapest candidate.</caption>
+    </table>
+  </div>
+  <p><strong>The Metal Gear half is the clean one.</strong> With <code>pre_met1</code> at 12 pages and <code>pre_met2</code> left at 14, the rebuilt overlay comes out at <em>exactly</em> 24,911 bytes &mdash; identical to retail. So the stage stays 87 sectors, no header field changes, no relocation, and the patch applies in place: a 26 KB PPF rather than 180 KB. Built and verified by re-parsing (215 records, <code>script_len</code> 8,900&rarr;9,646); <strong>not yet confirmed on screen.</strong></p>
+</section>
+
+<section id="optionfix">
+  <h2 class="sec">The option screen&rsquo;s 21-character buffer</h2>
+  <p class="lede">Porting <code>use directional buttons to test</code> works &mdash; the text renders and the script executes cleanly &mdash; but it corrupts that row of the screen. The cause is in the option screen&rsquo;s own code, not in the data.</p>
+  <pre class="code">rect.w = 64;                                       <strong>// opt.c, every option string</strong>
+font_set_kcb(kcb, -1, -1, 0, 6, 2, 0);
+w = (kcb-&gt;rect_ptr-&gt;w * 4) / (kcb-&gt;c_skip + 12);    <strong>// font.c -> 64*4/12 = 21</strong></pre>
+  <p>Each option string gets a buffer holding <strong>21 characters on one line</strong>. The retail Japanese line is 13 glyphs and fits; <code>use directional buttons to test</code> is 31 and spills into neighbouring VRAM. The columns make it worse &mdash; they are placed at x = 832 and 896, exactly <code>rect.w</code> apart, so anything wider lands on the next column.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Ruled out by testing</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td>Retail Integral, same row</td><td>clean &mdash; the artifacts are ours</td></tr>
+        <tr><td>Net-zero edit (no growth, no container change)</td><td>artifacts present &mdash; not the growth</td></tr>
+        <tr><td>Japanese label blanked (line much shorter)</td><td>unchanged &mdash; not the line width</td></tr>
+        <tr><td>MGSM2Fix HD font system disabled</td><td>unchanged &mdash; not the font hook</td></tr>
+        <tr><td>MGS1 USA, same 31 characters</td><td>clean &mdash; ASCII is not the problem</td></tr>
+      </tbody>
+      <caption>Five hypotheses died before the decomp gave the answer. The fix is a source edit to <code>rect.w</code> plus a VRAM re-layout, since the columns currently have no slack between them.</caption>
+    </table>
+  </div>
+  <p><strong>The fix, from the decomp:</strong> entries 12 and 26 get a 128-pixel texture instead of 64, and column 3 drops one 21-row band so the wider texture cannot overlap it. Each string occupies a band of 20 rows of texture plus one row of CLUT, and the columns sit at x = 768, 832 and 896 &mdash; no horizontal slack to widen into without moving something.</p>
+  <pre class="code">rect.w = (index == 12 || index == 26) ? 128 : 64;   <strong>// opt.c</strong>
+work-&gt;f29F4 = 277;  work-&gt;f29FC = 297;              <strong>// column 3, was 256 / 276</strong></pre>
+  <p>Two records on that screen are also worth knowing about: <code>[3]</code> holds the row label 振動テスト and <code>[7]</code> a fullwidth colon. The USA build ships both empty. Blanking <code>[3]</code> removes the label; blanking <code>[7]</code> does <em>not</em> remove the colon, so that glyph comes from somewhere still unidentified.</p>
+</section>
+
+<section id="installed">
+  <h2 class="sec">What is installed</h2>
+  <p class="lede">Five PPFs per disc in the Ketchup mods folder. They touch disjoint ranges and are independent &mdash; any one can be removed on its own.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Patch</th><th>What it does</th><th>State</th></tr></thead>
+      <tbody>
+        <tr><td class="mono">en_items</td><td>36 weapon and item descriptions</td><td><span class="role d">confirmed in-game</span></td></tr>
+        <tr><td class="mono">en_menu</td><td><code>RADAR OFF</code>, screen-brightness and key-config help lines</td><td><span class="role d">confirmed in-game</span></td></tr>
+        <tr><td class="mono">en_preope</td><td>the Metal Gear recap in English &mdash; 12 pages, re-wrapped to 45 characters; Metal Gear 2 stays Japanese</td><td><span class="role d">renders in-game</span></td></tr>
+        <tr><td class="mono">en_option</td><td><code>use directional buttons to test</code>, with a 128px texture for entries 12 and 26</td><td><span class="role t">rebuilt, awaiting test</span></td></tr>
+        <tr><td class="mono">en_menu2</td><td>Demo Theater names and the disc-swap prompts</td><td><span class="role t">unreachable</span> until Demo Theater unlocks</td></tr>
+        <tr><td class="mono">en_menu3</td><td>disc-swap prompts in the <code>title</code> stage</td><td><span class="role t">disabled</span> &mdash; crashes, cause unknown</td></tr>
+      </tbody>
+      <caption><code>[Game] EnglishText</code> is also fixed and confirmed (<code>LANGUAGE: ENGLISH</code> on the option screen): it now holds the setting until it has survived 120 frames on the title screen, rather than writing once during <code>init</code> before the memory card restores it.</caption>
+    </table>
+  </div>
+  <p><strong>Re-wrapping is not editing.</strong> The USA release&rsquo;s recap lines run to 53 characters and Integral&rsquo;s texture clips around 50, so its line breaks cannot be reused as they are. Paragraphs are rejoined &mdash; including across the USA build&rsquo;s hyphenated word breaks, so <code>FOX-</code> + <code>HOUND</code> becomes <code>FOX-HOUND</code> &mdash; and re-flowed at 45 characters. Every word is verbatim; only the line breaks move, and the result has no mid-word hyphen splits.</p>
+</section>
+
+<section id="rest">
+  <h2 class="sec">What else is still Japanese</h2>
+  <p class="lede">Less than the community consensus suggests. Most of Integral is already localised; the item text was the large remaining block.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Text</th><th>Lives in</th><th>State in Integral</th></tr></thead>
+      <tbody>
+        <tr><td>Codec / radio script</td><td class="mono">RADIO.DAT</td><td><span class="role d">already English</span> 11.2 MB vs 1.78 MB on the USA disc &mdash; it carries both scripts, byte-identical</td></tr>
+        <tr><td>Cutscene &amp; briefing subtitles</td><td class="mono">DEMO.DAT</td><td><span class="role d">already English</span></td></tr>
+        <tr><td>HUD short names, save/load UI</td><td class="mono">boot EXE</td><td><span class="role d">already English</span> 257 of 310 USA UI strings present verbatim</td></tr>
+        <tr><td>Item &amp; weapon names + descriptions</td><td class="mono">boot EXE</td><td><span class="role d">ported</span> 36 records, confirmed in-game</td></tr><tr><td>Previous Operations recap</td><td class="mono">STAGE.DIR <code>preope</code></td><td><span class="role d">ported</span> 231 records from MGS1 (USA), verbatim &mdash; awaiting an in-game check</td></tr><tr><td>Option / title / demo menu help lines</td><td class="mono">STAGE.DIR</td><td><span class="role d">ported</span> every slot with an English counterpart</td></tr><tr><td>Mission abstract screens</td><td class="mono">STAGE.DIR <code>abst</code></td><td><span class="role t">Japanese</span> 123 English chains exist in MGS1 (USA) &mdash; the largest block still to do</td></tr><tr><td>Difficulty descriptions</td><td class="mono">STAGE.DIR <code>title</code></td><td><span class="role t">Japanese</span> 3 lines with no English anywhere; the USA build leaves the slots empty</td></tr>
+        <tr><td>Memory-card status messages</td><td class="mono">boot EXE</td><td><span class="role t">Japanese</span> 11 save + 15 load against the USA build&rsquo;s 7 + 7, so the surplus has no counterpart. Many are glosses of English on-screen labels, which the USA build simply leaves blank.</td></tr>
+        <tr><td><code>MP 5 SD</code> description</td><td class="mono">boot EXE</td><td><span class="role t">Japanese</span> Integral-only; no English exists anywhere</td></tr>
+      </tbody>
+      <caption>Text baked into textures &mdash; difficulty select, mission screens &mdash; is outside what a string scan can see and would be a separate, much larger job.</caption>
+    </table>
+  </div>
+</section>
+
+<section id="vr">
+  <h2 class="sec">What VR Missions (USA) is actually for</h2>
+  <p class="lede">It cannot serve as the donor for discs 1&ndash;2 &mdash; but it is the most useful reference disc in the set, and it is the exact donor for disc 3.</p>
+  <ul class="plain">
+    <li><strong>It is two records short.</strong> Its tables hold 24 items, not 26: the frozen Ketchup and frozen Rations variants the main game needs simply are not there. MGS1 (USA), with all 26 items and all 10 weapons, is the complete donor.</li>
+    <li><strong>It proves the Integral-generation engine speaks Latin.</strong> Five language blocks run through one pair of tables with a language index, using the same <code>B014</code>/<code>D015</code>/<code>807C</code> grammar plus <code>1Fxx</code> for accented letters. Its item pool starts at <code>80010EA0</code>, twelve bytes from Integral&rsquo;s <code>80010EAC</code>, and the two builds share roughly twice as much byte-identical code as either shares with MGS1 (USA).</li>
+    <li><strong>It supplies tighter English.</strong> Its English block is otherwise the same text as MGS1 (USA)&rsquo;s, but with names trimmed to fit &mdash; useful the moment a name overruns.</li>
+    <li><strong>It is the 1:1 donor for Integral disc 3.</strong> VR Missions (USA) <em>is</em> the localised VR-Disk, so the same method aimed at Ketchup&rsquo;s <code>INTEGRAL\VR-DISK</code> folder is a straight table-for-table transplant, with a language index already in place.</li>
+    <li><strong>Its extended-Latin escapes are the route to other languages.</strong> Anyone wanting Integral in Spanish, Italian, French or German has both the text and the glyph codes in this one executable.</li>
+  </ul>
+</section>
+
+<section id="native">
+  <h2 class="sec">Two obstacles in the build, worth keeping</h2>
+  <p class="lede">Neither is in the fix itself, and both will catch the next person.</p>
+  <p><strong><code>build_zydis.cmd</code> breaks on any path containing a space.</strong> It tests <code>if not exist %ZY_PROJECT%</code> and invokes <code>msbuild %ZY_PROJECT%</code> unquoted, so a checkout under, say, <code>My Drive</code> makes cmd split the path and the script reports the Zydis project file missing when it is sitting right there. Quoting both sites fixes it. A space-free checkout never sees this, which is why it has survived.</p>
+  <p><strong>Zydis pins <code>v143</code>.</strong> The project targets <code>v145</code>, so a machine with only the 2026 Build Tools cannot build the dependency as configured. Pre-building Zydis with <code>v145</code> and writing its <code>.zydis_build_hash</code> makes the cache check skip it, leaving both the static library and the ASI on one toolset. Note that CI sidesteps this from the other direction, overriding everything to <code>v143</code>.</p>
+</section>
+
+<footer>
+  <p>Findings derived from static analysis of five PlayStation executables and both STAGE.DIR archives, plus an end-to-end patch application against retail disc images. All addresses are PSX RAM unless labelled as file offsets; all string sizes include the NUL terminator.</p>
+</footer>
+
+</div>
