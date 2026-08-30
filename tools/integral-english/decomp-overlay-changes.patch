@@ -1,7 +1,7 @@
-From bc4a0ddd438db1eeb731c83effbb7598744ffc88 Mon Sep 17 00:00:00 2001
-From: TideGear <amilecki@urbansurfaces.com>
-Date: Sat, 29 Aug 2026 23:25:05 -0700
-Subject: [PATCH] Integral: English Previous Operations and option screen
+From 26a838bf83f2349c0edc68a454beec321aa20ad7 Mon Sep 17 00:00:00 2001
+From: TideGear <tidegear@gmail.com>
+Date: Sat, 29 Aug 2026 23:28:29 -0700
+Subject: [PATCH 1/2] Integral: English Previous Operations and option screen
 
 preope: Metal Gear's recap comes from the GCL chain as usual (12 pages).
 Metal Gear 2's 149 lines cannot - both recaps' text together overflows the
@@ -262,6 +262,40 @@ index 003bda4..45db8ea 100644
  void *NewPreviousOperation(int name, int where, int argc, char **argv)
  {
      Work *work;
+-- 
+2.50.1.windows.1
+
+
+From b8ea28b488d890a298d85822cdf3aee5d8a78ae7 Mon Sep 17 00:00:00 2001
+From: TideGear <tidegear@gmail.com>
+Date: Sun, 30 Aug 2026 02:28:19 -0700
+Subject: [PATCH 2/2] preope: write the string terminator as an escape, not a
+ raw NUL
+
+The MG2 recap walk compared against a literal 0x00 byte embedded in the
+source between two quotes, which is not a valid C character constant and
+made the whole file binary to grep and diff. psyq compiled it to the same
+comparison against zero - obj/preope.bin is byte identical before and
+after, and NewPreviousOperation stays at 800C4DA4 - but any tool that
+re-saved the file would have silently dropped the byte and changed the
+loop's meaning.
+---
+ source/onoda/preope/preope.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/source/onoda/preope/preope.c b/source/onoda/preope/preope.c
+index 45db8ea..bab17bd 100644
+--- a/source/onoda/preope/preope.c
++++ b/source/onoda/preope/preope.c
+@@ -843,7 +843,7 @@ static int GetResources(Work *work, int map)
+         {
+             work->field_4614[index].string = (char *)p;
+ 
+-            while (*p++ != ' ')
++            while (*p++ != '\0')
+             {
+             }
+         }
 -- 
 2.50.1.windows.1
 
