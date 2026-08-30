@@ -16,7 +16,8 @@ sys.path.insert(0, '.')
 import pcx4
 from PIL import Image
 from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BASEADDR,
-                       ROW_H_ADDR, ROW_H_OLD, ROW_H, S00_ADDR, S00_OLD, S00_NEW)
+                       ROW_H_ADDR, ROW_H_OLD, ROW_H, S00_ADDR, S00_OLD, S00_NEW,
+                       ADVANCE)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -62,6 +63,12 @@ _have = list(struct.unpack('<5I', ovl[_o:_o+20]))
 assert _have == S00_OLD, 'br_s00 width chain not at %08X: %s' % (S00_ADDR, [hex(x) for x in _have])
 struct.pack_into('<5I', ovl, _o, *S00_NEW)
 print('br_s00 width chain @%08X: 52n -> 100n  (x1 = w*n/6 + 26)' % S00_ADDR)
+for addr, old_v, new_v, who in ADVANCE:
+    o = addr - BASEADDR
+    w = struct.unpack('<I', ovl[o:o+4])[0]
+    assert (w >> 26) == 9 and ((w >> 16) & 31) == 7 and ((w >> 21) & 31) == 0         and (w & 0xFFFF) == old_v, 'advance not at %08X (got %08X)' % (addr, w)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | new_v)
+    print('row advance @%08X: %d -> %d  (%s, two lines in English)' % (addr, old_v, new_v, who))
 print('patched %d quad immediates:' % len(patched))
 for addr, o, n, users in patched:
     print('   %08X  %5d -> %-5d  %s' % (addr, o, n, ', '.join(users)))
