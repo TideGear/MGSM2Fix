@@ -125,3 +125,23 @@ indices where Integral uses 5.
 (`人質` -> `hostages`, `核兵器` -> `nuclear weapons`) are squeezed into narrow
 quads and render small. Fixing that needs the quad constants, which live in the
 undecompiled `brf` asm (`asm/overlays/brf/*.s`, raw `dw` opcode dumps).
+
+### Matching USA label sizing: not possible from the texture side
+
+Tested and ruled out. The 16 labels were placed at USA's exact native
+dimensions in free VRAM (page-aligned, no overlaps) and still rendered at
+Integral's proportions - `hostages` small, `the terrorists' armament` large.
+Had the quad been `tex->w/h`, USA-sized textures would have drawn USA-sized.
+So the draw rect is a hardcoded constant, and only patching
+`asm/overlays/brf/*.s` (raw `dw` opcode dumps) can change it.
+
+Two constraints learned the hard way while trying:
+
+- **Texture pages.** At 4bpp a page is 64 VRAM units wide and a texture must
+  fit inside one: `(px % 64) + ceil(w / 4) <= 64`. Every Integral label obeys
+  this. Straddling a boundary makes the U coordinate wrap and every label
+  collapses into one cluster on screen.
+- **Occupancy needs real colour depth.** The `brf` archive is not uniformly
+  4bpp; the large background panels are deeper. Computing free VRAM as
+  `ceil(w / 4)` for all 51 textures underestimates their footprint, and labels
+  packed into "free" space land on the background art and show through it.
