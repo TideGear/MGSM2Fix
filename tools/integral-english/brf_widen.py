@@ -65,9 +65,46 @@ ni = [k for k, t in enumerate(ti) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 nu = [k for k, t in enumerate(tu) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])
 U = {e[0]: e[3] for e in eu}
-quads = json.load(open('work/brf_quads.json'))
+quads = json.load(open('work/brf_quads_all.json'))
 WIDEN = {strcode(n): n for n in quads}
 for t in WIDEN: assert t in U, 'missing %s in USA archive' % WIDEN[t]
+I0 = {e[0]: e[3] for e in ei}
+
+# ---- target quads -----------------------------------------------------------
+# b_select.c: brf_800C983C does setXY4(poly, xl, yt, xr, yb) with the UVs
+# spanning the whole texture, so the texture is *stretched* to the quad.  The
+# rendered size is therefore the quad's, and a texture only draws at its true
+# size when its canvas equals the quad.  Several labels share an immediate
+# (same store address), so a group gets one quad sized to its largest member
+# and the smaller members are padded out to match.
+gid = {}
+for n, g in quads.items():
+    for key in ('xr', 'yb'):
+        if key in g: gid.setdefault((key, g[key][1]), []).append(n)
+newimm = {}
+for (key, addr), members in gid.items():
+    lo_key = 'xl' if key == 'xr' else 'yt'
+    dim = 'w' if key == 'xr' else 'h'
+    newimm[addr] = max(quads[n][lo_key][0] + geo(U[strcode(n)])[dim] for n in members)
+target = {}
+for n, g in quads.items():
+    w = newimm[g['xr'][1]] - g['xl'][0]
+    # Families B and C never get a yb immediate: the height is forced at runtime
+    # (13 rows by brf_800C69B4, 17 for the FILE labels), so the canvas must use
+    # that height and taller USA art is scaled down to it.
+    h = g['fixed_h'] if 'fixed_h' in g else newimm[g['yb'][1]] - g['yt'][0]
+    target[strcode(n)] = (w, h)
+# br_s00's right edge is computed at runtime (x1 = t0 + 26, an animated reveal),
+# so it has no patchable quad and keeps Integral's slot.
+ALL = ['br_s%02d' % i for i in range(16)] + ['br_f%02d' % i for i in range(4)]
+for n in ALL:
+    t = strcode(n)
+    assert t in U and t in I0, 'missing %s' % n
+    WIDEN[t] = n
+    if t not in target: g = geo(I0[t]); target[t] = (g['w'], g['h'])
+assert len(target) == 20, 'expected all 20 labels, got %d' % len(target)
+json.dump({hex(k): list(v) for k, v in target.items()}, open('work/brf_target.json', 'w'))
+json.dump({hex(k): v for k, v in newimm.items()}, open('work/brf_imm.json', 'w'))
 
 # ---- VRAM occupancy from everything that is NOT being widened ---------------
 grid = bytearray(1024 * 512)
@@ -89,30 +126,32 @@ for e in ei:
 
 # ---- place each widened label ----------------------------------------------
 place = {}
-for tid in sorted(WIDEN, key=lambda t: -units(geo(U[t])['w'], geo(U[t])['bpp'])):
-    ig = geo(dict((e[0], e[3]) for e in ei)[tid]); ug = geo(U[tid])
-    need = units(ug['w'], ug['bpp'])
-    if (ig['px'] % 64) + need <= 64 and not busy(ig['px'], ig['py'], need, ug['h']):
+def tgt(t):
+    w, h = target[t]; return w, h, units(w, geo(U[t])['bpp'])
+for tid in sorted(WIDEN, key=lambda t: -tgt(t)[2]):
+    ig = geo(I0[tid]); tw, th, need = tgt(tid)
+    if (ig['px'] % 64) + need <= 64 and not busy(ig['px'], ig['py'], need, th):
         place[tid] = (ig['px'], ig['py'])
     else:
         found = None
         for page in (896, 960, 832, 768, 704, 640, 576, 512):
-            for ny in range(0, 512 - ug['h']):
+            for ny in range(0, 512 - th):
                 for nx in range(page, page + 64 - need + 1):
-                    if not busy(nx, ny, need, ug['h']): found = (nx, ny); break
+                    if not busy(nx, ny, need, th): found = (nx, ny); break
                 if found: break
             if found: break
-        assert found, 'no VRAM room for %s (%d units x %d rows)' % (WIDEN[tid], need, ug['h'])
+        assert found, 'no VRAM room for %s (%d units x %d rows)' % (WIDEN[tid], need, th)
         place[tid] = found
-    mark(place[tid][0], place[tid][1], need, ug['h'])
+    mark(place[tid][0], place[tid][1], need, th)
 
-I0 = {e[0]: e[3] for e in ei}
-print('%-8s %-9s %-18s %s' % ('label', 'where', 'VRAM', 'size'))
+print('%-8s %-9s %-14s %-11s %-11s %s' % ('label', 'where', 'VRAM', 'quad', 'USA art', 'fit'))
 for tid in sorted(place, key=lambda t: WIDEN[t]):
-    ig, ug = geo(I0[tid]), geo(U[tid])
+    ig, ug = geo(I0[tid]), geo(U[tid]); tw, th, _ = tgt(tid)
     tag = 'in place' if place[tid] == (ig['px'], ig['py']) else 'moved'
-    print('  %-8s %-9s (%3d,%3d)->(%3d,%3d)  %3dx%-3d -> %3dx%-3d'
-          % (WIDEN[tid], tag, ig['px'], ig['py'], place[tid][0], place[tid][1],
-             ig['w'], ig['h'], ug['w'], ug['h']))
+    fit = 'exact' if (ug['w'], ug['h']) == (tw, th) else (
+          'pad %+d,%+d' % (tw - ug['w'], th - ug['h']) if ug['w'] <= tw and ug['h'] <= th
+          else 'SCALE to fit')
+    print('  %-8s %-9s (%3d,%3d)     %3dx%-3d    %3dx%-3d    %s'
+          % (WIDEN[tid], tag, place[tid][0], place[tid][1], tw, th, ug['w'], ug['h'], fit))
 json.dump({hex(k): list(v) for k, v in place.items()}, open('work/brf_widen.json', 'w'))
 print('placed %d widened labels' % len(place))
