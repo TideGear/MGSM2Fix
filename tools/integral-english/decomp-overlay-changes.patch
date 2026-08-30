@@ -1,0 +1,267 @@
+From bc4a0ddd438db1eeb731c83effbb7598744ffc88 Mon Sep 17 00:00:00 2001
+From: TideGear <amilecki@urbansurfaces.com>
+Date: Sat, 29 Aug 2026 23:25:05 -0700
+Subject: [PATCH] Integral: English Previous Operations and option screen
+
+preope: Metal Gear's recap comes from the GCL chain as usual (12 pages).
+Metal Gear 2's 149 lines cannot - both recaps' text together overflows the
+chain's size ceiling, which sits between 9,567 and 10,304 bytes - so they live
+in the script chunk past the end of the script as NUL terminated strings, found
+by pointer from field_394[0].string (the payload of the chain's first record).
+They cannot go in the overlay either: it loads at a fixed address and must not
+grow past retail's 13 sectors.
+
+preope_reserved() is padding, never called. The main executable on the disc is
+never rebuilt, so it calls NewPreviousOperation at a hardcoded 0x800C4DA4; the
+edits above shift the code ahead of it and this puts the offset back. Verify
+after any change to preope.c with:
+
+    grep -m1 "  NewPreviousOperation" obj/asm_preope_lhs.map
+
+opt.c: the ported help lines need more than the 21 characters a 64-word column
+holds, so the columns are re-laid as {768, 896, 960} with column 3 starting one
+band lower, and font_set_kcb takes an explicit character width per entry. Both
+draw sites now read the column table instead of deriving x from the loop
+counter, which is what made a widened entry sample the wrong VRAM. f924 is
+grown to 12: it is indexed by f920, whose cursor states reach 11, so eight
+entries ran off the end into kcb[0]. Entry 27 (a colon USA does not show) is
+parked off-screen rather than blanked - blanking its chain record leaves EXIT's
+geometry uninitialised and the cursor writes through it.
+---
+ source/onoda/option/opt.c      | 56 +++++++++++++++++++++++++++-------
+ source/onoda/preope/pre_met1.c |  2 +-
+ source/onoda/preope/pre_met2.c |  2 +-
+ source/onoda/preope/preope.c   | 35 ++++++++++++++++-----
+ 4 files changed, 74 insertions(+), 21 deletions(-)
+
+diff --git a/source/onoda/option/opt.c b/source/onoda/option/opt.c
+index 23a51af..f8cceb9 100644
+--- a/source/onoda/option/opt.c
++++ b/source/onoda/option/opt.c
+@@ -42,7 +42,10 @@ typedef struct _Work
+     POLY_FT4 field_674[17];
+     int      f91C;
+     int      f920;
+-    int      f924[8];
++    /* Indexed as f924[f920].  The cursor states run to 11 (EXIT steps to 10),
++       so eight entries ran off the end into kcb[0] and corrupted a font
++       control block's pointers - the wild write behind the EXIT freeze. */
++    int      f924[12];
+     KCB      kcb[31];
+     char     pad1[0x14];
+     DR_TPAGE tpage[3];
+@@ -88,7 +91,10 @@ static Unknown2 dword_800C3218[] =
+     {0, 172, 190, 0},
+     {0, 172, 190, 0},
+     {0, 172, 190, 0},
+-    {0, 122, 190, 0},
++    /* entry 12, the vibration help line.  The retail x was hand-set for the
++       Japanese string's width; the English one is wider, so centre it instead
++       (num 1 subtracts half of max_width, and half of max_height from y). */
++    {1, 170, 200, 0},
+     {0, 36, 110, 0},
+     {0, 36, 125, 0},
+     {0, 36, 140, 0},
+@@ -103,7 +109,9 @@ static Unknown2 dword_800C3218[] =
+     {0, 36, 175, 0},
+     {0, 88, 190, 0},
+     {0, 122, 190, 0},
+-    {0, 110, 188, 0},
++    /* entry 27: the colon before the help line.  USA shows none.  Parked below
++       the visible area rather than blanked, so the entry stays live. */
++    {0, 110, 300, 0},
+     {0, 76, 190, 0},
+     {0, 172, 190, 0},
+     {0, 172, 190, 0},
+@@ -114,6 +122,27 @@ signed char byte_800C3394[] = {-1, 0, 1, 0, 0, 1, 0, -1};
+ 
+ #define EXEC_LEVEL GV_ACTOR_MANAGER
+ 
++/* VRAM x of the three font columns.  The draw code used to derive this from
++   its own loop counter as 768 + i * 64, so a texture could only ever live in
++   one of three fixed places - moving one without moving the other made the
++   sprite sample the wrong column.  Both sides now read the same table.
++   Column 3 sits at 960 so that entry 12, the 31-character vibration-test
++   help line, can have a 128-wide texture at 832 without overwriting it. */
++static const short option_column_x[3] = { 768, 896, 960 };
++/* Entries whose ported English text needs more than the 21 characters a
++   64-word column holds.  font_get_buffer_size derives the VRAM width back
++   from the character count, so widening is done by character count alone. */
++#define OPTION_HELP_INDEX 12
++static int option_char_width(int index)
++{
++    switch (index)
++    {
++    case 4:  case 5:  return 24;   /* screen brightness / key configuration setup */
++    default:          return -1;   /* -1 keeps the width derived from rect.w */
++    }
++}
++
++
+ static void option_800C339C(Work *work, int index)
+ {
+     RECT rect;
+@@ -124,21 +153,26 @@ static void option_800C339C(Work *work, int index)
+     if (index == 12)
+     {
+         work->f29F4 = 256;
+-        work->f29F0 = 832;
++        work->f29F0 = option_column_x[1];
+         work->f29FC = 276;
+         work->f29F8 = work->f29F0;
+     }
+     else if (index == 24)
+     {
+-        work->f29F4 = 256;
+-        work->f29F0 = 896;
+-        work->f29FC = 276;
++        /* one band down: entry 12's wide texture occupies this column's x
++           range for the first band only */
++        work->f29F4 = 277;
++        work->f29F0 = option_column_x[2];
++        work->f29FC = 297;
+         work->f29F8 = work->f29F0;
+     }
+ 
+     rect.x = work->f29F0;
+     rect.y = work->f29F4;
+-    rect.w = 64;
++    /* 64 words is 256 pixels, which font_set_kcb turns into 21 characters -
++       three short of the English help line.  128 gives it 42.  Only entry 12
++       gets it; the strip it grows into is free now that column 3 moved. */
++    rect.w = (index == OPTION_HELP_INDEX) ? 128 : 64;
+     rect.h = 21;
+ 
+     work->fEC4[index].f0 = work->f29F0;
+@@ -151,7 +185,7 @@ static void option_800C339C(Work *work, int index)
+     work->fEC4[index].f6 = work->f29FC;
+     work->f29FC += 21;
+ 
+-    font_set_kcb(kcb, -1, -1, 0, 6, 2, 0);
++    font_set_kcb(kcb, option_char_width(index), -1, 0, 6, 2, 0);
+ 
+     font_set_buffer(kcb, GV_AllocMemory(GV_NORMAL_MEMORY, font_get_buffer_size(kcb)));
+ 
+@@ -245,7 +279,7 @@ static void option_800C3664(Work *work, u_long *ot)
+         if (found != 0)
+         {
+             tpage = &work->tpage[i];
+-            setDrawTPage(tpage, 1, 0, getTPage(0, 0, 768 + i * 64, 256));
++            setDrawTPage(tpage, 1, 0, getTPage(0, 0, option_column_x[i], 256));
+             addPrim(ot, tpage);
+         }
+     }
+@@ -288,7 +322,7 @@ static void option_800C3664(Work *work, u_long *ot)
+     if (found != 0)
+     {
+         tpage2 = &work->tpage[i];
+-        setDrawTPage(tpage2, 1, 0, getTPage(0, 0, 768 + i * 64, 256));
++        setDrawTPage(tpage2, 1, 0, getTPage(0, 0, option_column_x[i], 256));
+         addPrim(ot, tpage2);
+     }
+ }
+diff --git a/source/onoda/preope/pre_met1.c b/source/onoda/preope/pre_met1.c
+index 60aea1e..30b87b2 100644
+--- a/source/onoda/preope/pre_met1.c
++++ b/source/onoda/preope/pre_met1.c
+@@ -16,7 +16,7 @@
+ /*---------------------------------------------------------------------------*/
+ 
+ #define EXEC_LEVEL  GV_ACTOR_USER
+-#define PAGE_COUNT  9
++#define PAGE_COUNT  12
+ 
+ typedef struct PreMet1Prims
+ {
+diff --git a/source/onoda/preope/pre_met2.c b/source/onoda/preope/pre_met2.c
+index 29e3ca4..f9993e0 100644
+--- a/source/onoda/preope/pre_met2.c
++++ b/source/onoda/preope/pre_met2.c
+@@ -16,7 +16,7 @@
+ /*---------------------------------------------------------------------------*/
+ 
+ #define EXEC_LEVEL  GV_ACTOR_USER
+-#define PAGE_COUNT  14
++#define PAGE_COUNT  19
+ 
+ typedef struct PreMet2Prims
+ {
+diff --git a/source/onoda/preope/preope.c b/source/onoda/preope/preope.c
+index 003bda4..45db8ea 100644
+--- a/source/onoda/preope/preope.c
++++ b/source/onoda/preope/preope.c
+@@ -16,6 +16,8 @@
+ #define EXEC_LEVEL GV_ACTOR_MANAGER
+ 
+ // FIXME: it's the same struct as in change.c (in change overlay)
++#define MG2_RECAP_OFFSET 22029
++
+ typedef struct _Unknown
+ {
+     SPRT  text_sprt[2];
+@@ -46,8 +48,8 @@ typedef struct _Work
+     char     pad378[0x14];
+     DR_TPAGE field_38C;
+     Unknown  field_394[4];
+-    Unknown  field_714[72];
+-    Unknown  field_4614[112];
++    Unknown  field_714[12 * 8];
++    Unknown  field_4614[19 * 8];
+     int      field_A814;
+     int      field_A818;
+     int      clut_x;
+@@ -820,7 +822,7 @@ static int GetResources(Work *work, int map)
+     }
+ 
+     index = 0;
+-    for (j = 0; j < 9; j++)
++    for (j = 0; j < 12; j++)
+     {
+         for (i = 0; i < 8; i++)
+         {
+@@ -829,13 +831,21 @@ static int GetResources(Work *work, int map)
+         }
+     }
+ 
+-    index = 0;
+-    for (j = 0; j < 14; j++)
++    /* Metal Gear 2's lines sit in the script chunk past the end of the script,
++       as NUL terminated strings: both recaps' text together overflows the GCL
++       chain's size ceiling, and the overlay loads at a fixed address so it
++       cannot hold them either.  field_394[0].string is the payload of the
++       chain's first record, so the run is a fixed distance from it. */
+     {
+-        for (i = 0; i < 8; i++)
++        const char *p = work->field_394[0].string - 2 + MG2_RECAP_OFFSET;
++
++        for (index = 0; index < 19 * 8; index++)
+         {
+-            work->field_4614[index].string = GCL_GetString(GCL_NextStr());
+-            index++;
++            work->field_4614[index].string = (char *)p;
++
++            while (*p++ != ' ')
++            {
++            }
+         }
+     }
+ 
+@@ -854,6 +864,15 @@ static int GetResources(Work *work, int map)
+ 
+ /*---------------------------------------------------------------------------*/
+ 
++/* Keeps NewPreviousOperation at the fixed 0x800C4DA4 the main executable
++   calls.  Never called. */
++volatile int preope_reserved_sink;
++
++void preope_reserved(int n)
++{
++    preope_reserved_sink = n + 1;
++}
++
+ void *NewPreviousOperation(int name, int where, int argc, char **argv)
+ {
+     Work *work;
+-- 
+2.50.1.windows.1
+
