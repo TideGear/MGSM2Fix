@@ -85,3 +85,43 @@ Disc 2 in game (its `preope` stage is byte-identical to disc 1's, so the same
 build is used); the option submenus (SCREEN, KEY CONFIG, VIBRATION TEST), which
 use the VRAM columns this changes; and the `f924[12]` fix, which corrects a real
 out-of-bounds write but was not what fixed the EXIT freeze.
+
+## Briefing menu (`brf` stage)
+
+The briefing's videos, subtitles and character bios are **already English in
+Integral** - only the menu chrome is Japanese. Those labels are not text: they
+are PCX textures drawn as textured quads (`b_select.c`, `brf_800C983C` ->
+`DG_GetTexture`), which is why no ASCII label exists in STAGE.DIR, the
+executable or BRF.DAT.
+
+`GV_StrCode` (source/libgv/strcode.c, verified against its own doc examples)
+maps resource names to archive ids: the labels are **`br_s00`-`br_s15`**, the
+detailed-information submenu. The four `FILE 00`-`FILE 03` labels are different
+textures, not yet located.
+
+`pcx4.py` decodes/encodes the format: standard PCX, 1 bit/pixel x 4 planes,
+128-byte header, RLE where `code > 0xC0` means a run of `code - 0xC0`. Note the
+RLE stream is **row-wide** - `PcxInflate4` decodes `stride * nplanes` bytes as
+one stream, so runs cross plane boundaries.
+
+Three things must be right or the game breaks:
+
+1. **VRAM coordinates.** Each PCX carries its own destination in a `PCXINFO`
+   block at offset 74 (stamp 12345): `px, py, cx, cy`. USA's differ completely
+   from Integral's - using them uploads labels over the FILE menu and over
+   whatever the briefing video's timestamp draws from. Keep Integral's.
+2. **Slot dimensions.** The draw quads are hardcoded to Integral's original
+   label sizes (confirmed by on-screen width ratios matching Integral's texture
+   widths, not USA's). Anything wider overflows into the neighbouring texture's
+   VRAM and garbles it. Fit each image to Integral's `w x h`.
+3. **4-byte alignment.** Every archive entry's size is a multiple of 4, padded
+   with trailing zeros. Emitting an unaligned entry misaligns everything after
+   it and the loader takes a wild jump (seen as `pc: 30824000`).
+
+Palette and `n_colors` must come from the USA artwork, which uses up to 16
+indices where Integral uses 5.
+
+**Known imperfection:** labels whose English is far longer than the Japanese
+(`人質` -> `hostages`, `核兵器` -> `nuclear weapons`) are squeezed into narrow
+quads and render small. Fixing that needs the quad constants, which live in the
+undecompiled `brf` asm (`asm/overlays/brf/*.s`, raw `dw` opcode dumps).
