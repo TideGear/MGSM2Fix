@@ -171,7 +171,26 @@ including every label visible in the detailed-information submenu:
 All nine equal their Integral texture dimensions. The other seven keep their
 values in registers across call sites and need proper dataflow analysis.
 
-**To finish:** patch `xr = xl + usa_w` and `yb = yt + usa_h` for each label
+**Done, with one limit.** The compiler reuses registers across call sites, so
+several labels *share* an immediate - patching one silently changes another:
+
+    800C9EFC  86   br_s02.xr, br_s06.xr
+    800CA038  -7   br_s06.yt, br_s09.yt
+    800CA134  122  br_s09.xr, br_s11.xr
+
+Only `br_s04`, `br_s07`, `br_s08` and `br_s14` have both `xr` and `yb` unique,
+so only those four are widened to USA proportions (`brf_build.py`). They happen
+to include the two that looked worst, `hostages` and `nuclear weapons`. The
+remaining five keep the fitted-to-slot treatment. Widening those would need
+each to get its own `addiu`, i.e. space for extra instructions rather than an
+in-place value edit.
+
+The four `FILE NN` labels (`br_f00`-`br_f03`) are also ported. Their rects are
+zero at the call site - set elsewhere - so they are fitted to slot, which costs
+almost nothing here: USA's are within 20px of Integral's and the heights match
+exactly at 17px.
+
+**Original plan, for reference:** patch `xr = xl + usa_w` and `yb = yt + usa_h`
 (the immediates are in the overlay at `addr - 0x800C3208`, no code size change),
 and give each texture room in VRAM. Checked with correct colour depths - the
 archive is **47 textures at 4bpp and 4 at 8bpp**, and VRAM units are
