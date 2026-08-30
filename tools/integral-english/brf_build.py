@@ -15,8 +15,8 @@ import struct, json, sys
 sys.path.insert(0, '.')
 import pcx4
 from PIL import Image
-from brf_widen import (stage, parse, geo, units, ufits, strcode, pad, BASEADDR,
-                       ROW_H_ADDR, ROW_H_OLD, ROW_H)
+from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BASEADDR,
+                       ROW_H_ADDR, ROW_H_OLD, ROW_H, S00_ADDR, S00_OLD, S00_NEW)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -56,6 +56,12 @@ _w = struct.unpack('<I', ovl[_off:_off+4])[0]
 assert (_w >> 26) == 9 and (_w & 0xFFFF) == ROW_H_OLD, 'row height not at %08X' % ROW_H_ADDR
 struct.pack_into('<I', ovl, _off, (_w & 0xFFFF0000) | ROW_H)
 print('row height @%08X: %d -> %d  (brf_800C69B4, all br_sNN)' % (ROW_H_ADDR, ROW_H_OLD, ROW_H))
+# br_s00's animated width: rebuild the 52n shift/add chain as 100n
+_o = S00_ADDR - BASEADDR
+_have = list(struct.unpack('<5I', ovl[_o:_o+20]))
+assert _have == S00_OLD, 'br_s00 width chain not at %08X: %s' % (S00_ADDR, [hex(x) for x in _have])
+struct.pack_into('<5I', ovl, _o, *S00_NEW)
+print('br_s00 width chain @%08X: 52n -> 100n  (x1 = w*n/6 + 26)' % S00_ADDR)
 print('patched %d quad immediates:' % len(patched))
 for addr, o, n, users in patched:
     print('   %08X  %5d -> %-5d  %s' % (addr, o, n, ', '.join(users)))
@@ -107,7 +113,9 @@ for tid, g in G2.items():
     u = units(g['w'], g['bpp'])
     if tid in LAB:
         assert ufits(g['px'], g['w'], g['bpp']),             '0x%04X: u1 = %d > 255, the U coordinate would wrap' % (
-                tid, (g['px'] % 64) * (16 // g['bpp']) + g['w'] + 1)
+                tid, (g['px'] % 64) * (16 // g['bpp']) + g['w'])
+        assert vfits(g['py'], g['h']),             '0x%04X: v2 = %d > 255, the V coordinate would wrap' % (
+                tid, (g['py'] % 256) + g['h'])
     rects.append((g['px'], g['py'], u, g['h'], tid))
 for i in range(len(rects)):
     for j in range(i+1, len(rects)):

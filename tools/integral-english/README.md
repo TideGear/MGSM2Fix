@@ -188,9 +188,7 @@ single-line labels are untouched: their extra rows are transparent and row
 positions come from `y`, which does not change. Rows then overlap by up to 3
 transparent rows at the tightest advance, which is invisible.
 
-Result: **all 20 labels carry USA's artwork at 1:1 pixel size**, except
-`br_s00`, squashed on x alone (100 → 52) because its right edge is computed at
-runtime.
+Result: **all 20 labels carry USA's artwork at 1:1 pixel size.**
 
 ### Constraints that must all hold
 
@@ -214,7 +212,11 @@ runs cross plane boundaries.
    unit-wise page test and supersedes it. Over 255 the U wraps and the quad
    samples across the whole page as vertical stripes.
 
-   This was the navigation-order garble. `br_s09`/`br_s11` at `(928, …)` 128
+   The V axis has the same limit: `off_y = py % 256`, `poly->v2 = off_y + h`,
+   which also keeps a texture inside one 256-row tpage half. `br_s14` broke on
+   it when the row height went to 20 (`239 + 20 = 259`).
+
+   The U form was the navigation-order garble. `br_s09`/`br_s11` at `(928, …)` 128
    wide gave `128 + 128 + 1 = 257`; the unit test `(928 % 64) + 32 <= 64`
    passed because 32 + 32 = 64 exactly. They were the only two labels over the
    limit and the only two that garbled. Moving them to `px = 896` (`off_x = 0`)
