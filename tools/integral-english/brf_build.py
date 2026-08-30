@@ -15,7 +15,8 @@ import struct, json, sys
 sys.path.insert(0, '.')
 import pcx4
 from PIL import Image
-from brf_widen import (stage, parse, geo, units, ufits, strcode, pad, BASEADDR)
+from brf_widen import (stage, parse, geo, units, ufits, strcode, pad, BASEADDR,
+                       ROW_H_ADDR, ROW_H_OLD, ROW_H)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -49,6 +50,12 @@ for addr, val in sorted(newimm.items()):
     users = sorted(n for n, g in quads.items()
                    if addr in (g['xr'][1], g.get('yb', (0, None))[1]))
     patched.append((addr, old[addr], val, users))
+# the single row-height constant every br_sNN is drawn with
+_off = ROW_H_ADDR - BASEADDR
+_w = struct.unpack('<I', ovl[_off:_off+4])[0]
+assert (_w >> 26) == 9 and (_w & 0xFFFF) == ROW_H_OLD, 'row height not at %08X' % ROW_H_ADDR
+struct.pack_into('<I', ovl, _off, (_w & 0xFFFF0000) | ROW_H)
+print('row height @%08X: %d -> %d  (brf_800C69B4, all br_sNN)' % (ROW_H_ADDR, ROW_H_OLD, ROW_H))
 print('patched %d quad immediates:' % len(patched))
 for addr, o, n, users in patched:
     print('   %08X  %5d -> %-5d  %s' % (addr, o, n, ', '.join(users)))
@@ -62,15 +69,18 @@ for e in ei:
     cw, ch = target[e[0]]
     uw, uh, upal, urows = pcx4.decode(U[e[0]])
     bg = next((i for i in range(len(upal)) if tuple(upal[i]) == (0, 0, 0)), 0)
-    if uw <= cw and uh <= ch:                      # true size, padded
-        rows = [[(urows[y][x] if y < uh and x < uw else bg) for x in range(cw)]
-                for y in range(ch)]
-        how = 'exact' if (uw, uh) == (cw, ch) else 'pad'
-    else:                                          # quad too small - scale down
+    # Squash only the axis that does not fit; pad the other, so the art keeps
+    # 1:1 wherever the quad allows it.
+    sw, sh = min(uw, cw), min(uh, ch)
+    if (sw, sh) != (uw, uh):
         im = Image.new('P', (uw, uh)); im.putdata([v for r in urows for v in r])
-        px = list(im.resize((cw, ch), Image.NEAREST).getdata())
-        rows = [px[y*cw:(y+1)*cw] for y in range(ch)]
-        how = 'scaled'
+        px = list(im.resize((sw, sh), Image.NEAREST).getdata())
+        urows = [px[y*sw:(y+1)*sw] for y in range(sh)]
+        how = 'squashed %s' % ('x' if sw != uw else 'y')
+    else:
+        how = 'exact' if (uw, uh) == (cw, ch) else 'pad'
+    rows = [[(urows[y][x] if y < sh and x < sw else bg) for x in range(cw)]
+            for y in range(ch)]
     npx, npy = place.get(e[0], (ig['px'], ig['py']))
     src = bytearray(pcx4.encode(U[e[0]], cw, ch, upal, rows))
     struct.pack_into('<7H', src, 74, 12345, ug['fl'], npx, npy, ig['cx'], ig['cy'], ug['nc'])
@@ -111,7 +121,7 @@ for name, g in quads.items():                     # quad == canvas, for every la
     tid = strcode(name)
     qw = imm16(g['xr'][1]) - g['xl'][0]
     # families B and C get no yb immediate: the height is forced at runtime
-    qh = (g['fixed_h'] or G2[tid]['h']) if 'fixed_h' in g else imm16(g['yb'][1]) - g['yt'][0]
+    qh = 17 if name.startswith('br_f') else ROW_H
     assert (qw, qh) == (G2[tid]['w'], G2[tid]['h']), \
         '%s quad %dx%d vs texture %dx%d' % (name, qw, qh, G2[tid]['w'], G2[tid]['h'])
 print('\nlabel textures:')

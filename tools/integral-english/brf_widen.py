@@ -84,23 +84,25 @@ I0 = {e[0]: e[3] for e in ei}
 # size when its canvas equals the quad.  Several labels share an immediate
 # (same store address), so a group gets one quad sized to its largest member
 # and the smaller members are padded out to match.
+# Only xr is ever patched.  The quad height is 13 for every br_sNN - retail's
+# yb immediates all give exactly 13, and brf_800C69B4 forces 13 at runtime from
+# 16 call sites regardless - and 17 for the FILE labels.  Measured against USA:
+# the art must be PADDED into that height, never stretched to it, or the label
+# renders 13/art_h too tall (the terrorists' armament came out 1.88x).
+# brf_800C69B4 draws every br_sNN into a quad of one hardcoded height
+# (`addiu v1, a2, 13` at 800C69D0).  Padding keeps art 1:1 at ANY quad height,
+# so raising it to 20 lets the two-line labels (br_s02 20 rows, br_s12/s13 19)
+# render full size while the single-line ones are unaffected - their extra rows
+# are transparent and the row positions come from y, which does not change.
+ROW_H_ADDR, ROW_H_OLD, ROW_H = 0x800C69D0, 13, 20
 gid = {}
-for n, g in quads.items():
-    for key in ('xr', 'yb'):
-        if key in g: gid.setdefault((key, g[key][1]), []).append(n)
-newimm = {}
-for (key, addr), members in gid.items():
-    lo_key = 'xl' if key == 'xr' else 'yt'
-    dim = 'w' if key == 'xr' else 'h'
-    newimm[addr] = max(quads[n][lo_key][0] + geo(U[strcode(n)])[dim] for n in members)
+for n, g in quads.items(): gid.setdefault(g['xr'][1], []).append(n)
+newimm = {addr: max(quads[n]['xl'][0] + geo(U[strcode(n)])['w'] for n in members)
+          for addr, members in gid.items()}
 target = {}
 for n, g in quads.items():
-    w = newimm[g['xr'][1]] - g['xl'][0]
-    # Families B and C never get a yb immediate: the height is forced at runtime
-    # (13 rows by brf_800C69B4, 17 for the FILE labels), so the canvas must use
-    # that height and taller USA art is scaled down to it.
-    h = (g['fixed_h'] or geo(U[strcode(n)])['h']) if 'fixed_h' in g else newimm[g['yb'][1]] - g['yt'][0]
-    target[strcode(n)] = (w, h)
+    target[strcode(n)] = (newimm[g['xr'][1]] - g['xl'][0],
+                          17 if n.startswith('br_f') else ROW_H)
 # br_s00's right edge is computed at runtime (x1 = t0 + 26, an animated reveal),
 # so it has no patchable quad and keeps Integral's slot.
 ALL = ['br_s%02d' % i for i in range(16)] + ['br_f%02d' % i for i in range(4)]
@@ -108,7 +110,9 @@ for n in ALL:
     t = strcode(n)
     assert t in U and t in I0, 'missing %s' % n
     WIDEN[t] = n
-    if t not in target: g = geo(I0[t]); target[t] = (g['w'], g['h'])
+    if t not in target:
+        g = geo(I0[t])
+        target[t] = (g['w'], 17 if n.startswith('br_f') else ROW_H)
 assert len(target) == 20, 'expected all 20 labels, got %d' % len(target)
 json.dump({hex(k): list(v) for k, v in target.items()}, open('work/brf_target.json', 'w'))
 json.dump({hex(k): v for k, v in newimm.items()}, open('work/brf_imm.json', 'w'))

@@ -166,35 +166,31 @@ before each one. Args are `a3=xl, 16(sp)=yt, 20(sp)=xr, 24(sp)=yb, 28(sp)=abe,
 unique `xr`. `xr - xl` equals the Integral texture width exactly for all six.
 Width patchable, height not — see below.
 
-### Height is always 13, so the canvas must keep USA's native height
+### Height: pad into the quad, never stretch to it
 
 `brf_800C69B4(work, idx, y, h)` sets `p[idx].y2 = y + 0xD` and preserves x. It
 has no caller in the decompiled C, but the overlay has **16 call sites, one per
-`br_sNN`** (`800C6F6C`–`800C72C4`, `a1` = poly index 9–24). So every submenu
-label is repositioned at runtime into a **13-row** quad, whatever `yb` says —
-the family-A `yb` patches are no-ops, and retail's family-A quads are all 13
-tall anyway.
+`br_sNN`** (`800C6F6C`–`800C72C4`, `a1` = poly index 9–24), so every submenu
+label is drawn into a quad of one hardcoded height whatever `yb` says. `a3` is
+only the row advance (17–20), not a height.
 
-Every label is therefore stretched from its texture height to 13, **in USA
-too**. To match USA the canvas must carry USA's *native* height so the stretch
-ratio is identical; forcing the canvas to 13 would render the art smaller than
-USA's and resample it twice. The FILE labels are not in that set (polys 4–7,
-positioned in C at 17 rows, which already matches USA's 17).
+Measuring both games' screenshots settles how to use that. Every label's
+rendered height came out at exactly `13 / texture_height` of USA's — `the
+terrorists' armament` 1.88x (13/7), `unit FOX-HOUND` 1.87x, `next generation`
+0.69x (13/19). So **USA renders at native height and the canvas must be padded
+into the quad, not sized to the art**. Padding keeps the art 1:1 at any quad
+height; sizing the canvas to the art stretches it to fill.
 
-**C — the FILE labels** (`br_f00`–`br_f03`): a zero rect at the call site. They
-are positioned in decompiled C (`b_select.c`, `p[4]`–`p[7]`) as `x0 = -142`,
-`x1 = -22`/`-46`, y spanning 17 rows. The x constants are still immediates in
-the overlay and are patchable at `800C6C44`, `800C6CC4`, `800C6D4C`,
-`800C6DD0`. Height 17 already matches USA's.
+That also frees the two-line labels. Since padding is height-independent, the
+row constant can be raised — `addiu v1, a2, 13` at **`800C69D0` → 20** — so
+`br_s02` (20 rows) and `br_s12`/`br_s13` (19) render full size while the
+single-line labels are untouched: their extra rows are transparent and row
+positions come from `y`, which does not change. Rows then overlap by up to 3
+transparent rows at the tightest advance, which is invisible.
 
-`br_s00` is the one exception: its right edge is computed at runtime
-(`x1 = t0 + 26` from a division — an animated reveal), so it has no patchable
-quad and keeps Integral's slot.
-
-Result: 19 of 20 labels carry USA's artwork with **no resampling at all** — 17
-exact, plus `br_s06` and `br_s09` padded because they share an immediate with a
-larger neighbour. Only `br_s00` is scaled, because its right edge is computed
-at runtime.
+Result: **all 20 labels carry USA's artwork at 1:1 pixel size**, except
+`br_s00`, squashed on x alone (100 → 52) because its right edge is computed at
+runtime.
 
 ### Constraints that must all hold
 
