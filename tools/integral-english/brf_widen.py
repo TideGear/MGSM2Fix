@@ -55,11 +55,17 @@ def geo(b):
 def units(w, bpp): return (w * bpp + 15) // 16
 
 def ufits(px, w, bpp):
-    """DG_SetTexture keeps off_x = (px % 64) * (16 / bpp) TEXELS, and
-    brf_800C983C sets poly->u1 = off_x + w + 1 into a u_char.  Anything over
-    255 wraps and the quad samples across the whole page as vertical stripes.
-    This is stricter than the unit-wise page test and supersedes it."""
-    return (px % 64) * (16 // bpp) + w + 1 <= 255
+    """DG_SetTexture stores off_x = (px % 64) * (16 / bpp) TEXELS and
+    tex->w = w - 1, and brf_800C983C sets poly->u1 = off_x + tex->w + 1 into a
+    u_char.  So the limit is off_x + w <= 255; over that the U wraps and the
+    quad samples across the page as vertical stripes."""
+    return (px % 64) * (16 // bpp) + w <= 255
+
+def vfits(py, h):
+    """Same on the other axis: off_y = py % 256, tex->h = h - 1, and
+    poly->v2 = off_y + tex->h + 1.  This also keeps a texture inside one
+    256-row tpage half, which the tpage field cannot express otherwise."""
+    return (py % 256) + h <= 255
 
 def strcode(s):
     i = 0
@@ -95,6 +101,12 @@ I0 = {e[0]: e[3] for e in ei}
 # render full size while the single-line ones are unaffected - their extra rows
 # are transparent and the row positions come from y, which does not change.
 ROW_H_ADDR, ROW_H_OLD, ROW_H = 0x800C69D0, 13, 20
+# br_s00 has no stored quad: its right edge is animated as x1 = 52n/6 + 26,
+# with the 52 baked into a shift/add chain at 800C7658.  Rebuilding the chain
+# as 100n (using $at as scratch, same five slots) gives it USA's 100 px width.
+S00_ADDR = 0x800C7658
+S00_OLD = [0x00051040, 0x00451021, 0x00021080, 0x00451021, 0x00021080]
+S00_NEW = [0x00050940, 0x00051180, 0x00411021, 0x00050880, 0x00411021]
 gid = {}
 for n, g in quads.items(): gid.setdefault(g['xr'][1], []).append(n)
 newimm = {addr: max(quads[n]['xl'][0] + geo(U[strcode(n)])['w'] for n in members)
@@ -112,7 +124,9 @@ for n in ALL:
     WIDEN[t] = n
     if t not in target:
         g = geo(I0[t])
-        target[t] = (g['w'], 17 if n.startswith('br_f') else ROW_H)
+        # br_s00's animated width is patched to USA's below
+        w = geo(U[t])['w'] if n == 'br_s00' else g['w']
+        target[t] = (w, 17 if n.startswith('br_f') else ROW_H)
 assert len(target) == 20, 'expected all 20 labels, got %d' % len(target)
 json.dump({hex(k): list(v) for k, v in target.items()}, open('work/brf_target.json', 'w'))
 json.dump({hex(k): v for k, v in newimm.items()}, open('work/brf_imm.json', 'w'))
@@ -142,14 +156,14 @@ def tgt(t):
 for tid in sorted(WIDEN, key=lambda t: -tgt(t)[2]):
     ig = geo(I0[tid]); tw, th, need = tgt(tid)
     bpp = geo(U[tid])['bpp']
-    if ufits(ig['px'], tw, bpp) and not busy(ig['px'], ig['py'], need, th):
+    if ufits(ig['px'], tw, bpp) and vfits(ig['py'], th)        and not busy(ig['px'], ig['py'], need, th):
         place[tid] = (ig['px'], ig['py'])
     else:
         found = None
         for page in (896, 960, 832, 768, 704, 640, 576, 512):
             for ny in range(0, 512 - th):
                 for nx in range(page, page + 64 - need + 1):
-                    if ufits(nx, tw, bpp) and not busy(nx, ny, need, th):
+                    if ufits(nx, tw, bpp) and vfits(ny, th) and not busy(nx, ny, need, th):
                         found = (nx, ny); break
                 if found: break
             if found: break
