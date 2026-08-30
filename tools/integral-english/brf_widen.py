@@ -54,6 +54,13 @@ def geo(b):
 
 def units(w, bpp): return (w * bpp + 15) // 16
 
+def ufits(px, w, bpp):
+    """DG_SetTexture keeps off_x = (px % 64) * (16 / bpp) TEXELS, and
+    brf_800C983C sets poly->u1 = off_x + w + 1 into a u_char.  Anything over
+    255 wraps and the quad samples across the whole page as vertical stripes.
+    This is stricter than the unit-wise page test and supersedes it."""
+    return (px % 64) * (16 // bpp) + w + 1 <= 255
+
 def strcode(s):
     i = 0
     for ch in s.encode(): i = (((i << 5) | (i >> 11)) & 0xFFFF); i = (i + ch) & 0xFFFF
@@ -92,7 +99,7 @@ for n, g in quads.items():
     # Families B and C never get a yb immediate: the height is forced at runtime
     # (13 rows by brf_800C69B4, 17 for the FILE labels), so the canvas must use
     # that height and taller USA art is scaled down to it.
-    h = g['fixed_h'] if 'fixed_h' in g else newimm[g['yb'][1]] - g['yt'][0]
+    h = (g['fixed_h'] or geo(U[strcode(n)])['h']) if 'fixed_h' in g else newimm[g['yb'][1]] - g['yt'][0]
     target[strcode(n)] = (w, h)
 # br_s00's right edge is computed at runtime (x1 = t0 + 26, an animated reveal),
 # so it has no patchable quad and keeps Integral's slot.
@@ -130,14 +137,16 @@ def tgt(t):
     w, h = target[t]; return w, h, units(w, geo(U[t])['bpp'])
 for tid in sorted(WIDEN, key=lambda t: -tgt(t)[2]):
     ig = geo(I0[tid]); tw, th, need = tgt(tid)
-    if (ig['px'] % 64) + need <= 64 and not busy(ig['px'], ig['py'], need, th):
+    bpp = geo(U[tid])['bpp']
+    if ufits(ig['px'], tw, bpp) and not busy(ig['px'], ig['py'], need, th):
         place[tid] = (ig['px'], ig['py'])
     else:
         found = None
         for page in (896, 960, 832, 768, 704, 640, 576, 512):
             for ny in range(0, 512 - th):
                 for nx in range(page, page + 64 - need + 1):
-                    if not busy(nx, ny, need, th): found = (nx, ny); break
+                    if ufits(nx, tw, bpp) and not busy(nx, ny, need, th):
+                        found = (nx, ny); break
                 if found: break
             if found: break
         assert found, 'no VRAM room for %s (%d units x %d rows)' % (WIDEN[tid], need, th)

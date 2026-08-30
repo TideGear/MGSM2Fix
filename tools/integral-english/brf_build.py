@@ -15,7 +15,7 @@ import struct, json, sys
 sys.path.insert(0, '.')
 import pcx4
 from PIL import Image
-from brf_widen import (stage, parse, geo, units, strcode, pad, BASEADDR)
+from brf_widen import (stage, parse, geo, units, ufits, strcode, pad, BASEADDR)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -95,7 +95,9 @@ G2 = {e[0]: geo(e[3]) for e in e2}
 rects = []
 for tid, g in G2.items():
     u = units(g['w'], g['bpp'])
-    if tid in LAB: assert (g['px'] % 64) + u <= 64, '0x%04X crosses a texture page' % tid
+    if tid in LAB:
+        assert ufits(g['px'], g['w'], g['bpp']),             '0x%04X: u1 = %d > 255, the U coordinate would wrap' % (
+                tid, (g['px'] % 64) * (16 // g['bpp']) + g['w'] + 1)
     rects.append((g['px'], g['py'], u, g['h'], tid))
 for i in range(len(rects)):
     for j in range(i+1, len(rects)):
@@ -109,7 +111,7 @@ for name, g in quads.items():                     # quad == canvas, for every la
     tid = strcode(name)
     qw = imm16(g['xr'][1]) - g['xl'][0]
     # families B and C get no yb immediate: the height is forced at runtime
-    qh = g['fixed_h'] if 'fixed_h' in g else imm16(g['yb'][1]) - g['yt'][0]
+    qh = (g['fixed_h'] or G2[tid]['h']) if 'fixed_h' in g else imm16(g['yb'][1]) - g['yt'][0]
     assert (qw, qh) == (G2[tid]['w'], G2[tid]['h']), \
         '%s quad %dx%d vs texture %dx%d' % (name, qw, qh, G2[tid]['w'], G2[tid]['h'])
 print('\nlabel textures:')
