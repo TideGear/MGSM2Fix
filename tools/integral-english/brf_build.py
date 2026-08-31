@@ -16,9 +16,9 @@ sys.path.insert(0, '.')
 import pcx4
 from PIL import Image
 from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BASEADDR,
-                       ROW_H_ADDR, ROW_H_OLD, ROW_H, S00_ADDR, S00_OLD, S00_NEW,
+                       ROW_H_ADDR, ROW_H_OLD, ROW_H_NEW, ROW_H_BIAS, S00_ADDR, S00_OLD, S00_NEW,
                        advance_patches, INT_FN, xl_patches, S00_X_ADDRS, LINE_DELTA,
-                       quads)
+                       quads, HILITE)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -53,28 +53,40 @@ for addr, val in sorted(newimm.items()):
     patched.append((addr, old[addr], val, users))
 # the single row-height constant every br_sNN is drawn with
 _off = ROW_H_ADDR - BASEADDR
-_w = struct.unpack('<I', ovl[_off:_off+4])[0]
-assert (_w >> 26) == 9 and (_w & 0xFFFF) == ROW_H_OLD, 'row height not at %08X' % ROW_H_ADDR
-struct.pack_into('<I', ovl, _off, (_w & 0xFFFF0000) | ROW_H)
-print('row height @%08X: %d -> %d  (brf_800C69B4, all br_sNN)' % (ROW_H_ADDR, ROW_H_OLD, ROW_H))
+_have = list(struct.unpack('<9I', ovl[_off:_off+36]))
+assert _have == ROW_H_OLD, 'row positioner not as expected: %s' % [hex(x) for x in _have]
+struct.pack_into('<9I', ovl, _off, *ROW_H_NEW)
+print('row height @%08X: fixed 13 -> per-label (advance - %d), highlight follows'
+      % (ROW_H_ADDR, ROW_H_BIAS))
 # br_s00's animated width: rebuild the 52n shift/add chain as 100n
 _o = S00_ADDR - BASEADDR
 _have = list(struct.unpack('<5I', ovl[_o:_o+20]))
 assert _have == S00_OLD, 'br_s00 width chain not at %08X: %s' % (S00_ADDR, [hex(x) for x in _have])
 struct.pack_into('<5I', ovl, _o, *S00_NEW)
 print('br_s00 width chain @%08X: 52n -> 100n  (x1 = w*n/6 + 26)' % S00_ADDR)
-for n, (addr, old_v, new_v) in sorted(xl_patches(bytes(pi[0]), pu[0]).items()):
+from brf_widen import XL as _XL
+for n, (addr, old_v, new_v) in sorted(_XL.items()):
     o = addr - BASEADDR
     w = struct.unpack('<I', ovl[o:o+4])[0]
     assert (w >> 26) == 9 and (w & 0xFFFF) == old_v, 'xl %08X: %08X' % (addr, w)
     struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
     print('label xl  @%08X: %2d -> %-2d  %s' % (addr, old_v, new_v, n))
-for addr in S00_X_ADDRS:                     # br_s00's animated x, same shift
+if LINE_DELTA:
+    for addr in S00_X_ADDRS:                 # br_s00's animated x, same shift
+        o = addr - BASEADDR
+        w = struct.unpack('<I', ovl[o:o+4])[0]
+        assert (w >> 26) == 9 and (w & 0xFFFF) == 26, 'br_s00 x @%08X: %08X' % (addr, w)
+        struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (26 + LINE_DELTA))
+        print('label xl  @%08X: 26 -> %d  br_s00 (animated)' % (addr, 26 + LINE_DELTA))
+
+for addr, old_v, new_v, what in HILITE:
     o = addr - BASEADDR
     w = struct.unpack('<I', ovl[o:o+4])[0]
-    assert (w >> 26) == 9 and (w & 0xFFFF) == 26, 'br_s00 x @%08X: %08X' % (addr, w)
-    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | 30)
-    print('label xl  @%08X: 26 -> 30  br_s00 (animated)' % addr)
+    assert (w >> 26) == 9 and ((w >> 21) & 31) == 7, 'highlight %08X: %08X' % (addr, w)
+    cur = w & 0xFFFF; cur -= 0x10000 if cur >= 0x8000 else 0
+    assert cur == old_v, 'highlight %08X: %d != %d' % (addr, cur, old_v)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
+    print('highlight @%08X: base_y%+d -> base_y%+d  (%s)' % (addr, old_v, new_v, what))
 
 NM = {9+i: 'br_s%02d' % i for i in range(16)}
 for addr, old_v, new_v, idx in advance_patches(bytes(pi[0]), pu[0]):
@@ -154,7 +166,7 @@ for name, g in quads.items():                     # quad == canvas, for every la
     tid = strcode(name)
     qw = imm16(g['xr'][1]) - g['xl'][0]
     # families B and C get no yb immediate: the height is forced at runtime
-    qh = 17 if name.startswith('br_f') else ROW_H
+    qh = 17 if name.startswith('br_f') else target[tid][1]   # per-label, advance - bias
     assert (qw, qh) == (G2[tid]['w'], G2[tid]['h']), \
         '%s quad %dx%d vs texture %dx%d' % (name, qw, qh, G2[tid]['w'], G2[tid]['h'])
 print('\nlabel textures:')
