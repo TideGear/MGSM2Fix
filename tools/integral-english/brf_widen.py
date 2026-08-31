@@ -96,6 +96,37 @@ LINE_DELTA = 0
 # br_s10 is 120 px at family-B's xl 46 -> 166.  Clamp each family's xl so its
 # widest member ends by RIGHT_LIMIT, keeping the indent uniform within a family.
 RIGHT_LIMIT = 156
+
+# Two pairs share one xr immediate, so the narrower member gets the wider one's
+# quad - and since the selection highlight follows the quad, its highlight runs
+# far past its text (br_s06, Dr. Naomi, was 112 wide against USA's 52).  USA
+# gives each its own xr.  Un-sharing needs one spare slot per block and there is
+# none - except that the rewritten positioner now overwrites all four poly y
+# values every frame, which makes the GetResources yt/yb *dead* for every
+# br_sNN.  Their loads are the spare slots.  All four rows are unconditional,
+# so the positioner always runs and the y really is always replaced.
+UNSHARE = ['br_s02', 'br_s06', 'br_s09', 'br_s11']
+
+def unshare_patches(xl_of, w_of):
+    def li(rt, v): return 0x24000000 | (rt << 16) | (v & 0xFFFF)
+    def sw(rt, o): return 0xAFA00000 | (rt << 16) | o
+    T0, S1, S4, S5 = 8, 17, 20, 21
+    x02 = xl_of('br_s02') + w_of('br_s02'); x06 = xl_of('br_s06') + w_of('br_s06')
+    x09 = xl_of('br_s09') + w_of('br_s09'); x11 = xl_of('br_s11') + w_of('br_s11')
+    return [
+        # br_s02: its own xr in t0, and s5 left holding br_s06's xr for later
+        (0x800C9EF8,
+         [0x2408FFD1, 0x24150056, 0xAFA80010, 0x2408FFDE, 0xAFB50014, 0xAFA80018, 0xAFB1001C],
+         [li(T0, x02), li(S5, x06), sw(T0, 16), sw(T0, 20), sw(T0, 24), sw(S1, 28), 0],
+         'br_s02 xr=%d, leaves s5=%d for br_s06' % (x02, x06)),
+        # br_s06 reads that s5 unchanged; br_s09 just needs its own immediate
+        (0x800CA134, [0x2414007A], [li(S4, x09)], 'br_s09 xr=%d' % x09),
+        # br_s11 no longer reads s4
+        (0x800CA1C8,
+         [0x2408FFE5, 0xAFA80010, 0x2408FFF2, 0xAFB40014, 0xAFA80018, 0xAFB1001C],
+         [li(T0, x11), sw(T0, 16), sw(T0, 20), sw(T0, 24), sw(S1, 28), 0],
+         'br_s11 xr=%d' % x11),
+    ]
 S00_X_ADDRS = (0x800C7674, 0x800C76A4)      # br_s00's animated x0 and x1 base
 
 # Selection highlight (brf_800C6930, decompiled in b_select.c).  Integral draws
@@ -218,7 +249,8 @@ for n, (addr, old, new) in XL.items():
     if n in quads: quads[n]['xl'] = [new, addr]     # xr is derived from this
 
 gid = {}
-for n, g in quads.items(): gid.setdefault(g['xr'][1], []).append(n)
+for n, g in quads.items():
+    if n not in UNSHARE: gid.setdefault(g['xr'][1], []).append(n)
 newimm = {addr: max(quads[n]['xl'][0] + geo(U[strcode(n)])['w'] for n in members)
           for addr, members in gid.items()}
 target = {}
@@ -227,7 +259,9 @@ for n, g in quads.items():
         h = 17
     else:
         h = USA_ADV[strcode(n)] - ROW_H_BIAS
-    target[strcode(n)] = (newimm[g['xr'][1]] - g['xl'][0], h)
+    # un-shared labels get their own xr, so the quad is exactly USA's width
+    w = geo(U[strcode(n)])['w'] if n in UNSHARE else newimm[g['xr'][1]] - g['xl'][0]
+    target[strcode(n)] = (w, h)
 # br_s00's right edge is computed at runtime (x1 = t0 + 26, an animated reveal),
 # so it has no patchable quad and keeps Integral's slot.
 ALL = ['br_s%02d' % i for i in range(16)] + ['br_f%02d' % i for i in range(4)]
