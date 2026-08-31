@@ -80,13 +80,33 @@ ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])
 U = {e[0]: e[3] for e in eu}
 quads = json.load(open('work/brf_quads_all.json'))
 
-# Horizontal: Integral's whole briefing panel sits 20 game px right of USA's
-# (the vertical rule measures x 2101 vs 1921, 180 display px / 9). The label xl
-# constants differ by only 16-17, so the labels sit ~4 px left of where USA has
-# them relative to their own rule. Setting xl = USA's xl + that offset puts them
-# exactly where USA has them; xr follows because the canvas is xl + USA's width.
-LINE_DELTA = 20
+# Horizontal: DO NOT shift xl.  Integral's vertical rule sits 20 game px right
+# of USA's (measured 2101 vs 1921, 180 display px / 9) while its label xl
+# constants are only 16-17 right, so the labels sit ~4 px left of USA's
+# label-to-rule offset.  Matching that offset (xl = USA's xl + 20) puts
+# `the terrorists' armament`, 128 px wide, at 30..158 - and the panel spans
+# -160..160, so the final `t` touches the screen edge.  USA only fits it
+# because its rule is at 0: 10..138, 22 px of margin.  Integral's native xl
+# keeps 6 px of margin, so the 4 px offset stays and the text stays on screen.
+# Moving the rule instead would need whatever positions it - it is not a poly
+# either game writes, and the DG_PRIM world matrix is set in undecompiled asm.
+LINE_DELTA = 0
+# The panel spans -160..160.  Integral's indents were sized for the narrower
+# Japanese art, so USA's longest labels run off the right edge at them:
+# br_s10 is 120 px at family-B's xl 46 -> 166.  Clamp each family's xl so its
+# widest member ends by RIGHT_LIMIT, keeping the indent uniform within a family.
+RIGHT_LIMIT = 156
 S00_X_ADDRS = (0x800C7674, 0x800C76A4)      # br_s00's animated x0 and x1 base
+
+# Selection highlight (brf_800C6930, decompiled in b_select.c).  Integral draws
+# a box [base_y-4, base_y+10] plus a 1px bar [base_y+10, base_y+11] - 15 rows.
+# USA's equivalent takes `above` as a stack argument and draws [y-above, y+3]
+# plus [y+3, y+4], i.e. above+4 = 6 rows, with its top ON the text top.  Our
+# text top is y (we pad rather than offset by `above`), so the same-sized
+# highlight aligned to our text is [y, y+5] plus [y+5, y+6].
+HILITE = [(0x800C6944, 10,  5, 'bar top / box bottom'),
+          (0x800C6950, 11,  6, 'bar bottom'),
+          (0x800C698C, -4,  0, 'box top')]
 
 def xl_patches(int_ovl, usa_ovl):
     from quadscan import scan
@@ -96,7 +116,7 @@ def xl_patches(int_ovl, usa_ovl):
         if not n or not n.startswith('br_s') or n == 'br_s00': continue
         if xl is None or sa is None or U.get(n) is None: continue
         new = U[n] + LINE_DELTA
-        if new != xl: out[n] = (sa, xl, new)
+        if LINE_DELTA and new != xl: out[n] = (sa, xl, new)
     return out
 WIDEN = {strcode(n): n for n in quads}
 for t in WIDEN: assert t in U, 'missing %s in USA archive' % WIDEN[t]
@@ -114,12 +134,37 @@ I0 = {e[0]: e[3] for e in ei}
 # 16 call sites regardless - and 17 for the FILE labels.  Measured against USA:
 # the art must be PADDED into that height, never stretched to it, or the label
 # renders 13/art_h too tall (the terrorists' armament came out 1.88x).
-# brf_800C69B4 draws every br_sNN into a quad of one hardcoded height
-# (`addiu v1, a2, 13` at 800C69D0).  Padding keeps art 1:1 at ANY quad height,
-# so raising it to 20 lets the two-line labels (br_s02 20 rows, br_s12/s13 19)
-# render full size while the single-line ones are unaffected - their extra rows
-# are transparent and the row positions come from y, which does not change.
-ROW_H_ADDR, ROW_H_OLD, ROW_H = 0x800C69D0, 13, 20
+# brf_800C69B4 draws every br_sNN into a quad of ONE hardcoded height
+# (`addiu v1, a2, 13`).  The selection highlight follows that quad, so a fixed
+# height gives a fixed highlight - USA's varies per row because USA sizes each
+# box to its own label (`above + below + 5` = the texture height).
+#
+# The function has two genuinely redundant stores - `sh a0, 8(v0)` and
+# `sh a1, 32(v0)` write back values it just read with lh - which is room enough
+# to make the height per-label.  a3 is the row advance, already per-label and
+# already set to USA's value, and `advance - 6` tracks USA's box height within
+# a row or two everywhere (only br_s05 is 1 row tall for it, which the canvas
+# builder squashes).  The return value y + a3 is untouched, so row positions
+# do not move.
+ROW_H_ADDR, ROW_H_BIAS = 0x800C69D0, 6
+ROW_H_OLD = [0x24C3000D,   # addiu v1, a2, 13
+             0xA446000A,   # sh a2, 10(v0)
+             0xA4460012,   # sh a2, 18(v0)
+             0xA443001A,   # sh v1, 26(v0)
+             0xA4430022,   # sh v1, 34(v0)
+             0xA4440008,   # sh a0,  8(v0)   <- redundant (x0 = x0)
+             0xA4450010,   # sh a1, 16(v0)
+             0xA4440018,   # sh a0, 24(v0)
+             0xA4450020]   # sh a1, 32(v0)   <- redundant (x3 = x3)
+ROW_H_NEW = [0x00C71821,   # addu  v1, a2, a3      v1 = y + advance
+             0x2463FFFA,   # addiu v1, v1, -6      v1 = y + advance - 6
+             0xA446000A,   # sh a2, 10(v0)         y0
+             0xA4460012,   # sh a2, 18(v0)         y1
+             0xA443001A,   # sh v1, 26(v0)         y2
+             0xA4430022,   # sh v1, 34(v0)         y3
+             0xA4450010,   # sh a1, 16(v0)         x1 = x3
+             0xA4440018,   # sh a0, 24(v0)         x2 = x0
+             0x00000000]   # nop
 # br_s00 has no stored quad: its right edge is animated as x1 = 52n/6 + 26,
 # with the 52 baked into a shift/add chain at 800C7658.  Rebuilding the chain
 # as 100n (using $at as scratch, same five slots) gives it USA's 100 px width.
@@ -149,7 +194,26 @@ def advance_patches(int_ovl, usa_ovl):
             if op == 0 and (w & 0x3F) == 0x21 and ((w >> 11) & 31) == 7:
                 out.append((x, adv, want, idx)); break
     return out      # the reason for unanimous approval
-XL = xl_patches(pi[0], pu[0])
+from rowargs import run_bytes as _rb
+USA_ADV = {}
+for _a, _i, _adv, _ab, _be in _rb(pu[0], USA_BASE, USA_FN):
+    if _i is not None and 9 <= _i <= 24: USA_ADV[strcode('br_s%02d' % (_i - 9))] = _adv
+assert len(USA_ADV) == 16 and all(v for v in USA_ADV.values()), 'USA advances incomplete'
+
+XL = dict(xl_patches(pi[0], pu[0]))
+# clamp per family (labels sharing an xl value) so the widest one fits
+from quadscan import scan as _scan
+_sites = {n: (xl, sa) for a, n, xl, yt, xr, yb, sa in _scan(pi[0], BASEADDR, 0x800C983C)
+          if n and n.startswith('br_s') and xl is not None and sa is not None}
+_fam = {}
+for n, (xl, sa) in _sites.items(): _fam.setdefault(xl, []).append(n)
+for xl, members in _fam.items():
+    widest = max(geo(U[strcode(n)])['w'] for n in members)
+    room = RIGHT_LIMIT - widest
+    if room < xl:
+        for n in members: XL[n] = (_sites[n][1], xl, room)
+        print('xl clamp: family at %d -> %d (widest %s is %d px)'
+              % (xl, room, max(members, key=lambda m: geo(U[strcode(m)])['w']), widest))
 for n, (addr, old, new) in XL.items():
     if n in quads: quads[n]['xl'] = [new, addr]     # xr is derived from this
 
@@ -159,8 +223,11 @@ newimm = {addr: max(quads[n]['xl'][0] + geo(U[strcode(n)])['w'] for n in members
           for addr, members in gid.items()}
 target = {}
 for n, g in quads.items():
-    target[strcode(n)] = (newimm[g['xr'][1]] - g['xl'][0],
-                          17 if n.startswith('br_f') else ROW_H)
+    if n.startswith('br_f'):
+        h = 17
+    else:
+        h = USA_ADV[strcode(n)] - ROW_H_BIAS
+    target[strcode(n)] = (newimm[g['xr'][1]] - g['xl'][0], h)
 # br_s00's right edge is computed at runtime (x1 = t0 + 26, an animated reveal),
 # so it has no patchable quad and keeps Integral's slot.
 ALL = ['br_s%02d' % i for i in range(16)] + ['br_f%02d' % i for i in range(4)]
@@ -170,9 +237,10 @@ for n in ALL:
     WIDEN[t] = n
     if t not in target:
         g = geo(I0[t])
+        # br_s00 too: its height comes from the same per-label rule
         # br_s00's animated width is patched to USA's below
         w = geo(U[t])['w'] if n == 'br_s00' else g['w']
-        target[t] = (w, 17 if n.startswith('br_f') else ROW_H)
+        target[t] = (w, 17 if n.startswith('br_f') else USA_ADV[t] - ROW_H_BIAS)
 assert len(target) == 20, 'expected all 20 labels, got %d' % len(target)
 json.dump({hex(k): list(v) for k, v in target.items()}, open('work/brf_target.json', 'w'))
 json.dump({hex(k): v for k, v in newimm.items()}, open('work/brf_imm.json', 'w'))

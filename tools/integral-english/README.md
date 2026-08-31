@@ -166,29 +166,63 @@ before each one. Args are `a3=xl, 16(sp)=yt, 20(sp)=xr, 24(sp)=yb, 28(sp)=abe,
 unique `xr`. `xr - xl` equals the Integral texture width exactly for all six.
 Width patchable, height not — see below.
 
-### Height: pad into the quad, never stretch to it
+### Height: the selection highlight follows the label quad
 
-`brf_800C69B4(work, idx, y, h)` sets `p[idx].y2 = y + 0xD` and preserves x. It
-has no caller in the decompiled C, but the overlay has **16 call sites, one per
-`br_sNN`** (`800C6F6C`–`800C72C4`, `a1` = poly index 9–24), so every submenu
-label is drawn into a quad of one hardcoded height whatever `yb` says. `a3` is
-only the row advance (17–20), not a height.
+`brf_800C69B4` drew every `br_sNN` into a quad of one hardcoded height
+(`addiu v1, a2, 13`). **The selection highlight follows that quad**, so a fixed
+height gives a fixed highlight — measured by diffing screenshots that differ
+only in which row is selected:
 
-Measuring both games' screenshots settles how to use that. Every label's
-rendered height came out at exactly `13 / texture_height` of USA's — `the
-terrorists' armament` 1.88x (13/7), `unit FOX-HOUND` 1.87x, `next generation`
-0.69x (13/19). So **USA renders at native height and the canvas must be padded
-into the quad, not sized to the art**. Padding keeps the art 1:1 at any quad
-height; sizing the canvas to the art stretches it to fill.
+    fixed 20-row quad   mine 24, 24, 24, 24 ...        (uniform)
+    USA                 5, 6, 7, 9, 10, 11, 12, 13, 14, 23, 24
 
-That also frees the two-line labels. Since padding is height-independent, the
-row constant can be raised — `addiu v1, a2, 13` at **`800C69D0` → 20** — so
-`br_s02` (20 rows) and `br_s12`/`br_s13` (19) render full size while the
-single-line labels are untouched: their extra rows are transparent and row
-positions come from `y`, which does not change. Rows then overlap by up to 3
-transparent rows at the tightest advance, which is invisible.
+USA varies because it sizes each box to its own label: `above + below + 5`
+equals that label's texture height, exactly, for all 16.
 
-Result: **all 20 labels carry USA's artwork at 1:1 pixel size.**
+The function has two genuinely redundant stores — `sh a0, 8(v0)` and
+`sh a1, 32(v0)` write back values it just read with `lh` — which is room enough
+to make the height per-label without growing the function:
+
+    addu  v1, a2, a3      v1 = y + advance     (a3 is already USA's advance)
+    addiu v1, v1, -6
+    sh a2,10 / a2,18 / v1,26 / v1,34
+    sh a1,16 / a0,24 / nop
+
+`advance - 6` tracks USA's box height within a row or two on 15 of 16 labels
+(only `br_s05` comes out 1 row short, which the canvas builder squashes). The
+return value `y + a3` is untouched, so row positions do not move.
+
+Measured after: `5,6,7,8,9,12,13,14,15,16,19,23,24` against USA's
+`5,6,7,9,10,11,12,13,14,19,23,24,25`.
+
+**Residual.** USA's box height *is* the art height, so its highlight hugs the
+text exactly; ours is `advance - 6`, which is 0–3 rows taller than the art on
+some labels, and the highlight shows that padding. Matching exactly needs a
+per-label height the function cannot reach: family A's `yb` immediates could
+supply it (`lh v1, 26(v0)` still holds the GetResources value on entry), but
+family B and `br_s00` pass `yb = 0` and have no spare slot at their call sites
+to supply one.
+
+### Horizontal: USA's relative layout does not fit Integral
+
+Integral's vertical rule sits 20 game px right of USA's (measured 2101 vs 1921,
+180 display px at 9 px per game px) while its label `xl` constants are only
+16–17 right. So the labels sit ~4 px left of USA's label-to-rule offset — but
+closing that gap does not fit:
+
+    USA       rule at  0,  xl 10  ->  the terrorists' armament (128) ends 138   22 px margin
+    Integral  rule at 20,  xl 30  ->                               ends 158   touching the edge
+
+The panel spans -160..160, so `xl = USA's xl + 20` puts the final `t` on the
+screen edge. Integral keeps its native `xl`; the 4 px offset stays and the text
+stays on screen. The rule is not a poly either game writes and the `DG_PRIM`
+world matrix is set in undecompiled asm, so moving it was not available.
+
+That also exposed a pre-existing overflow: Integral's indents were sized for
+the narrower Japanese art, and USA's `genetic strengthening` (120 px) at
+family B's `xl` 46 ends at **166**, off screen — `the reason for unanimous
+approval` at 162. Each family's `xl` is now clamped so its widest member ends
+by 156; family B goes 46 -> 36.
 
 ### Read USA's constants; measure only to find discrepancies
 
