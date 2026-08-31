@@ -80,22 +80,19 @@ ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])
 U = {e[0]: e[3] for e in eu}
 quads = json.load(open('work/brf_quads_all.json'))
 
-# Horizontal: DO NOT shift xl.  Integral's vertical rule sits 20 game px right
-# of USA's (measured 2101 vs 1921, 180 display px / 9) while its label xl
-# constants are only 16-17 right, so the labels sit ~4 px left of USA's
-# label-to-rule offset.  Matching that offset (xl = USA's xl + 20) puts
-# `the terrorists' armament`, 128 px wide, at 30..158 - and the panel spans
-# -160..160, so the final `t` touches the screen edge.  USA only fits it
-# because its rule is at 0: 10..138, 22 px of margin.  Integral's native xl
-# keeps 6 px of margin, so the 4 px offset stays and the text stays on screen.
-# Moving the rule instead would need whatever positions it - it is not a poly
-# either game writes, and the DG_PRIM world matrix is set in undecompiled asm.
+# Horizontal: move the whole submenu group to USA's absolute position.
+#
+# The FILE column already measures pixel-identical to USA, so both games share
+# the actor origin - which means Integral's submenu really does sit 20 game px
+# right of USA's, and USA's xl values are the right target rather than an
+# offset from Integral's.  Moving the rule with the labels is what makes this
+# work; moving the labels alone either broke the label-to-rule gap or pushed
+# `the terrorists' armament` off the screen edge.
+#
+# With xl at USA's values nothing overflows (family A 10 + 128 = 138, family B
+# 29 + 120 = 149, against the 160 edge), so the earlier clamp is gone.
 LINE_DELTA = 0
-# The panel spans -160..160.  Integral's indents were sized for the narrower
-# Japanese art, so USA's longest labels run off the right edge at them:
-# br_s10 is 120 px at family-B's xl 46 -> 166.  Clamp each family's xl so its
-# widest member ends by RIGHT_LIMIT, keeping the indent uniform within a family.
-RIGHT_LIMIT = 156
+RIGHT_LIMIT = 158
 
 # Two pairs share one xr immediate, so the narrower member gets the wider one's
 # quad - and since the selection highlight follows the quad, its highlight runs
@@ -128,6 +125,7 @@ def unshare_patches(xl_of, w_of):
          'br_s11 xr=%d' % x11),
     ]
 S00_X_ADDRS = (0x800C7674, 0x800C76A4)      # br_s00's animated x0 and x1 base
+S00_X_OLD, S00_X_NEW = 26, 10               # to USA's family-A xl
 
 # Selection highlight (brf_800C6930, decompiled in b_select.c).  Integral draws
 # a box [base_y-4, base_y+10] plus a 1px bar [base_y+10, base_y+11] - 15 rows.
@@ -141,6 +139,19 @@ S00_X_ADDRS = (0x800C7674, 0x800C76A4)      # br_s00's animated x0 and x1 base
 # one drawn item that is 17 game px; USA measures 12.6.  The bottom constant is
 # independent of the row start (s0 = -41 - v1), so shortening it moves the rule
 # without moving any text: 2*v1 + 0 = 12 for n = 1.
+# The submenu group's x: the vertical rules (polys 26/40/42) take theirs from
+# s6/s5, and the horizontal connectors (polys 25/39/41) run from the FILE column
+# to the rule, taking their right end from s4.  Shift the rule and that right
+# end by -20 so they land on USA's; the connectors' left ends (-46 at 800C6F14,
+# -24 at 800C700C) are anchored to the FILE column and stay put.
+GROUP_DX = -20
+RULE_X = [(0x800C6F28, 19, 19 + GROUP_DX, 'vertical rule left  (s6, polys 26/40/42)'),
+          (0x800C6F38, 23, 23 + GROUP_DX, 'vertical rule right (s5, polys 26/40/42)')]
+# s4 is `addu s4, a3, zero` - it reuses br_s00's advance 20 as an x coordinate,
+# so it needs a real load, not an edited immediate.  a3 must keep its 20.
+RULE_S4 = (0x800C6F18, 0x00E0A021, 0x24140000 | ((20 + GROUP_DX) & 0xFFFF),
+           'connector right end (s4, polys 25/39/41)')
+
 RULE = [(0x800C6F3C, -38, -43, 'operation-outline rule bottom'),
         # The operation-member rule is poly 40 (its x comes from s6/s5 = 19/23,
         # left by the outline block).  top = s0 - 2, bottom = v0 - 18, so the
@@ -161,7 +172,7 @@ def xl_patches(int_ovl, usa_ovl):
         if not n or not n.startswith('br_s') or n == 'br_s00': continue
         if xl is None or sa is None or U.get(n) is None: continue
         new = U[n] + LINE_DELTA
-        if LINE_DELTA and new != xl: out[n] = (sa, xl, new)
+        if new != xl: out[n] = (sa, xl, new)
     return out
 WIDEN = {strcode(n): n for n in quads}
 for t in WIDEN: assert t in U, 'missing %s in USA archive' % WIDEN[t]
@@ -264,19 +275,12 @@ for _a, _i, _adv, _ab, _be in _rb(pu[0], USA_BASE, USA_FN):
 assert len(USA_ADV) == 16 and all(v for v in USA_ADV.values()), 'USA advances incomplete'
 
 XL = dict(xl_patches(pi[0], pu[0]))
-# clamp per family (labels sharing an xl value) so the widest one fits
+# nothing may cross the right edge now that xl is USA's
 from quadscan import scan as _scan
-_sites = {n: (xl, sa) for a, n, xl, yt, xr, yb, sa in _scan(pi[0], BASEADDR, 0x800C983C)
-          if n and n.startswith('br_s') and xl is not None and sa is not None}
-_fam = {}
-for n, (xl, sa) in _sites.items(): _fam.setdefault(xl, []).append(n)
-for xl, members in _fam.items():
-    widest = max(geo(U[strcode(n)])['w'] for n in members)
-    room = RIGHT_LIMIT - widest
-    if room < xl:
-        for n in members: XL[n] = (_sites[n][1], xl, room)
-        print('xl clamp: family at %d -> %d (widest %s is %d px)'
-              % (xl, room, max(members, key=lambda m: geo(U[strcode(m)])['w']), widest))
+for _a, _n, _xl, _yt, _xr, _yb, _sa in _scan(pi[0], BASEADDR, 0x800C983C):
+    if not _n or not _n.startswith('br_s') or _n not in XL: continue
+    _new = XL[_n][2]; _w = geo(U[strcode(_n)])['w']
+    assert _new + _w <= RIGHT_LIMIT, '%s would end at %d' % (_n, _new + _w)
 for n, (addr, old, new) in XL.items():
     if n in quads: quads[n]['xl'] = [new, addr]     # xr is derived from this
 
