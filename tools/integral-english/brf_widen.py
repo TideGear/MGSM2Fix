@@ -135,6 +135,14 @@ S00_X_ADDRS = (0x800C7674, 0x800C76A4)      # br_s00's animated x0 and x1 base
 # plus [y+3, y+4], i.e. above+4 = 6 rows, with its top ON the text top.  Our
 # text top is y (we pad rather than offset by `above`), so the same-sized
 # highlight aligned to our text is [y, y+5] plus [y+5, y+6].
+# The operation-outline submenu's vertical rule.  Integral draws it centred,
+# top = (-41 - v1) - 2 and bottom = v1 - 38 with v1 = (20n - 7)/2, so its length
+# is 2*v1 + 5 = 20n - 2 - the 20 being Integral's original row advance.  For the
+# one drawn item that is 17 game px; USA measures 12.6.  The bottom constant is
+# independent of the row start (s0 = -41 - v1), so shortening it moves the rule
+# without moving any text: 2*v1 + 0 = 12 for n = 1.
+RULE = [(0x800C6F3C, -38, -43, 'operation-outline rule bottom')]
+
 HILITE = [(0x800C6944, 10,  5, 'bar top / box bottom'),
           (0x800C6950, 11,  6, 'bar bottom'),
           (0x800C698C, -4,  0, 'box top')]
