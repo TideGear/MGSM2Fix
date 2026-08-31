@@ -141,7 +141,13 @@ S00_X_ADDRS = (0x800C7674, 0x800C76A4)      # br_s00's animated x0 and x1 base
 # one drawn item that is 17 game px; USA measures 12.6.  The bottom constant is
 # independent of the row start (s0 = -41 - v1), so shortening it moves the rule
 # without moving any text: 2*v1 + 0 = 12 for n = 1.
-RULE = [(0x800C6F3C, -38, -43, 'operation-outline rule bottom')]
+RULE = [(0x800C6F3C, -38, -43, 'operation-outline rule bottom'),
+        # The operation-member rule is poly 40 (its x comes from s6/s5 = 19/23,
+        # left by the outline block).  top = s0 - 2, bottom = v0 - 18, so the
+        # length is 2*v0 + 5 = 57 game px for the three drawn items; USA's is
+        # 62.8, so the bottom moves 6 rows down.  v0 feeds only these two
+        # stores, and s0 was computed from it earlier, so the rows do not move.
+        (0x800C7028, -18, -12, 'operation-member rule bottom')]
 
 HILITE = [(0x800C6944, 10,  5, 'bar top / box bottom'),
           (0x800C6950, 11,  6, 'bar bottom'),
@@ -230,6 +236,10 @@ INT_FN, USA_BASE, USA_FN = 0x800C69B4, 0x800C5970, 0x800C9194
 # those four alone.  (br_s02 is `ori a3, s6, 10`, i.e. 27 or 30; its measured
 # gap is 27.1, so its patch to 27 stays.)
 CONDITIONAL_ADV = {12, 13, 14, 15}          # poly idx for br_s03..br_s06
+# br_s02 is `ori a3, s6, 10`, so it follows the same conditional s6: 27 when
+# s6 = 17, 30 when s6 = 20.  USA renders the 20 path here (its br_s03..s06 gaps
+# measure 20), so br_s02 is 20 | 10 = 30, not the 27 the other branch gives.
+ADV_OVERRIDE = {11: 30}                     # poly idx -> advance
 
 def advance_patches(int_ovl, usa_ovl):
     from rowargs import run_bytes
@@ -239,7 +249,7 @@ def advance_patches(int_ovl, usa_ovl):
     out = []
     for a, idx, adv, _, _ in run_bytes(int_ovl, BASEADDR, INT_FN):
         if idx in CONDITIONAL_ADV: continue     # USA's value here is state-dependent
-        want = usa.get(idx)
+        want = ADV_OVERRIDE.get(idx, usa.get(idx))
         if want is None or want == adv: continue
         for x in [a+4] + list(range(a, a-0x80, -4)):        # incl. the delay slot
             w = at(x); op = w >> 26

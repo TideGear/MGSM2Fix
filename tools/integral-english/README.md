@@ -252,12 +252,21 @@ Only the outline case is safely correctable: the bottom constant is independent
 of the row start, so shortening it moves the rule without moving any text.
 `800C6F3C  -38 -> -43` gives `2*v1` = 12 game px against USA's 12.6.
 
-**Still different: the operation-member rule**, 6 game px shorter than USA's.
-Its length is not written by the outline block (the only `-38` in the range),
-nor by the second poly-26 block at `800C7508`, which animates x and preserves
-y. Matching it means porting USA's formula, which is shaped differently and
-whose Integral counterpart also feeds the row start — so it was left alone
-rather than reshaped blind.
+Each submenu has its **own** rule poly, which is why one `-38` edit only moved
+the outline one. They are found by looking for `sh` into the y0/y2 of polys 27+
+(the ones GetResources never sets up, so they carry no texture):
+
+    poly 26   operation outline    top s0-2,  bottom v0-38   (the -38 above)
+    poly 40   operation member     top s0-2,  bottom v0-18   -> -12
+    poly 42   detailed information top s0-2,  bottom v0+2    matches USA already
+
+They share their x with poly 26 via `s6`/`s5` (19 and 23), left in those
+registers by the outline block — which is why every submenu's rule sits at the
+same x even though only one block sets it.
+
+Length is `2*v0 + K`. For the member submenu that is 57 game px against USA's
+62.8, so `800C7028  -18 -> -12` adds the 6. `v0` feeds only that poly's y2/y3
+and `s0` was computed from it earlier, so the rows do not move.
 
 ### Horizontal: USA's relative layout does not fit Integral
 
