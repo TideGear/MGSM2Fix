@@ -226,6 +226,39 @@ the highlight uniform) and `advance - 6` (which left it 0–3 rows tall). Measur
 before the fix: highlight 14.0 game px against USA's 11.0, both with their top
 2.0 px above the ink — the tops already agreed, only the height was over.
 
+### The vertical rule
+
+The rule left of the submenu items is **poly 26** (the first `br_line2`), found
+by scanning every poly-x store for the rule's x: `x0/x2 = 19`, `x1/x3 = 23`.
+Not `br_line1` (poly 25) — that one is a *horizontal* rule, and the code that
+writes it only sets x, reading and writing y back unchanged.
+
+Integral sizes it centred, from a hardcoded 20 per item — its **original** row
+advance:
+
+    v1   = (20n - 7) / 2
+    s0   = -41 - v1            the list's starting y
+    rule = [s0 - 2, v1 - 38]   length = 2*v1 + 5 = 20n - 2
+
+Verified: that predicts 17 game px for the one-item operation-outline submenu
+and 57 for the three-item operation-member one; measured 16.8 and 56.8.
+
+USA's rule is structurally different — its code is a top-anchored animated
+reveal (`y0/y1 = -55`, `y2/y3 = a3 - 55`, x ramped by a timer) rather than a
+centred bar — and measures 12.6 and 62.8 for the same two submenus, i.e. it
+grows ~25 per item against Integral's 20, in the opposite direction on each.
+
+Only the outline case is safely correctable: the bottom constant is independent
+of the row start, so shortening it moves the rule without moving any text.
+`800C6F3C  -38 -> -43` gives `2*v1` = 12 game px against USA's 12.6.
+
+**Still different: the operation-member rule**, 6 game px shorter than USA's.
+Its length is not written by the outline block (the only `-38` in the range),
+nor by the second poly-26 block at `800C7508`, which animates x and preserves
+y. Matching it means porting USA's formula, which is shaped differently and
+whose Integral counterpart also feeds the row start — so it was left alone
+rather than reshaped blind.
+
 ### Horizontal: USA's relative layout does not fit Integral
 
 Integral's vertical rule sits 20 game px right of USA's (measured 2101 vs 1921,
