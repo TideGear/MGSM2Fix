@@ -18,7 +18,8 @@ from PIL import Image
 from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BASEADDR,
                        ROW_H_ADDR, ROW_H_OLD, ROW_H_NEW, S00_ADDR, S00_OLD, S00_NEW,
                        advance_patches, INT_FN, xl_patches, S00_X_ADDRS, LINE_DELTA,
-                       quads, HILITE, UNSHARE, unshare_patches, RULE)
+                       quads, HILITE, UNSHARE, unshare_patches, RULE,
+                       RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -71,13 +72,12 @@ for n, (addr, old_v, new_v) in sorted(_XL.items()):
     assert (w >> 26) == 9 and (w & 0xFFFF) == old_v, 'xl %08X: %08X' % (addr, w)
     struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
     print('label xl  @%08X: %2d -> %-2d  %s' % (addr, old_v, new_v, n))
-if LINE_DELTA:
-    for addr in S00_X_ADDRS:                 # br_s00's animated x, same shift
-        o = addr - BASEADDR
-        w = struct.unpack('<I', ovl[o:o+4])[0]
-        assert (w >> 26) == 9 and (w & 0xFFFF) == 26, 'br_s00 x @%08X: %08X' % (addr, w)
-        struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (26 + LINE_DELTA))
-        print('label xl  @%08X: 26 -> %d  br_s00 (animated)' % (addr, 26 + LINE_DELTA))
+for addr in S00_X_ADDRS:                     # br_s00's animated x follows the labels
+    o = addr - BASEADDR
+    w = struct.unpack('<I', ovl[o:o+4])[0]
+    assert (w >> 26) == 9 and (w & 0xFFFF) == S00_X_OLD, 'br_s00 x @%08X: %08X' % (addr, w)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | S00_X_NEW)
+    print('label xl  @%08X: %d -> %d  br_s00 (animated)' % (addr, S00_X_OLD, S00_X_NEW))
 
 _xl = lambda n: quads[n]['xl'][0]
 _w  = lambda n: geo(U[strcode(n)])['w']
@@ -87,6 +87,20 @@ for addr, oldw, neww, what in unshare_patches(_xl, _w):
     assert have == oldw, 'unshare %08X: %s' % (addr, [hex(x) for x in have])
     struct.pack_into('<%dI' % len(neww), ovl, o, *neww)
     print('unshare   @%08X: %s' % (addr, what))
+
+for addr, old_v, new_v, what in RULE_X:
+    o = addr - BASEADDR
+    w = struct.unpack('<I', ovl[o:o+4])[0]
+    cur = w & 0xFFFF; cur -= 0x10000 if cur >= 0x8000 else 0
+    assert (w >> 26) == 9 and cur == old_v, 'rule x %08X: %08X' % (addr, w)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
+    print('group x   @%08X: %+d -> %+d  (%s)' % (addr, old_v, new_v, what))
+_a, _old, _new, _what = RULE_S4
+_o = _a - BASEADDR
+assert struct.unpack('<I', ovl[_o:_o+4])[0] == _old, 's4 not at %08X' % _a
+struct.pack_into('<I', ovl, _o, _new)
+print('group x   @%08X: addu s4,a3,zero -> addiu s4,zero,%d  (%s)'
+      % (_a, (20 + GROUP_DX), _what))
 
 for addr, old_v, new_v, what in RULE:
     o = addr - BASEADDR

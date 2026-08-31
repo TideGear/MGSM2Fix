@@ -268,100 +268,34 @@ Length is `2*v0 + K`. For the member submenu that is 57 game px against USA's
 62.8, so `800C7028  -18 -> -12` adds the 6. `v0` feeds only that poly's y2/y3
 and `s0` was computed from it earlier, so the rows do not move.
 
-### Horizontal: USA's relative layout does not fit Integral
+### Horizontal: move the whole group, not just the labels
 
-Integral's vertical rule sits 20 game px right of USA's (measured 2101 vs 1921,
-180 display px at 9 px per game px) while its label `xl` constants are only
-16–17 right. So the labels sit ~4 px left of USA's label-to-rule offset — but
-closing that gap does not fit:
+Integral's submenu sits **20 game px right of USA's**. The FILE column already
+measures pixel-identical to USA, so both games share the actor origin — which
+means this is genuinely different chrome, and USA's `xl` values are the target
+rather than an offset from Integral's.
 
-    USA       rule at  0,  xl 10  ->  the terrorists' armament (128) ends 138   22 px margin
-    Integral  rule at 20,  xl 30  ->                               ends 158   touching the edge
+Moving the labels alone never worked: it either broke the label-to-rule gap or
+pushed `the terrorists' armament` (128 px) off the 160 px edge. The rule has to
+move with them, and every x involved is an immediate:
 
-The panel spans -160..160, so `xl = USA's xl + 20` puts the final `t` on the
-screen edge. Integral keeps its native `xl`; the 4 px offset stays and the text
-stays on screen. The rule is not a poly either game writes and the `DG_PRIM`
-world matrix is set in undecompiled asm, so moving it was not available.
+    800C6F28   s6  19 -> -1     vertical rule left    (polys 26 / 40 / 42)
+    800C6F38   s5  23 ->  3     vertical rule right
+    800C6F18   s4  addu s4,a3,zero -> addiu s4,zero,0
+                               connector right end   (polys 25 / 39 / 41)
+    label xl        26 -> 10, 46 -> 29   (USA's values)
+    800C7674/76A4   26 -> 10             br_s00's animated x
 
-That also exposed a pre-existing overflow: Integral's indents were sized for
-the narrower Japanese art, and USA's `genetic strengthening` (120 px) at
-family B's `xl` 46 ends at **166**, off screen — `the reason for unanimous
-approval` at 162. Each family's `xl` is now clamped so its widest member ends
-by 156; family B goes 46 -> 36.
+`s4` is `addu s4, a3, zero` — it reuses `br_s00`'s **advance** of 20 as an x
+coordinate, so it needs a real load rather than an edited immediate, and `a3`
+must keep its 20. The connectors' left ends (`-46` at `800C6F14`, `-24` at
+`800C700C`) are anchored to the FILE column and stay put.
 
-### Read USA's constants; measure only to find discrepancies
+At USA's `xl` nothing overflows (family A 10 + 128 = 138, family B 29 + 120 =
+149), so the earlier right-edge clamp is gone and both families sit at USA's
+real indent. An assertion keeps it that way.
 
-USA reworked the row positioner. It takes the box extents as stack arguments —
-
-    subu v1, a2, v1        top    = y - arg4   (16(sp))
-    addiu a0, a0, 5
-    addu  a0, a2, a0       bottom = y + arg5 + 5  (20(sp))
-
-— where Integral hardcodes 13. **Every USA box height (`above + below + 5`)
-equals that label's texture height exactly**, which is both how USA renders each
-row at its own size and a self-check that the extraction is right.
-
-The call structure is identical in both games, so USA's constants transfer.
-`rowargs.py` simulates registers over an overlay and reports each call's
-arguments; `quadscan.py` does the same for the label draws, labelling calls by
-the resource-name string; `brf_widen` diffs the two overlays and emits the patch
-lists, so the build follows the discs rather than any hardcoded number.
-
-| | s00 | s01 | s02 | s03 | s04 | s05 | s06 | s07 | s08 | s09 | s10 | s11 | s12 | s13 | s14 | s15 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Integral adv | 20 | 20 | 20 | 20 | 20 | 20 | 20 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 |
-| USA adv | 20 | 20 | **27** | 17† | 17† | 17† | 17† | 16 | 16 | 16 | 16 | 16 | **26** | **26** | 16 | 16 |
-| shipped | 20 | 20 | 27 | 20 | 20 | 20 | 20 | 16 | 16 | 16 | 16 | 16 | 26 | 26 | 16 | 16 |
-
-**† `br_s03`–`br_s06` are conditional and must NOT be patched.** Their advance
-is USA's `s6`, which has two assignments — `addiu s6, zero, 20` at `800C96C8`
-(the default) and `addiu s6, zero, 17` at `800C97DC`, reached only on one
-branch. A linear extraction sees the 17 and hardcoding it made the
-operation-member rows 3 game px tighter than USA: Roy Campbell → Dr. Naomi
-measured **17.28** game px against USA's **19.89**, and 19.89 is the 20 path,
-which is what Integral already had. Those four are left at Integral's 20.
-
-`br_s02` is `ori a3, s6, 10`, so 27 or 30 depending on the same `s6`; its
-measured gap is 27.1, so the patch to 27 stays. Measure ink **centroids**, not
-band tops, when comparing rows — a highlighted row's glow shifts a threshold's
-idea of where the ink starts by 2–3 px, which is the same order as the effect
-being measured.
-| USA xl | — | 29 | 10 | 29 | 10 | 29 | 10 | 10 | 10 | 10 | 29 | 10 | 10 | 29 | 10 | 29 |
-| Integral xl | — | 46 | 26 | 46 | 26 | 46 | 26 | 26 | 26 | 26 | 46 | 26 | 26 | 46 | 26 | 46 |
-
-**Horizontal.** Integral's whole panel sits 20 game px right of USA's — the
-vertical rule measures x 2101 vs 1921, 180 display px at 9 px per game px (the
-scale is 2160/240, not the 8.75 an ink-width estimate suggests). The `xl`
-constants differ by only 16–17, so the labels sat ~4 px left of where USA has
-them relative to their own rule. Setting `xl = USA's xl + 20` places them
-exactly; `xr` follows because the canvas is `xl + USA's width`. The rule itself
-is not a poly either game writes — it is panel art — so it cannot be moved.
-
-**Traps, all of which produced a wrong answer first:**
-
-- A `jal` takes arguments from its **delay slot**. Scanning only backwards
-  mis-attributes them by one call: that first put `br_s12`'s advance at
-  `800C7228`, which is really `br_s10`'s.
-- `br_s08`'s advance is `addu a3, a1, zero` — it reuses its own poly index 17
-  as the advance, so it needs a replaced instruction, not an edited immediate.
-- `br_s02`'s advance is `ori a3, s6, 10` = `17 | 10` = **27**. A simulator that
-  handles only addiu/addu reports it as inherited and invites a guess of 20.
-- Writing `$zero` in the simulator corrupts every later value; MIPS discards
-  those writes.
-
-Estimating from screenshots gave 28 for `br_s12` and 28 for `br_s02`; the
-binaries say 26 and 20→27, and that **every** single-line advance was off by
-1–3 as well. Measure to locate a discrepancy, then read the disc for the value.
-
-**Known residual.** USA's box top is `y - above` with `above` 2–4 per label;
-Integral's is `y`, so rows sit 2–4 px lower than USA's relative to the rule.
-Fixing it means making the box `[y-4, y+H]` and placing each label's art at
-canvas row `4 - above`. The positioner has a free slot for it — `sh a0, 8(v0)`
-writes x0 back unchanged — but the highlight box (`brf_800C6930`) derives its
-own geometry from the same `base_y` and would need the matching shift, so this
-is untested and deliberately not applied.
-
-### Constraints that must all hold### Constraints that must all hold### Constraints that must all hold
+### Constraints that must all hold### Constraints that must all hold### Constraints that must all hold### Constraints that must all hold
 
 `pcx4.py` decodes/encodes the format: standard PCX, 1bpp × 4 planes, 128-byte
 header, RLE where `code > 0xC0` is a run of `code - 0xC0`. The RLE stream is
