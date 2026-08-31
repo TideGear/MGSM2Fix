@@ -142,10 +142,32 @@ why an earlier attempt — dropping USA's native-size textures into free VRAM �
 changed nothing on screen, and it is the reason to prefer padding over scaling:
 padding a canvas out to the quad keeps the art 1:1, scaling distorts it.
 
-It also dissolves the shared-register problem. Several labels share one
-immediate, so they must share a quad — but they need not be the same width.
-Size the shared quad to the group's largest member and pad the smaller ones
-with the palette's black entry; each still renders at its own true size.
+It also dissolves the shared-register problem *for the art*. Several labels
+share one `xr` immediate, so they share a quad — but they need not be the same
+width: size the shared quad to the group's largest member and pad the smaller
+ones with the palette's black entry, and each still renders at its own true
+size.
+
+That is not enough once the **selection highlight** is considered, because the
+highlight follows the quad. `br_s06` (Dr. Naomi, 52 px) shares `xr` with
+`br_s02` (112 px), so its highlight ran 60 px past its text; `br_s09` shares
+with `br_s11` and ran 8 px over. USA gives each its own `xr`.
+
+Un-sharing needs one spare instruction slot per argument block and there is
+none — **except** that the rewritten positioner overwrites all four poly `y`
+values every frame, which makes the GetResources `yt`/`yb` dead for every
+`br_sNN`. Their loads are the spare slots. All four rows are unconditional, so
+the positioner always runs and the `y` really is always replaced:
+
+    br_s02  800C9EF8  addiu t0, zero, 138   ; its own xr
+                      addiu s5, zero, 78    ; and leaves br_s06's xr in s5
+                      sw t0,16 / sw t0,20 / sw t0,24 / sw s1,28 / nop
+    br_s09  800CA134  addiu s4, zero, 146
+    br_s11  800CA1C8  addiu t0, zero, 154   ; no longer reads s4
+                      sw t0,16 / sw t0,20 / sw t0,24 / sw s1,28 / nop
+
+All 15 label quad widths then equal USA's exactly, and every canvas equals its
+own art with no group padding.
 
 ### The three quad families
 

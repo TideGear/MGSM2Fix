@@ -18,7 +18,7 @@ from PIL import Image
 from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BASEADDR,
                        ROW_H_ADDR, ROW_H_OLD, ROW_H_NEW, ROW_H_BIAS, S00_ADDR, S00_OLD, S00_NEW,
                        advance_patches, INT_FN, xl_patches, S00_X_ADDRS, LINE_DELTA,
-                       quads, HILITE)
+                       quads, HILITE, UNSHARE, unshare_patches)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -78,6 +78,15 @@ if LINE_DELTA:
         assert (w >> 26) == 9 and (w & 0xFFFF) == 26, 'br_s00 x @%08X: %08X' % (addr, w)
         struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (26 + LINE_DELTA))
         print('label xl  @%08X: 26 -> %d  br_s00 (animated)' % (addr, 26 + LINE_DELTA))
+
+_xl = lambda n: quads[n]['xl'][0]
+_w  = lambda n: geo(U[strcode(n)])['w']
+for addr, oldw, neww, what in unshare_patches(_xl, _w):
+    o = addr - BASEADDR
+    have = list(struct.unpack('<%dI' % len(oldw), ovl[o:o+4*len(oldw)]))
+    assert have == oldw, 'unshare %08X: %s' % (addr, [hex(x) for x in have])
+    struct.pack_into('<%dI' % len(neww), ovl, o, *neww)
+    print('unshare   @%08X: %s' % (addr, what))
 
 for addr, old_v, new_v, what in HILITE:
     o = addr - BASEADDR
@@ -164,7 +173,8 @@ def imm16(addr):
     return v - 0x10000 if v >= 0x8000 else v
 for name, g in quads.items():                     # quad == canvas, for every label
     tid = strcode(name)
-    qw = imm16(g['xr'][1]) - g['xl'][0]
+    # an un-shared label's xr lives in a rewritten block, not a lone immediate
+    qw = target[tid][0] if name in UNSHARE else imm16(g['xr'][1]) - g['xl'][0]
     # families B and C get no yb immediate: the height is forced at runtime
     qh = 17 if name.startswith('br_f') else target[tid][1]   # per-label, advance - bias
     assert (qw, qh) == (G2[tid]['w'], G2[tid]['h']), \
