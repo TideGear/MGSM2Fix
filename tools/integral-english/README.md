@@ -301,7 +301,22 @@ lists, so the build follows the discs rather than any hardcoded number.
 | | s00 | s01 | s02 | s03 | s04 | s05 | s06 | s07 | s08 | s09 | s10 | s11 | s12 | s13 | s14 | s15 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Integral adv | 20 | 20 | 20 | 20 | 20 | 20 | 20 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 | 17 |
-| USA adv | 20 | 20 | **27** | 17 | 17 | 17 | 17 | 16 | 16 | 16 | 16 | 16 | **26** | **26** | 16 | 16 |
+| USA adv | 20 | 20 | **27** | 17† | 17† | 17† | 17† | 16 | 16 | 16 | 16 | 16 | **26** | **26** | 16 | 16 |
+| shipped | 20 | 20 | 27 | 20 | 20 | 20 | 20 | 16 | 16 | 16 | 16 | 16 | 26 | 26 | 16 | 16 |
+
+**† `br_s03`–`br_s06` are conditional and must NOT be patched.** Their advance
+is USA's `s6`, which has two assignments — `addiu s6, zero, 20` at `800C96C8`
+(the default) and `addiu s6, zero, 17` at `800C97DC`, reached only on one
+branch. A linear extraction sees the 17 and hardcoding it made the
+operation-member rows 3 game px tighter than USA: Roy Campbell → Dr. Naomi
+measured **17.28** game px against USA's **19.89**, and 19.89 is the 20 path,
+which is what Integral already had. Those four are left at Integral's 20.
+
+`br_s02` is `ori a3, s6, 10`, so 27 or 30 depending on the same `s6`; its
+measured gap is 27.1, so the patch to 27 stays. Measure ink **centroids**, not
+band tops, when comparing rows — a highlighted row's glow shifts a threshold's
+idea of where the ink starts by 2–3 px, which is the same order as the effect
+being measured.
 | USA xl | — | 29 | 10 | 29 | 10 | 29 | 10 | 10 | 10 | 10 | 29 | 10 | 10 | 29 | 10 | 29 |
 | Integral xl | — | 46 | 26 | 46 | 26 | 46 | 26 | 26 | 26 | 26 | 46 | 26 | 26 | 46 | 26 | 46 |
 

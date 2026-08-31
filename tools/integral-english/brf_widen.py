@@ -222,6 +222,15 @@ S00_NEW = [0x00050940, 0x00051180, 0x00411021, 0x00050880, 0x00411021]
 # registers over each overlay (see rowargs.py), so this follows the discs.
 INT_FN, USA_BASE, USA_FN = 0x800C69B4, 0x800C5970, 0x800C9194
 
+# br_s03..br_s06 take their advance from USA's s6, which is CONDITIONAL - 20 by
+# default (800C96C8) and 17 only on one branch (800C97DC).  Extracting the 17
+# and hardcoding it made the operation-member rows 3 game px tighter than USA:
+# measured Roy Campbell -> Dr. Naomi at 17.28 game px against USA's 19.89, and
+# 19.89 is the 20 path, which is exactly what Integral already had.  So leave
+# those four alone.  (br_s02 is `ori a3, s6, 10`, i.e. 27 or 30; its measured
+# gap is 27.1, so its patch to 27 stays.)
+CONDITIONAL_ADV = {12, 13, 14, 15}          # poly idx for br_s03..br_s06
+
 def advance_patches(int_ovl, usa_ovl):
     from rowargs import run_bytes
     usa = {idx: adv for _, idx, adv, _, _ in run_bytes(usa_ovl, USA_BASE, USA_FN)}
@@ -229,6 +238,7 @@ def advance_patches(int_ovl, usa_ovl):
     def at(a): return W[(a - BASEADDR)//4]
     out = []
     for a, idx, adv, _, _ in run_bytes(int_ovl, BASEADDR, INT_FN):
+        if idx in CONDITIONAL_ADV: continue     # USA's value here is state-dependent
         want = usa.get(idx)
         if want is None or want == adv: continue
         for x in [a+4] + list(range(a, a-0x80, -4)):        # incl. the delay slot
