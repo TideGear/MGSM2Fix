@@ -165,37 +165,41 @@ I0 = {e[0]: e[3] for e in ei}
 # 16 call sites regardless - and 17 for the FILE labels.  Measured against USA:
 # the art must be PADDED into that height, never stretched to it, or the label
 # renders 13/art_h too tall (the terrorists' armament came out 1.88x).
-# brf_800C69B4 draws every br_sNN into a quad of ONE hardcoded height
+# brf_800C69B4 drew every br_sNN into a quad of ONE hardcoded height
 # (`addiu v1, a2, 13`).  The selection highlight follows that quad, so a fixed
-# height gives a fixed highlight - USA's varies per row because USA sizes each
-# box to its own label (`above + below + 5` = the texture height).
+# height gives a fixed highlight - USA's varies because it sizes each box to its
+# own label (`above + below + 5` = the texture height, for all 16).
 #
-# The function has two genuinely redundant stores - `sh a0, 8(v0)` and
-# `sh a1, 32(v0)` write back values it just read with lh - which is room enough
-# to make the height per-label.  a3 is the row advance, already per-label and
-# already set to USA's value, and `advance - 6` tracks USA's box height within
-# a row or two everywhere (only br_s05 is 1 row tall for it, which the canvas
-# builder squashes).  The return value y + a3 is untouched, so row positions
-# do not move.
-ROW_H_ADDR, ROW_H_BIAS = 0x800C69D0, 6
-ROW_H_OLD = [0x24C3000D,   # addiu v1, a2, 13
-             0xA446000A,   # sh a2, 10(v0)
-             0xA4460012,   # sh a2, 18(v0)
-             0xA443001A,   # sh v1, 26(v0)
-             0xA4430022,   # sh v1, 34(v0)
-             0xA4440008,   # sh a0,  8(v0)   <- redundant (x0 = x0)
-             0xA4450010,   # sh a1, 16(v0)
-             0xA4440018,   # sh a0, 24(v0)
-             0xA4450020]   # sh a1, 32(v0)   <- redundant (x3 = x3)
-ROW_H_NEW = [0x00C71821,   # addu  v1, a2, a3      v1 = y + advance
-             0x2463FFFA,   # addiu v1, v1, -6      v1 = y + advance - 6
-             0xA446000A,   # sh a2, 10(v0)         y0
-             0xA4460012,   # sh a2, 18(v0)         y1
-             0xA443001A,   # sh v1, 26(v0)         y2
-             0xA4430022,   # sh v1, 34(v0)         y3
-             0xA4450010,   # sh a1, 16(v0)         x1 = x3
-             0xA4440018,   # sh a0, 24(v0)         x2 = x0
-             0x00000000]   # nop
+# The exact per-label height is already in the poly and the positioner never
+# touches it: brf_800C983C sets v0 = tex->off_y and v2 = tex->off_y + tex->h + 1,
+# and tex->h is height-1, so **v2 - v0 is the texture height**.  Reading it needs
+# four instructions, and the function has them: its x normalisation is entirely
+# redundant (setXY4 already leaves x2 == x0 and x1 == x3), so the two `lh` and
+# the two `sh` that copy x are dead, as is the nop.  Unlike the poly's y, the
+# UVs are stable across frames, so this cannot accumulate.
+ROW_H_ADDR = 0x800C69C8
+ROW_H_OLD = [0x84440008,   # lh   a0,  8(v0)      x0   <- redundant
+             0x84450020,   # lh   a1, 32(v0)      x3   <- redundant
+             0x24C3000D,   # addiu v1, a2, 13     the fixed height
+             0xA446000A,   # sh   a2, 10(v0)      y0
+             0xA4460012,   # sh   a2, 18(v0)      y1
+             0xA443001A,   # sh   v1, 26(v0)      y2
+             0xA4430022,   # sh   v1, 34(v0)      y3
+             0xA4440008,   # sh   a0,  8(v0)      x0 = x0  <- redundant
+             0xA4450010,   # sh   a1, 16(v0)      x1 = x3  <- redundant
+             0xA4440018,   # sh   a0, 24(v0)      x2 = x0  <- redundant
+             0xA4450020]   # sh   a1, 32(v0)      x3 = x3  <- redundant
+ROW_H_NEW = [0x9044001D,   # lbu  a0, 29(v0)      v2
+             0x9045000D,   # lbu  a1, 13(v0)      v0
+             0x00851823,   # subu v1, a0, a1      v1 = texture height
+             0x00C31821,   # addu v1, a2, v1      v1 = y + height
+             0xA446000A,   # sh   a2, 10(v0)      y0
+             0xA4460012,   # sh   a2, 18(v0)      y1
+             0xA443001A,   # sh   v1, 26(v0)      y2
+             0xA4430022,   # sh   v1, 34(v0)      y3
+             0x00000000,
+             0x00000000,
+             0x00000000]
 # br_s00 has no stored quad: its right edge is animated as x1 = 52n/6 + 26,
 # with the 52 baked into a shift/add chain at 800C7658.  Rebuilding the chain
 # as 100n (using $at as scratch, same five slots) gives it USA's 100 px width.
@@ -258,7 +262,7 @@ for n, g in quads.items():
     if n.startswith('br_f'):
         h = 17
     else:
-        h = USA_ADV[strcode(n)] - ROW_H_BIAS
+        h = geo(U[strcode(n)])['h']       # the quad now IS the texture height
     # un-shared labels get their own xr, so the quad is exactly USA's width
     w = geo(U[strcode(n)])['w'] if n in UNSHARE else newimm[g['xr'][1]] - g['xl'][0]
     target[strcode(n)] = (w, h)
@@ -274,7 +278,7 @@ for n in ALL:
         # br_s00 too: its height comes from the same per-label rule
         # br_s00's animated width is patched to USA's below
         w = geo(U[t])['w'] if n == 'br_s00' else g['w']
-        target[t] = (w, 17 if n.startswith('br_f') else USA_ADV[t] - ROW_H_BIAS)
+        target[t] = (w, 17 if n.startswith('br_f') else geo(U[t])['h'])
 assert len(target) == 20, 'expected all 20 labels, got %d' % len(target)
 json.dump({hex(k): list(v) for k, v in target.items()}, open('work/brf_target.json', 'w'))
 json.dump({hex(k): v for k, v in newimm.items()}, open('work/brf_imm.json', 'w'))

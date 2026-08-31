@@ -188,42 +188,43 @@ before each one. Args are `a3=xl, 16(sp)=yt, 20(sp)=xr, 24(sp)=yb, 28(sp)=abe,
 unique `xr`. `xr - xl` equals the Integral texture width exactly for all six.
 Width patchable, height not — see below.
 
-### Height: the selection highlight follows the label quad
+### Height: take it from the texture's own V coordinates
 
 `brf_800C69B4` drew every `br_sNN` into a quad of one hardcoded height
 (`addiu v1, a2, 13`). **The selection highlight follows that quad**, so a fixed
 height gives a fixed highlight — measured by diffing screenshots that differ
 only in which row is selected:
 
-    fixed 20-row quad   mine 24, 24, 24, 24 ...        (uniform)
-    USA                 5, 6, 7, 9, 10, 11, 12, 13, 14, 23, 24
+    fixed quad   mine 24, 24, 24 ...                          (uniform)
+    USA          5, 6, 7, 9, 10, 11, 12, 13, 14, 23, 24       (per row)
 
 USA varies because it sizes each box to its own label: `above + below + 5`
 equals that label's texture height, exactly, for all 16.
 
-The function has two genuinely redundant stores — `sh a0, 8(v0)` and
-`sh a1, 32(v0)` write back values it just read with `lh` — which is room enough
-to make the height per-label without growing the function:
+The exact per-label height is already in the poly, and the positioner never
+touches it. `brf_800C983C` sets `v0 = tex->off_y` and
+`v2 = tex->off_y + tex->h + 1`, and `tex->h` is height−1, so **`v2 - v0` is the
+texture height**. Unlike the poly's `y`, the UVs are stable across frames, so
+reading them cannot accumulate.
 
-    addu  v1, a2, a3      v1 = y + advance     (a3 is already USA's advance)
-    addiu v1, v1, -6
+Reading it costs four instructions, and the function has them: its x
+normalisation is entirely redundant, because `setXY4` already leaves `x2 == x0`
+and `x1 == x3`. The two `lh` and the two `sh` that copy x are dead:
+
+    lbu  a0, 29(v0)      v2
+    lbu  a1, 13(v0)      v0
+    subu v1, a0, a1      v1 = texture height
+    addu v1, a2, v1      v1 = y + height
     sh a2,10 / a2,18 / v1,26 / v1,34
-    sh a1,16 / a0,24 / nop
 
-`advance - 6` tracks USA's box height within a row or two on 15 of 16 labels
-(only `br_s05` comes out 1 row short, which the canvas builder squashes). The
-return value `y + a3` is untouched, so row positions do not move.
+The quad is now the texture height per label — the same rule USA uses — so the
+highlight matches without approximation, and every canvas is USA's art at USA's
+size with no padding, scaling or squashing.
 
-Measured after: `5,6,7,8,9,12,13,14,15,16,19,23,24` against USA's
-`5,6,7,9,10,11,12,13,14,19,23,24,25`.
-
-**Residual.** USA's box height *is* the art height, so its highlight hugs the
-text exactly; ours is `advance - 6`, which is 0–3 rows taller than the art on
-some labels, and the highlight shows that padding. Matching exactly needs a
-per-label height the function cannot reach: family A's `yb` immediates could
-supply it (`lh v1, 26(v0)` still holds the GetResources value on entry), but
-family B and `br_s00` pass `yb = 0` and have no spare slot at their call sites
-to supply one.
+Two earlier approximations are gone with it: a fixed 20-row quad (which made
+the highlight uniform) and `advance - 6` (which left it 0–3 rows tall). Measured
+before the fix: highlight 14.0 game px against USA's 11.0, both with their top
+2.0 px above the ink — the tops already agreed, only the height was over.
 
 ### Horizontal: USA's relative layout does not fit Integral
 

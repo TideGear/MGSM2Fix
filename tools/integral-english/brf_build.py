@@ -16,7 +16,7 @@ sys.path.insert(0, '.')
 import pcx4
 from PIL import Image
 from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BASEADDR,
-                       ROW_H_ADDR, ROW_H_OLD, ROW_H_NEW, ROW_H_BIAS, S00_ADDR, S00_OLD, S00_NEW,
+                       ROW_H_ADDR, ROW_H_OLD, ROW_H_NEW, S00_ADDR, S00_OLD, S00_NEW,
                        advance_patches, INT_FN, xl_patches, S00_X_ADDRS, LINE_DELTA,
                        quads, HILITE, UNSHARE, unshare_patches)
 
@@ -53,11 +53,11 @@ for addr, val in sorted(newimm.items()):
     patched.append((addr, old[addr], val, users))
 # the single row-height constant every br_sNN is drawn with
 _off = ROW_H_ADDR - BASEADDR
-_have = list(struct.unpack('<9I', ovl[_off:_off+36]))
+_have = list(struct.unpack('<11I', ovl[_off:_off+44]))
 assert _have == ROW_H_OLD, 'row positioner not as expected: %s' % [hex(x) for x in _have]
-struct.pack_into('<9I', ovl, _off, *ROW_H_NEW)
-print('row height @%08X: fixed 13 -> per-label (advance - %d), highlight follows'
-      % (ROW_H_ADDR, ROW_H_BIAS))
+struct.pack_into('<11I', ovl, _off, *ROW_H_NEW)
+print('row height @%08X: fixed 13 -> v2 - v0 (the texture height), per label'
+      % ROW_H_ADDR)
 # br_s00's animated width: rebuild the 52n shift/add chain as 100n
 _o = S00_ADDR - BASEADDR
 _have = list(struct.unpack('<5I', ovl[_o:_o+20]))
@@ -176,7 +176,7 @@ for name, g in quads.items():                     # quad == canvas, for every la
     # an un-shared label's xr lives in a rewritten block, not a lone immediate
     qw = target[tid][0] if name in UNSHARE else imm16(g['xr'][1]) - g['xl'][0]
     # families B and C get no yb immediate: the height is forced at runtime
-    qh = 17 if name.startswith('br_f') else target[tid][1]   # per-label, advance - bias
+    qh = 17 if name.startswith('br_f') else target[tid][1]   # per-label = texture height
     assert (qw, qh) == (G2[tid]['w'], G2[tid]['h']), \
         '%s quad %dx%d vs texture %dx%d' % (name, qw, qh, G2[tid]['w'], G2[tid]['h'])
 print('\nlabel textures:')
