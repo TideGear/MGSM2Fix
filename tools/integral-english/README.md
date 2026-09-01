@@ -410,6 +410,121 @@ assert caught a real bug: `brf_quads_all.json` had recorded `br_s12`'s `yb` at
 `800CA214`, which is actually its `xl` (`addiu a3,zero,26`) — the patch had been
 moving br_s12's left edge, and both immediates being 26 hid it.
 
+## Option → SCREEN (brightness) screen
+
+Not ported yet. The two builds draw this paragraph by **completely different
+mechanisms**, which is why no amount of searching USA for the English text
+worked at first.
+
+**USA draws it as one texture.** `option`'s DAR carries `sc_text`
+(`GV_StrCode` 0x2FBD), 232x70, 4bpp, VRAM (512,256) — a single image holding
+six pre-rendered lines:
+
+    Adjust the monitor brightness so the gray
+    scale below the green line cannot be seen,
+    for the appropriate brightness to play this
+    game.
+    Press the O button to return to the option
+    screen.
+
+Integral's `option` DAR has **no** `sc_text` and Integral's option overlay does
+not contain the string `sc_text` at all, so there is no code to draw it. The
+resource-name strings in the two overlays differ exactly here: USA has
+`sc_text`, Integral instead has `int_op_language1/1_w/2/3/3_w`.
+
+**Integral draws it as font text from the GCL chain.** `opt.c:2750` binds every
+KCB entry from the chain in order:
+
+    for (i = 0; i < 31; i++)
+        work->fEC4[i].string = GCL_GetString(GCL_NextStr());
+
+`GCL_GetString` returns a pointer *into the chain* (`libgcl/parse.c:193`), so
+the text is inline in the option stage's 0xFF chunk, chain at +0x1B8. The
+brightness lines are:
+
+| record | glyphs | `dword_800C3218` x,y | content |
+|--------|--------|----------------------|---------|
+| 13 | 20 | 36, 110 | line 1 |
+| 14 | 20 | 36, 125 | line 2 |
+| 15 | 20 | 36, 140 | line 3 |
+| 16 | 19 | 36, 155 | line 4 |
+| 24 | 18 | 36, 175 | `○ボタンでオプション画面に戻ります。` |
+| 27 |  1 | 110, 300 | the parked colon — USA shows none |
+
+The 15 px row pitch and the 20 px gap before record 24 match the screenshot
+exactly (measured 65 px from line 1 to the ○ line; the table gives 175-110=65),
+which is what identifies the records without a glyph table. Record 24's first
+glyph is `901B` (○); record 25 is the same sentence without `○ボタンで`, used
+by another submenu.
+
+### Why the fifth line is not simply "no English counterpart"
+
+Integral shows five lines; USA shows four. It is tempting to treat
+`○ボタンでオプション画面に戻ります。` as Japanese-only and leave it, but it is
+**not** — lines 5-6 of `sc_text` are its English counterpart, authored by
+Konami. So this line can be ported without translating anything; it is only
+USA's *option* screen that does not display those two rows of the texture.
+
+### What blocks the port
+
+The font atlas, not the text. `option_800C339C` gives each KCB entry a 21 px
+band in one of three VRAM columns, `option_column_x = {768, 896, 960}`, 64
+units (256 px, 21 characters) wide by default:
+
+- entries 0-11 → column 0 (768..832)
+- entries 12-23 → column 1 (896..960, or ..1024 when widened to 128)
+- entries 24-30 → column 2 (960..1024)
+
+Lines 1-4 need 40, 41, 42 and 5 characters. 42 fits the 128-unit width already
+proven by `OPTION_HELP_INDEX 12`, so records 13-16 need no rewrapping — but
+128 units at 896 reaches 1024 and therefore overlaps column 2 for bands
+y=277..361, which is exactly where entries 24-27 sit. Entry 12 gets away with
+it only because its band (y 256..277) is above where column 2 starts, which is
+what the "one band down" special case for index 24 buys.
+
+Record 24 is worse: "Press the ○ button to return to the option screen." is 50
+characters, needing ~152 units, and column 2 has only 64 available before the
+1024 VRAM edge.
+
+A workable plan, not yet done:
+
+1. Move column 2 to the free strip at 832..896 (column 0 keeps 64 units), so
+   column 1 can be 128 units wide for every band without collision.
+2. Widen records 13-16 to 42 characters via `option_char_width`.
+3. Split record 24 the way USA's own texture does — "Press the ○ button to
+   return to the option" in 24, "screen." in the otherwise-unused entry 27,
+   moved from its parked y=300 to y=190. This is USA's wrapping, not ours.
+4. Grow the chain records (see the four fields in `integral-stage-container`).
+
+Alternatively port `sc_text` as a texture, but Integral's overlay has neither
+the `Init_Res` call nor a spare poly in the screen submenu's four-poly list
+(`sc_back_l`, `sc_back_r`, `sc_option`, `op_exit`), so that route means adding
+code, not just art.
+
+### Dead ends, recorded so they are not repeated
+
+`sc_back_l` and `sc_back_r` (160x224 4bpp, VRAM (80,256) and (208,256)) are the
+full-screen background halves and are **textless in both builds** — they hold
+the grey ramp, the green line, the 57/49/41/33/24/16/8/0 numbers and the grid.
+Decoding and rendering both confirmed it.
+
+The English paragraph is not ASCII anywhere: not in `us1.exe` (a PS-X EXE whose
+SDK strings *are* greppable, so ASCII would have been found), `us1_stage.dir`,
+`us1_brf.dat`, `us1_radio.dat`, `windata/alldata.bin` or either
+`windata/dlc/dlc_*.bin`. `grep` on `alldata.bin` does find "screen brightness
+setup" and "use directional buttons to test" twice each, which proves the search
+was working. A delta-pattern search (invariant under any uniform additive
+offset) and UTF-16/high-bit/XOR/0x81-padded variants all found nothing either.
+The one `Adjust` hit in `us1_stage.dir` at 0x29915A2 is a false positive inside
+a symbol map (`GM_ConfigMotionAdjust`); the two `monitor` hits are the source
+filename `monitor1.c` in `s08b`/`s08br`.
+
+USA's option chain really does have the paragraph slots empty. Its whole 680-byte
+0xFF chunk holds 28 records of which only four are non-empty — `[4] screen
+brightness setup`, `[5] key configuration setup`, `[12]` and `[26] use
+directional buttons to test` — with ` ` (a bare terminator) for the
+rest, including 13-16.
+
 ## Audit against the decomp
 
 Findings from re-checking the shipped work against the decompiled source.
