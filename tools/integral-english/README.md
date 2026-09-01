@@ -226,6 +226,57 @@ the highlight uniform) and `advance - 6` (which left it 0–3 rows tall). Measur
 before the fix: highlight 14.0 game px against USA's 11.0, both with their top
 2.0 px above the ink — the tops already agreed, only the height was over.
 
+### The `above` offset: left alone deliberately, and why
+
+USA's box is `[y - above, y + below + 5]`; ours is `[y, y + h]`. Since
+`above + below + 5 == h`, the only difference is that USA **translates** the box
+up by a per-label `above` (2–4). Rows therefore sit slightly lower here than in
+USA. This is the last known deviation and it is not fixed. The reasoning, so it
+does not have to be redone:
+
+**The translation itself is free.** It is a move, not a resize, so the highlight
+height is unaffected, and it fits in the positioner's spare slots — using `a0`,
+dead after the two `lbu`s, so that `a2` survives for the `y + advance` return:
+
+    lbu   a0, 29(v0)          v2
+    lbu   a1, 13(v0)          v0
+    subu  v1, a0, a1          h
+    addiu a0, a2, -K          top    = y - K
+    addu  v1, a0, v1          bottom = y - K + h     height still h
+    sh a0,10 / a0,18 / v1,26 / v1,34
+
+Nine instructions in the eleven slots, `a2` intact, highlight unchanged.
+
+**But a uniform `K` cannot beat `K = 0`.** Measured against USA in the
+detailed-information submenu, the error is exactly `above - 2` — our row anchors
+already sit where USA's `above = 2` labels want them:
+
+    br_s11 br_s12 br_s14   above 2   ~0.0 game px   already exact
+    br_s07 br_s08 br_s09   above 3   ~1.0           1 low
+    br_s05                 above 4   ~2.0           2 low
+
+Across all 16 (nine at `above` 2, six at 3, one at 4):
+
+    K = 0 (shipped)   mean |error| 0.50   9 exact, 6 off by 1, 1 off by 2
+    K = 1             mean |error| 0.63   6 exact, 10 off by 1
+
+So any uniform shift trades nine exact labels for six.
+
+**Exact per-label correction costs something either way.** `above` is not
+derivable from the texture — the UVs give the height, which the quad already
+uses — and nothing else per-label is reachable in the two remaining slots (a
+table lookup indexed by `a1` needs four). Encoding it in the artwork means one
+of:
+
+- pad the canvas top by `Kmax - above` and shift the box up by `Kmax`: exact
+  ink, but the box grows by that padding, so the **highlight** gets 0–2 rows
+  taller on 15 of 16 labels — undoing the thing the V-coordinate fix got right;
+- pad the top and crop the bottom by the same amount: box height preserved, but
+  the art is tight-cropped, so it cuts descenders.
+
+Nine of sixteen labels are already pixel-exact and the rest are within 1 px, so
+this is the one place where matching USA exactly costs more than it returns.
+
 ### The vertical rule
 
 The rule left of the submenu items is **poly 26** (the first `br_line2`), found
@@ -317,7 +368,7 @@ At USA's `xl` nothing overflows (family A 10 + 128 = 138, family B 29 + 120 =
 149), so the earlier right-edge clamp is gone and both families sit at USA's
 real indent. An assertion keeps it that way.
 
-### Constraints that must all hold### Constraints that must all hold### Constraints that must all hold### Constraints that must all hold
+### Constraints that must all hold
 
 `pcx4.py` decodes/encodes the format: standard PCX, 1bpp × 4 planes, 128-byte
 header, RLE where `code > 0xC0` is a run of `code - 0xC0`. The RLE stream is
