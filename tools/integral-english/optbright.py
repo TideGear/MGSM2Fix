@@ -41,10 +41,15 @@ SHIP   = 'work/int1_stage_opt11.dir'      # what the deployed option PPF contain
 OVL    = 'D:/mgsbuild/d/obj/option.bin'   # the rebuilt option overlay
 OUT    = 'work/int1_stage_bright.dir'
 
-# STAGE.DIR geometry, solved from the deployed PPF and verified against all
-# 2610 of its records (see verify_geometry below).
+# STAGE.DIR LBA per disc.  No Integral disc image is on disk, so these were
+# solved from the originally deployed option PPF and proved by re-encoding the
+# retail->SHIP diff and reproducing that PPF byte for byte, on all 2610 of its
+# records, for both discs.  cross_check() below repeats that whenever the PPF on
+# disk still holds exactly the SHIP diff; once this script has overwritten it,
+# the record counts differ and the check is skipped rather than faked.
 DISCS  = [(0, 136654, 'INTEGRAL_disc1_en_option.ppf'),
-          (1,      0, 'INTEGRAL_disc2_en_option.ppf')]
+          (1, 105178, 'INTEGRAL_disc2_en_option.ppf')]
+BASELINE = 'work/option_ppf_baseline_disc%d.ppf'   # the SHIP-state PPF, for revert
 HDR    = 24                               # mode 2 form 1
 MODS   = 'D:/Steam/SteamApps/common/MGS1/mods/INTEGRAL/INTEGRAL'
 DESC   = b'MGS Integral: option screen text'
@@ -52,15 +57,32 @@ DESC   = b'MGS Integral: option screen text'
 CIRCLE = b'\x90\x1b'    # the font's O glyph, mixed with ASCII exactly as
                         # int1_en.exe already does: "Press \x90\x1b to zoom in,"
 
+# USA's words, re-wrapped.  USA's own line breaks cannot be used: they run 41-43
+# characters, and Integral's half-width Latin glyphs are wider than the font
+# USA's texture was authored with.  Measured on screen, a 41-character line
+# renders 239 px against a hard limit of 240 - `buf_width = kcb->width - 12`,
+# since opt.c passes flag 0 so FONT_NO_KINSOKU is clear - and 43 characters would
+# exceed both that and the u8 `max_width`.  Over the limit `font_print_string`
+# wraps inside the 20-row band: the continuation lands on the CLUT row and runs
+# ~1.4 KB past the heap buffer, which is what corrupted the palettes and froze
+# the game on the first attempt.
+#
+# So: paragraphs rejoined and re-wrapped to 36 characters, words untouched, in
+# the same 4 + 2 line shape USA uses.  At the measured 5.83 px/char that is
+# ~210 px, ~30 px of headroom.  Same reasoning as the preope recaps.
 TEXT = {
-    13: b'Adjust the monitor brightness so the gray',
-    14: b'scale below the green line cannot be seen,',
-    15: b'for the appropriate brightness to play this',
-    16: b'game.',
-    24: b'Press the ' + CIRCLE + b' button to return to the option',
-    27: b'screen.',
+    13: b'Adjust the monitor brightness so the',
+    14: b'gray scale below the green line',
+    15: b'cannot be seen, for the appropriate',
+    16: b'brightness to play this game.',
+    24: b'Press the ' + CIRCLE + b' button to return to the',
+    27: b'option screen.',
 }
-PAD_INDEX = 16          # absorbs the delta with trailing spaces
+PAD_INDEX = 27          # absorbs the delta with trailing spaces - it must be the
+                        # shortest line, since padding widens max_width too
+WRAP_LIMIT = 240        # px, buf_width
+PX_ASCII   = 6.0        # conservative: measured 5.83 px/char over 41 characters
+PX_ZENKAKU = 12.0       # font_get_glyph_width returns 12 for anything non-hankaku
 
 
 def pad(x, a=2048): return (x + a - 1) // a * a
@@ -122,18 +144,16 @@ def read_ppf(path):
     return out
 
 
-def solve_lba(recs, ppf):
-    """The PPF holds no undo data and the disc image is not on disk, so recover
-    the mapping from the shipped PPF itself and prove it on every record."""
-    assert len(recs) == len(ppf), 'record count %d != %d' % (len(recs), len(ppf))
-    fo0 = recs[0][0]; off0 = ppf[0][0]
-    num = off0 - HDR - (fo0 % 2048)
-    assert num % 2352 == 0, 'no integral LBA for hdr=%d' % HDR
-    lba = num // 2352 - fo0 // 2048
+def cross_check(recs, ppf, lba):
+    """If the PPF on disk still holds exactly `recs`, prove `lba` against every
+    one of its records.  Returns None when it holds something else (i.e. this
+    script has already written it), so a stale file cannot silently validate."""
+    if len(recs) != len(ppf):
+        return None
     for (fo, dd), (o, pd) in zip(recs, ppf):
-        assert (lba + fo // 2048) * 2352 + HDR + (fo % 2048) == o and dd == pd, \
-            'geometry disagrees at file offset 0x%X' % fo
-    return lba
+        if (lba + fo // 2048) * 2352 + HDR + (fo % 2048) != o or dd != pd:
+            raise AssertionError('geometry disagrees at file offset 0x%X' % fo)
+    return len(recs)
 
 
 def build_ppf(recs, lba, desc, version):
@@ -157,19 +177,25 @@ def main():
     buf    = bytearray(open(SHIP, 'rb').read())
     assert len(buf) == len(retail), 'STAGE.DIR size changed'
 
-    # --- prove the disc geometry AND the writer against the deployed PPFs before
-    # writing anything: the same diff, re-encoded, must reproduce them byte for byte
+    # --- the SHIP-state PPF is the revert path, so write it out first; it is also
+    # what proves the geometry whenever the file on disk still matches it
     ship = diff_records(retail, bytes(buf))
     lbas, version = {}, 2
-    for disc, _l, name in DISCS:
+    for disc, lba, name in DISCS:
         path = os.path.join(MODS, str(disc), name)
         raw = open(path, 'rb').read()
         version = raw[5]
-        lbas[disc] = solve_lba(ship, read_ppf(path))
-        assert build_ppf(ship, lbas[disc], raw[6:56].rstrip(b'\x00'), version) == raw, \
-            'round-trip of the shipped PPF for disc %d differs' % (disc + 1)
-        print('disc %d: STAGE.DIR lba=%-7d - shipped PPF reproduced exactly (%d records)'
-              % (disc + 1, lbas[disc], len(ship)))
+        lbas[disc] = lba
+        base_ppf = build_ppf(ship, lba, DESC, version)
+        open(BASELINE % (disc + 1), 'wb').write(base_ppf)
+        n = cross_check(ship, read_ppf(path), lba)
+        if n is not None:
+            assert base_ppf == raw, 'round-trip of the deployed PPF for disc %d differs' % (disc + 1)
+            print('disc %d: lba=%-7d deployed PPF still the SHIP state - reproduced exactly (%d records)'
+                  % (disc + 1, lba, n))
+        else:
+            print('disc %d: lba=%-7d deployed PPF already rewritten by this script; '
+                  'baseline saved to %s' % (disc + 1, lba, BASELINE % (disc + 1)))
 
     base, span, tags, offs = stage_geom(buf, 'option')
     print('option stage: base 0x%X, %d sectors' % (base, span // 2048))
@@ -198,9 +224,22 @@ def main():
     need = {k: len(v) + 1 for k, v in TEXT.items()}          # payload + NUL
     delta = sum(need[k] - recs[k][1] for k in TEXT)
     grow  = -delta                                           # absorbed by PAD_INDEX
+    assert grow >= 0, 'chain would have to grow by %d; containers need adjusting' % -grow
     TEXT[PAD_INDEX] = TEXT[PAD_INDEX] + b' ' * grow
     print('chain: deltas %+d, padding [%d] with %d spaces -> net 0'
           % (delta, PAD_INDEX, grow))
+
+    # Every line must render inside buf_width or font_print_string wraps into
+    # the CLUT row and past the heap buffer.  Trailing padding counts.
+    for k, t in sorted(TEXT.items()):
+        px = 0.0
+        i = 0
+        while i < len(t):
+            if t[i] >= 0x81: px += PX_ZENKAKU; i += 2
+            else:            px += PX_ASCII;   i += 1
+        assert px <= WRAP_LIMIT - 16, \
+            'record %d estimates %.0f px, too close to the %d px wrap limit' % (k, px, WRAP_LIMIT)
+        print('   [%2d] %2d bytes  ~%3.0f px of %d' % (k, len(t), px, WRAP_LIMIT))
 
     out = bytearray()
     for k, (p, L, pl) in enumerate(recs):

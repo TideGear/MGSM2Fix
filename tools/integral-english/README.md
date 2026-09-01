@@ -480,39 +480,64 @@ test in `font_print_string` compares pixels:
 
     if (next_width > 0 && (x + dx + next_width + kcb->c_skip - 1) >= buf_width)
 
-against `kcb->width` = `(c_skip + 12) * c_width - c_skip` = **252 px** at the
-default 21-character budget. Measured off USA's own `sc_text`, the six lines
-render 222, 226, 224, 31, 227 and 37 px. All six fit the retail 64-unit lane
-with ~25 px spare, so `option_char_width` stays at its default for every one of
-them and no lane, column or band moves.
+against `buf_width`, which is `kcb->width` = `(c_skip + 12) * c_width - c_skip`
+= 252 px at the default 21-character budget, **less 12** — `font_print_string`
+does `if (!(kcb->flag & FONT_NO_KINSOKU)) buf_width -= 12;` and opt.c passes
+flag 0. So the real limit is **240 px**, and `option_char_width` can stay at its
+default for all six lines: no lane, column or band moves.
 
-The same 255 px bound shows up independently: `rect.w = kcb->max_width` and
+The same bound shows up independently: `rect.w = kcb->max_width` and
 `max_width` is a single byte, loaded `lbu` at 0x800C3598 in both retail's
-overlay and ours — so 255 px is the engine's own ceiling for an option line,
-and the 252 px wrap sits just inside it.
+overlay and ours, so 255 px is the engine's own hard ceiling for an option line
+and the 240 px wrap sits inside it.
 
-`integral-preope-three-limits` already recorded this ("the font is proportional
-and English is narrower: 45-character lines render complete in-game") from the
-recap work. Consulting it would have skipped the whole detour.
+**USA's line breaks cannot be used verbatim, and this cost a broken build.**
+USA's lines are 41-43 characters, and its `sc_text` renders them in 222-227 px —
+so they look like they fit. They do not: Integral's half-width Latin glyphs are
+wider than the font that texture was authored with. Measured on screen from our
+own build, `"Adjust the monitor brightness so the gray"` — 41 characters —
+renders **239 px**, one pixel inside the limit, and the 42- and 43-character
+lines wrapped.
+
+What a wrap does here is worth knowing, because it is not a cosmetic failure.
+The continuation is drawn 18 rows down (`l_skip + 12`) inside a band that is
+only 20 rows tall, so it lands on the CLUT row that sits at band + 20 — the
+multicoloured pixel noise — and it keeps writing past `row * height + 32`
+= 2,592 bytes of `GV_AllocMemory`, about 1.4 KB into the heap. The visible
+result was overlapping doubled lines and corrupted palettes; the real result was
+a heap smash that **froze the game** when a later screen allocated.
+
+So the paragraphs are rejoined and re-wrapped to 36 characters, words untouched,
+keeping USA's 4 + 2 line shape. Longest line measured 209 px, ~31 px of margin.
+This is the same conclusion the preope recaps reached for the same reason, and
+`integral-preope-three-limits` had already recorded the half of it that matters
+most — that the formula's 12 px per character is not the font's real metric.
+It does *not* say English fits USA's wrapping; measure our renderer, not USA's
+art.
 
 What the port actually changes:
 
-1. `dword_800C3218` entries 13-16, 24 and 27 → USA's positions (x 42, y 119,
-   131, 143, 155, 167, 179). USA's paragraph has a **12-row** line pitch and its
-   first cell top at screen y 134 with ink at x 43; our KCB entries render their
-   cell top 15 rows below the table's y and their ink 1 px right of its x,
-   measured on the shipping build against these very entries.
+1. `dword_800C3218` entries 13-16, 24 and 27 → x 43, y 118, 130, 142, 154, 166,
+   178. USA's paragraph has a **12-row** line pitch with its first ink row at
+   screen y 134 and ink left at x 43; measured on our own build, these entries
+   put their ink at exactly the table's x and 16 rows below its y, so the table
+   values are USA's positions less that offset. (The first attempt used +15 and
+   x 42, from a calibration against *kanji*; the screenshot then measured ink at
+   x 42 / y 135, which is where the 1 px corrections come from.)
 2. Entry 27 — a colon USA never shows, previously parked at y=300 — takes the
    second line of USA's own wrapping. Its colour call moves from `case 5` (the
    vibration screen) to `case 7` (this screen). Colours are reset for all 31
    entries before that switch, so dropping it from case 5 blanks the colon
    there, which is what USA shows.
-3. Records 13-16, 24 and 27 get USA's text. The ○ is the font's own glyph
-   `90 1B` mixed with ASCII, exactly as `int1_en.exe` already ships
-   (`Press \x90\x1b to zoom in,`).
-4. The chain delta is held at **exactly zero** by padding "game." with 15
-   trailing spaces, so no container size field moves and nothing after record 27
-   shifts. A large negative shift has crashed this script before.
+3. Records 13-16, 24 and 27 get USA's words on the 36-character wrap. The ○ is
+   the font's own glyph `90 1B` mixed with ASCII, exactly as `int1_en.exe`
+   already ships (`Press \x90\x1b to zoom in,`), and it costs 12 px rather than
+   ~6, since `font_get_glyph_width` returns 12 for anything non-hankaku.
+4. The chain delta is held at **exactly zero** by padding record 27 with 15
+   trailing spaces, so no container size field moves and nothing after it
+   shifts. A large negative shift has crashed this script before. The padding
+   goes on the *shortest* line, because trailing spaces widen `max_width` too —
+   padding a near-limit line would push it into a wrap.
 
 The overlay stays 25,950 bytes (the table edit is size-neutral and the relocated
 call moves 16 bytes from one switch case to another — visible in the build as
