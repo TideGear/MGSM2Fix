@@ -152,6 +152,23 @@ RULE_X = [(0x800C6F28, 19, 19 + GROUP_DX, 'vertical rule left  (s6, polys 26/40/
 RULE_S4 = (0x800C6F18, 0x00E0A021, 0x24140000 | ((20 + GROUP_DX) & 0xFFFF),
            'connector right end (s4, polys 25/39/41)')
 
+# The layout block is not the last word on x: every rule and connector is
+# rewritten by an animated reveal (`x = 11p - K`) that runs from the jump table
+# at 800C74C0.  For the outline submenu that block is still active once settled,
+# so its constants won and the rule stayed at game x 20 - inside the text -
+# while the others followed s6/s5 to 0.  Shift the animated constants by the
+# same -20.  The connectors' LEFT ends (-46, -24) anchor to the FILE column and
+# are left alone; only their animated right ends move.
+ANIM_X = [(0x800C73A0, -46, -66, 'p25 connector right end'),
+          (0x800C7424, -24, -44, 'p39 connector right end'),
+          (0x800C745C, -46, -66, 'p41 connector right end'),
+          (0x800C74FC, -47, -67, 'p26 outline rule  x0/x2'),
+          (0x800C7508, -43, -63, 'p26 outline rule  x1/x3'),
+          (0x800C7580, -25, -45, 'p40 member rule   x0/x2'),
+          (0x800C7584, -21, -41, 'p40 member rule   x1/x3'),
+          (0x800C75B8, -47, -67, 'p42 detailed rule x0/x2'),
+          (0x800C75C4, -43, -63, 'p42 detailed rule x1/x3')]
+
 RULE = [(0x800C6F3C, -38, -43, 'operation-outline rule bottom'),
         # The operation-member rule is poly 40 (its x comes from s6/s5 = 19/23,
         # left by the outline block).  top = s0 - 2, bottom = v0 - 18, so the

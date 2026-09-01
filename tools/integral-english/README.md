@@ -286,6 +286,28 @@ move with them, and every x involved is an immediate:
     label xl        26 -> 10, 46 -> 29   (USA's values)
     800C7674/76A4   26 -> 10             br_s00's animated x
 
+**The layout block is not the last word on x.** Every rule and connector is
+rewritten by an animated reveal (`x = 11p - K`) dispatched from the jump table
+at `800C74C0`, and for the *outline* submenu that block is still active once
+settled — so it won, and that rule stayed at game x 20, sitting inside
+`infiltration method`, while the others followed `s6`/`s5` to 0. The animated
+constants need the same shift:
+
+    800C73A0  -46 -> -66   p25 connector right end
+    800C7424  -24 -> -44   p39 connector right end
+    800C745C  -46 -> -66   p41 connector right end
+    800C74FC  -47 -> -67   p26 outline  rule x0/x2
+    800C7508  -43 -> -63   p26 outline  rule x1/x3
+    800C7580  -25 -> -45   p40 member   rule x0/x2
+    800C7584  -21 -> -41   p40 member   rule x1/x3
+    800C75B8  -47 -> -67   p42 detailed rule x0/x2
+    800C75C4  -43 -> -63   p42 detailed rule x1/x3
+
+The connectors' **left** ends (`-46` and `-24`, separate immediates) anchor to
+the FILE column and stay. Lesson: after moving anything in this menu, check for
+a second writer — the settled frame and the reveal animation set the same fields
+from different code, and which one wins varies by submenu.
+
 `s4` is `addu s4, a3, zero` — it reuses `br_s00`'s **advance** of 20 as an x
 coordinate, so it needs a real load rather than an edited immediate, and `a3`
 must keep its 20. The connectors' left ends (`-46` at `800C6F14`, `-24` at
