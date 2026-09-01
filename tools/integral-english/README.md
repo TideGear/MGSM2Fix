@@ -412,9 +412,9 @@ moving br_s12's left edge, and both immediates being 26 hid it.
 
 ## Option → SCREEN (brightness) screen
 
-Not ported yet. The two builds draw this paragraph by **completely different
-mechanisms**, which is why no amount of searching USA for the English text
-worked at first.
+Ported by `optbright.py`. The two builds draw this paragraph by **completely
+different mechanisms**, which is why no amount of searching USA for the English
+text worked at first.
 
 **USA draws it as one texture.** `option`'s DAR carries `sc_text`
 (`GV_StrCode` 0x2FBD), 232x70, 4bpp, VRAM (512,256) — a single image holding
@@ -465,41 +465,81 @@ Integral shows five lines; USA shows four. It is tempting to treat
 Konami. So this line can be ported without translating anything; it is only
 USA's *option* screen that does not display those two rows of the texture.
 
-### What blocks the port
+### What the port needed — and the VRAM analysis that was wrong
 
-The font atlas, not the text. `option_800C339C` gives each KCB entry a 21 px
-band in one of three VRAM columns, `option_column_x = {768, 896, 960}`, 64
-units (256 px, 21 characters) wide by default:
+**No VRAM work at all.** That is worth stating plainly because the first plan
+here was a font-atlas repack, and it was built on a false premise. The formula
+in `option_800C339C` / `font_get_buffer_size`,
+`c_width = (rect.w * 4) / (c_skip + 12)`, reads like 12 px per character, which
+makes a 42-character line need a 128-unit lane, which collides with the next
+column, which forces a repack. Every step of that follows from the 12.
 
-- entries 0-11 → column 0 (768..832)
-- entries 12-23 → column 1 (896..960, or ..1024 when widened to 128)
-- entries 24-30 → column 2 (960..1024)
+The 12 is only the *cell* size used to size the buffer. `put_hankaku_4bpp`
+returns each glyph's own advance, so ASCII is **proportional**, and the wrap
+test in `font_print_string` compares pixels:
 
-Lines 1-4 need 40, 41, 42 and 5 characters. 42 fits the 128-unit width already
-proven by `OPTION_HELP_INDEX 12`, so records 13-16 need no rewrapping — but
-128 units at 896 reaches 1024 and therefore overlaps column 2 for bands
-y=277..361, which is exactly where entries 24-27 sit. Entry 12 gets away with
-it only because its band (y 256..277) is above where column 2 starts, which is
-what the "one band down" special case for index 24 buys.
+    if (next_width > 0 && (x + dx + next_width + kcb->c_skip - 1) >= buf_width)
 
-Record 24 is worse: "Press the ○ button to return to the option screen." is 50
-characters, needing ~152 units, and column 2 has only 64 available before the
-1024 VRAM edge.
+against `kcb->width` = `(c_skip + 12) * c_width - c_skip` = **252 px** at the
+default 21-character budget. Measured off USA's own `sc_text`, the six lines
+render 222, 226, 224, 31, 227 and 37 px. All six fit the retail 64-unit lane
+with ~25 px spare, so `option_char_width` stays at its default for every one of
+them and no lane, column or band moves.
 
-A workable plan, not yet done:
+The same 255 px bound shows up independently: `rect.w = kcb->max_width` and
+`max_width` is a single byte, loaded `lbu` at 0x800C3598 in both retail's
+overlay and ours — so 255 px is the engine's own ceiling for an option line,
+and the 252 px wrap sits just inside it.
 
-1. Move column 2 to the free strip at 832..896 (column 0 keeps 64 units), so
-   column 1 can be 128 units wide for every band without collision.
-2. Widen records 13-16 to 42 characters via `option_char_width`.
-3. Split record 24 the way USA's own texture does — "Press the ○ button to
-   return to the option" in 24, "screen." in the otherwise-unused entry 27,
-   moved from its parked y=300 to y=190. This is USA's wrapping, not ours.
-4. Grow the chain records (see the four fields in `integral-stage-container`).
+`integral-preope-three-limits` already recorded this ("the font is proportional
+and English is narrower: 45-character lines render complete in-game") from the
+recap work. Consulting it would have skipped the whole detour.
 
-Alternatively port `sc_text` as a texture, but Integral's overlay has neither
-the `Init_Res` call nor a spare poly in the screen submenu's four-poly list
-(`sc_back_l`, `sc_back_r`, `sc_option`, `op_exit`), so that route means adding
-code, not just art.
+What the port actually changes:
+
+1. `dword_800C3218` entries 13-16, 24 and 27 → USA's positions (x 42, y 119,
+   131, 143, 155, 167, 179). USA's paragraph has a **12-row** line pitch and its
+   first cell top at screen y 134 with ink at x 43; our KCB entries render their
+   cell top 15 rows below the table's y and their ink 1 px right of its x,
+   measured on the shipping build against these very entries.
+2. Entry 27 — a colon USA never shows, previously parked at y=300 — takes the
+   second line of USA's own wrapping. Its colour call moves from `case 5` (the
+   vibration screen) to `case 7` (this screen). Colours are reset for all 31
+   entries before that switch, so dropping it from case 5 blanks the colon
+   there, which is what USA shows.
+3. Records 13-16, 24 and 27 get USA's text. The ○ is the font's own glyph
+   `90 1B` mixed with ASCII, exactly as `int1_en.exe` already ships
+   (`Press \x90\x1b to zoom in,`).
+4. The chain delta is held at **exactly zero** by padding "game." with 15
+   trailing spaces, so no container size field moves and nothing after record 27
+   shifts. A large negative shift has crashed this script before.
+
+The overlay stays 25,950 bytes (the table edit is size-neutral and the relocated
+call moves 16 bytes from one switch case to another — visible in the build as
+two jump-table targets shifting −16), so it stays inside its 26,624-byte
+footprint and the stage keeps its 75 sectors.
+
+The texture route was rejected: Integral's overlay has neither the `Init_Res`
+call nor a spare poly — the screen submenu's list is `POLY_FT4 field_5D4[4]`
+with `int f2AFC[4]`, exactly four slots with hardcoded traversals, against
+USA's five — and USA's runtime moves the quad in a way the decomp does not show
+(its `Init_Res` says `y0=2`, the screenshot renders at 14, and rows 47-69 do not
+appear at all). Text was both smaller and better understood.
+
+### Building and deploying
+
+`optbright.py` needs `work/int1_stage.dir` (retail), `work/int1_stage_opt11.dir`
+(whatever the deployed option PPF currently contains) and a rebuilt
+`D:/mgsbuild/d/obj/option.bin`, and it rewrites both discs' option PPFs in
+place.
+
+No Integral disc image is on disk, so the STAGE.DIR LBA cannot be looked up the
+way `ppfgen.py` does it. Instead the script **recovers the geometry from the
+deployed PPF and proves it**: it solves `lba` from the first record, checks that
+mapping against all 2,610 shipped records, and then re-encodes that same diff
+and requires it to reproduce the shipped file byte for byte before writing
+anything. Disc 1 is LBA 136654, disc 2 is 105178, both mode 2 form 1
+(24-byte sector header).
 
 ### Dead ends, recorded so they are not repeated
 
