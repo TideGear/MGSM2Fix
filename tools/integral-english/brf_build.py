@@ -19,7 +19,7 @@ from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BAS
                        ROW_H_ADDR, ROW_H_OLD, ROW_H_NEW, S00_ADDR, S00_OLD, S00_NEW,
                        advance_patches, INT_FN, xl_patches, S00_X_ADDRS, LINE_DELTA,
                        quads, HILITE, UNSHARE, unshare_patches, RULE,
-                       RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX)
+                       RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX, ANIM_X)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
 su, tu, Fu, pu = stage('work/us1_stage.dir')
@@ -87,6 +87,14 @@ for addr, oldw, neww, what in unshare_patches(_xl, _w):
     assert have == oldw, 'unshare %08X: %s' % (addr, [hex(x) for x in have])
     struct.pack_into('<%dI' % len(neww), ovl, o, *neww)
     print('unshare   @%08X: %s' % (addr, what))
+
+for addr, old_v, new_v, what in ANIM_X:
+    o = addr - BASEADDR
+    w = struct.unpack('<I', ovl[o:o+4])[0]
+    cur = w & 0xFFFF; cur -= 0x10000 if cur >= 0x8000 else 0
+    assert (w >> 26) == 9 and cur == old_v, 'anim x %08X: %08X (want %d)' % (addr, w, old_v)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
+    print('anim x    @%08X: %+d -> %+d  (%s)' % (addr, old_v, new_v, what))
 
 for addr, old_v, new_v, what in RULE_X:
     o = addr - BASEADDR
