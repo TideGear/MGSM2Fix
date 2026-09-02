@@ -18,6 +18,169 @@ counts and line breaks change.
 `en_menu3` is disabled — it crashes with `GCL:WRONG CODE` walking a RAM buffer,
 cause never found.
 
+## Gotchas
+
+Everything below cost at least one broken build. Sections further down have the
+detail; this is the index.
+
+### Diagnosing a freeze or crash — do these two things first
+
+1. **Compare the rebuilt overlay's size with retail's.** Over by even 32 bytes
+   is enough to freeze a menu row (see below). This is one command and it
+   would have saved a dozen relaunches.
+2. **Bisect against a stock run before theorising.** Move the PPF aside and
+   confirm the fault is even ours; then split it (overlay vs chain, then edit
+   by edit). Every mechanism I reasoned my way to without doing this — an
+   uninitialised array, the font atlas, a struct overrun — was wrong.
+3. **A freeze leaves no trace in `MGSM2Fix.log`.** The last lines are always
+   the periodic `check_write_mgs_savedata`, identical to a clean exit, so the
+   log cannot tell you a freeze happened or where.
+4. Symptoms mislead about *locality*: an overlay 32 bytes too large froze only
+   the EXIT row, which looks exactly like a bug in the EXIT row.
+
+### Overlays
+
+- **An overlay must not exceed retail's byte count.** It loads at a fixed
+  address, so one byte over corrupts whatever follows. On `option`: +108 froze
+  the KEY CONFIG *and* EXIT rows, +32 froze EXIT, +0 clean. **The padded sector
+  slot is not the limit** — 26,624 was recorded as the limit for a 25,842-byte
+  overlay and is far too generous to protect you.
+- **Do not "fix" retail's quirks.** `f924[8]` is read *and written* past its end
+  into `kcb[0]` because the cursor states run to 11. Retail tolerates it;
+  enlarging the array added 16 bytes plus every offset after it and helped push
+  the overlay over the limit. The retail key-config init likewise writes
+  `f2AFC[7..12]` into a 4-entry array. Leave both alone.
+- A struct field change shifts every later offset, so the recompiled overlay
+  differs from retail in ~20 KB of bytes. That is normal, not a red flag.
+- `build/*.matching.bin` is byte-identical to retail, so **the decomp is
+  trustworthy** — any misbehaviour in a rebuild comes from your own edits.
+- `FAIL: does not match target hash` from `build.py` is *expected* for the
+  overlays we deliberately modify (`option`, `preope`).
+- Overlays carry their own entry address in their header; entry points do **not**
+  need pinning.
+- Work areas are `GV_NewActor(EXEC_LEVEL, sizeof(Work))`, so growing `Work` is
+  safe for the allocation — but not for the size limit above.
+
+### Font and text rendering
+
+- **`c_width = (rect.w * 4) / 12` implies 12 px per character, but the ASCII
+  font is proportional.** This one formula caused two separate broken builds:
+  an unnecessary font-atlas repack, and lines wrapped at the wrong width.
+  Compute real widths from `font.res` (`glyph_widths()` in `optbright.py`).
+- **The wrap limit is `kcb->width - 12`, not `kcb->width`** —
+  `font_print_string` subtracts 12 unless `FONT_NO_KINSOKU` is set, and opt.c
+  passes flag 0. So 240 px at the default 21-character budget, not 252.
+- **`max_width` is one byte**, loaded `lbu`, so 255 px is a hard ceiling. The
+  decomp declares it `char`; PSY-Q's plain `char` is unsigned and retail emits
+  `lbu`, which is why it works.
+- **Wrapping is not cosmetic — it smashes the heap.** The continuation is drawn
+  18 rows down inside a 20-row band, so it lands on the CLUT row at band+20
+  (multicoloured pixel noise) and keeps writing ~1.4 KB past the
+  `row * height + 32` buffer. Visible result: doubled overlapping lines and
+  wrecked palettes; real result: a freeze on the next screen that allocates.
+- **Never size lines off USA's art.** Integral's half-width Latin glyphs are
+  wider than the font USA's `sc_text` texture was authored with — USA fits 43
+  characters in 242 px where ours needs more than 240. Measure our renderer.
+- Trailing-space padding widens `max_width` too, so **pad only the shortest
+  line** when balancing chain lengths.
+- Zenkaku (2-byte) glyphs cost a flat 12 px. `90 1B` is ○ and `90 18` is ✕,
+  mixed inline with ASCII — precedent already shipping in `int1_en.exe`
+  (`Press \x90\x1b to zoom in,`).
+- `font.res` is not addressable by tag id — it lives in the `init` stage and is
+  found by signature (`>II 392, 2306`). Table 1 is 96 big-endian words for
+  ASCII 32..127; width is bits 27:24.
+- Text visibility is the font **CLUT colour**, and all 31 entries are reset to 0
+  before the per-state switch — so lighting an entry in a new state is safe, and
+  blanking one is just omission.
+- All entries are printed once at init and drawn every frame; their positions
+  are read from `dword_800C3218` at print time.
+- For these option entries the ink lands at exactly the table's x and
+  **table y + 16**. Calibrating that offset against *kanji* gave +15 and put
+  everything 1 px low.
+
+### The GCL text chain
+
+- Records are `07 <len> <payload> 00`, starting at script+0x1B8.
+- **Fix container sizes with `gclparse.containers_over`**, not the hardcoded
+  offsets an older note lists — it finds every enclosing size field.
+- **Keeping the chain delta at exactly zero avoids container arithmetic
+  entirely.** Prefer it: a −8,055-byte shift crashed the script at `set map`
+  with no exception, and every edit that has ever worked moved things by at
+  most +780.
+- Empty records (payload = a single NUL) render zero-width and are harmless —
+  USA ships 24 of them.
+- `GCL_GetString` returns a pointer *into* the chain; the text is read in place,
+  so there is no separate string table to update.
+
+### Textures and quads
+
+- **The texture is stretched to a hardcoded quad**, and `SetPacketTexture`'s UVs
+  span the whole texture, so changing texture size alone does nothing. The
+  selection highlight follows the same quad.
+- A label's height is already in the poly: `v2 - v0`.
+- `off_x + w` and `off_y + h` must both be ≤ 255 (`u_char` UVs); overflow shows
+  as vertical striping.
+- PCX here is 4-plane 1bpp with row-wide RLE, `PCXINFO` at offset 74 (stamp
+  12345), width a multiple of 4, CLUTs on a 16-unit stride.
+- Many polys have **two writers** — a settled layout block and an animated
+  reveal dispatched from a jump table — and which one wins varies per submenu.
+- To find version-exclusive art, **diff the two builds' DARs**: that is how
+  USA's `sc_text` turned up as the only texture Integral's option stage lacks.
+- USA's `Init_Res` rect is not necessarily what renders: `sc_text` is set up at
+  `y0=2` but draws at 14, and its last two rows never appear. Something the
+  decomp does not show moves it.
+
+### Reading disassembly
+
+- USA's brf/option overlay base is **0x800C5970**, Integral's **0x800C3208**.
+  Match functions by call count, never by address.
+- A `jal` takes arguments from its **delay slot** too; scanning only backwards
+  mis-attributes them by one call.
+- **Never write `$zero`** in a register simulator — MIPS discards it, and a
+  simulator that doesn't corrupts everything downstream.
+- A linear simulation cannot be trusted on a **conditionally-assigned
+  register**; look for every write before believing one.
+- Resource ids are `GV_StrCode` hashes computed at runtime from strings in
+  `.rodata`, so they are **not** immediates in the code — grep the overlay for
+  the name instead.
+
+### Measuring from screenshots
+
+- Scale is **9 display px per game px** (2160/240) with a 480 px x offset.
+  Verify it against something with a known texture row — the brightness screen's
+  green line is `sc_back_l` row 92, i.e. game y 100.
+- Measure **ink centroids, not band tops**: a highlighted row's glow moves a
+  threshold's idea of where ink starts by 2–3 px, the same size as the effects
+  being chased.
+
+### PPFs and deployment
+
+- Ketchup loads every PPF in `mods/INTEGRAL/INTEGRAL/{0,1}`; the log line
+  `[Ketchup] base path is mods\INTEGRAL\INTEGRAL\0` confirms it picked them up.
+  Keep patches in separate files so they can be disabled individually.
+- Our PPFs carry **no undo data** and no Integral disc image is on disk, so
+  `ppfgen.py`'s LBA lookup is unusable. Recover the mapping from a deployed PPF
+  and prove it on every record (`optbright.py` does this). Disc 1 is LBA
+  136654, disc 2 is 105178, both mode 2 form 1 (24-byte sector header).
+- A PPF record's length is **one byte**, so split runs at 255 bytes *and* at
+  2048-byte sector boundaries.
+- Regenerating a PPF in place destroys the reference you were verifying
+  against — save a baseline copy first; it is also your revert path.
+
+### Toolchain and environment
+
+- Build with `PSYQ_SDK=D:/mgsbuild/psyq` from `D:/mgsbuild/d/build`
+  (`py build.py`). The SDK path default in `build.py` is wrong for this machine.
+- `obj/option.bin` is the modified overlay; `build/option.matching.bin` is the
+  pristine one.
+- **Do not author Python through shell heredocs.** Escapes get eaten — `\x00`
+  became a literal NUL byte in a source file twice, and a `str.replace` silently
+  matched nothing. Write files with an editor tool.
+- The console is cp1252: printing a 0x90 byte raises `UnicodeEncodeError`.
+  Escape non-ASCII before printing.
+- `MGSM2Fix.log` contains `exceptions are enabled` for every script VM it hooks,
+  so a log filter must not grep for `exception`.
+
 ## Building
 
 Needs the decompilation at `D:\mgsbuild\d` (branch `integral-english-text`,
