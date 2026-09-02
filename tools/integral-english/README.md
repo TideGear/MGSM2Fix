@@ -25,9 +25,9 @@ detail; this is the index.
 
 ### Diagnosing a freeze or crash — do these two things first
 
-1. **Compare the rebuilt overlay's size with retail's.** Over by even 32 bytes
-   is enough to freeze a menu row (see below). This is one command and it
-   would have saved a dozen relaunches.
+1. **Compare the rebuilt overlay's size with retail's, and check whether the
+   diff touches `f924`.** Size is cheap insurance; `f924` is the mechanism.
+   Growing `f924` past retail's 8 is a genuine freeze (see Overlays below).
 2. **Bisect against a stock run before theorising.** Move the PPF aside and
    confirm the fault is even ours; then split it (overlay vs chain, then edit
    by edit). Every mechanism I reasoned my way to without doing this — an
@@ -40,16 +40,23 @@ detail; this is the index.
 
 ### Overlays
 
-- **An overlay must not exceed retail's byte count.** It loads at a fixed
-  address, so one byte over corrupts whatever follows. On `option`: +108 froze
-  the KEY CONFIG *and* EXIT rows, +32 froze EXIT, +0 clean. **The padded sector
-  slot is not the limit** — 26,624 was recorded as the limit for a 25,842-byte
-  overlay and is far too generous to protect you.
-- **Do not "fix" retail's quirks.** `f924[8]` is read *and written* past its end
-  into `kcb[0]` because the cursor states run to 11. Retail tolerates it;
-  enlarging the array added 16 bytes plus every offset after it and helped push
-  the overlay over the limit. The retail key-config init likewise writes
-  `f2AFC[7..12]` into a 4-entry array. Leave both alone.
+- **Keep an overlay at or under retail's byte count** — but as insurance, not
+  because it is the mechanism. The `+108` / `+32` / `+0` bisection that produced
+  this rule was **confounded**: the commit that reached +0 also reverted
+  `f924[12]` to `[8]`, and that is the real freeze. Overlays load into the BSS
+  tail at `StageCharacterEntries` with ~118 KB of headroom (the largest stage
+  overlay on the disc is 143,856 bytes against option's 25,842), so +32 bytes
+  cannot plausibly overflow it. The padded sector slot (26,624) is not a limit
+  either.
+- **Do not "fix" retail's quirks — `f924` above all.** It is indexed
+  `f924[work->f920]` and the cursor states run to 11, so states 8..11 read and
+  write `kcb[0]`'s first bytes. Retail depends on what it finds there: enlarging
+  the array to 12 redirects those reads to freshly-zeroed slots and changes which
+  branch each state takes, which is the EXIT-row hang. Leave it at 8.
+  The retail key-config init likewise writes `f2AFC[7..16]` past a 4-entry array;
+  that one *is* inert (it stores literal 0 into already-zeroed memory, and
+  entering KEY CONFIG re-stamps all 17 of `f2B0C[0..16]`), so growing `f2AFC` is
+  safe where growing `f924` is not. Know which is which before you touch either.
 - A struct field change shifts every later offset, so the recompiled overlay
   differs from retail in ~20 KB of bytes. That is normal, not a red flag.
 - `build/*.matching.bin` is byte-identical to retail, so **the decomp is
@@ -78,9 +85,13 @@ detail; this is the index.
   (multicoloured pixel noise) and keeps writing ~1.4 KB past the
   `row * height + 32` buffer. Visible result: doubled overlapping lines and
   wrecked palettes; real result: a freeze on the next screen that allocates.
-- **Never size lines off USA's art.** Integral's half-width Latin glyphs are
-  wider than the font USA's `sc_text` texture was authored with — USA fits 43
-  characters in 242 px where ours needs more than 240. Measure our renderer.
+- **Never size lines off USA's art — and compare like with like.** The glyph
+  widths are in fact *identical* between the builds (measured ink-to-ink on
+  matching Previous Operations pages: 261 vs 261, 306 vs 306). An earlier note
+  here claimed Integral's were wider, from comparing a *computed advance* against
+  a *measured ink extent* — different quantities. Compute advances from
+  `font.res` (`glyph_widths()` in `optbright.py`) or measure ink on both screens
+  in one pass, never one against the other.
 - Trailing-space padding widens `max_width` too, so **pad only the shortest
   line** when balancing chain lengths.
 - Zenkaku (2-byte) glyphs cost a flat 12 px. `90 1B` is ○ and `90 18` is ✕,
@@ -126,9 +137,13 @@ detail; this is the index.
   reveal dispatched from a jump table — and which one wins varies per submenu.
 - To find version-exclusive art, **diff the two builds' DARs**: that is how
   USA's `sc_text` turned up as the only texture Integral's option stage lacks.
-- USA's `Init_Res` rect is not necessarily what renders: `sc_text` is set up at
-  `y0=2` but draws at 14, and its last two rows never appear. Something the
-  decomp does not show moves it.
+- **Copy USA's quad constants; never derive them from a screenshot.** I measured
+  USA's paragraph, converted `134 - 120` and got `y0` 14 where USA's own constant
+  is 2 — a 12-row error, and the "something moves it at runtime" theory it
+  spawned was false (`sc_text` is referenced exactly once in USA's overlay, with
+  no second writer to that poly). The KCB text path uses absolute SPRT
+  coordinates; a `POLY_FT4` is channel-relative, with the offset set in
+  `libdg/chanl.c`. A screenshot cannot settle a quad constant.
 
 ### Reading disassembly
 
@@ -782,12 +797,121 @@ past its end into `kcb[0]` because the cursor states run to 11; retail tolerates
 that, and correcting it costs 16 bytes of struct plus every offset after it.
 Leave retail's quirks alone unless there is evidence they hurt.
 
-The texture route was rejected: Integral's overlay has neither the `Init_Res`
-call nor a spare poly — the screen submenu's list is `POLY_FT4 field_5D4[4]`
-with `int f2AFC[4]`, exactly four slots with hardcoded traversals, against
-USA's five — and USA's runtime moves the quad in a way the decomp does not show
-(its `Init_Res` says `y0=2`, the screenshot renders at 14, and rows 47-69 do not
-appear at all). Text was both smaller and better understood.
+**Superseded: the texture route shipped, and the paragraph is now pixel-exact.**
+Everything above about the 240 px wrap and the 36-character re-wrap describes the
+*font* path, which is still what the option screen's other entries use — but the
+brightness paragraph is no longer one of them. See "The sc_text texture port"
+below. The rest of this section is kept because the font limits it documents are
+real and still bound every other entry on the screen.
+
+For the record, the reasons this route was first rejected were both wrong. "No
+spare poly" — the screen submenu's `POLY_FT4 field_5D4[4]` / `int f2AFC[4]` grow
+to 5 harmlessly (see below), and the real bound was `GM_MakePrim`'s pack count,
+not the arrays. "USA's runtime moves the quad" — it does not; USA's `sc_text`
+string is referenced exactly once in its overlay and there is no second writer to
+that poly. The apparent movement was my own coordinate-system error.
+
+## The sc_text texture port
+
+USA draws the brightness paragraph as **one 232x70 4bpp texture**, `sc_text`, on
+a quad - never with the font. Integral had no such texture and no code naming it.
+Porting it makes the paragraph pixel-exact, because it is USA's own artwork on
+USA's own quad: USA's line breaks, USA's glyph rendering, all six lines, none of
+the font path's limits. Built by `optsctext.py`.
+
+| | |
+|---|---|
+| overlay | 25,830 bytes |
+| DAR | 121,680 -> 127,540, 56 -> 57 entries |
+| stage | 75 -> 78 sectors, relocated to **DUMMY3M idx 384** |
+| sc_text | VRAM (512,256), CLUT (1008,237) |
+| key_pad | moved (512,256) -> (512,326), which is what USA does |
+| quad | `Init_Res(work, GV_StrCode("sc_text"), po, -121, 2, 111, 72, 0, 0)` |
+
+### The three things that would have shipped as bugs
+
+**`brf` is also relocated into DUMMY3M**, at idx 128..266, next to `preope`'s
+0..89. The obvious slot - 90, just past preope - would have overwritten 40
+sectors of the shipped briefing stage. Worse, a blankness check would have
+*passed*, because PPFs are applied by the loader at runtime and never written
+back, so the image on disk shows all 13,501 DUMMY3M sectors as zero. Occupancy
+has to be composited from the deployed PPFs; `optsctext.py` does that and asserts
+disjointness. Slot 384 leaves brf 256 sectors of growth room.
+
+**`menu.ppf` writes chain records 4 and 5** ("screen brightness setup", "key
+configuration setup") into the option stage. After relocation those writes land
+on a stage the game no longer reads, so both labels would have silently reverted
+to Japanese. The relocated image is therefore built from a **composite** of
+retail plus every deployed PPF's STAGE.DIR writes, and the build asserts records
+4/5/12/26 are English before emitting.
+
+**The quad's y was derived, and derived wrong.** I measured USA's paragraph on
+screen and converted: 134 - 120 = `y0` 14. That is invalid - the KCB text path
+uses absolute SPRT coordinates while a POLY_FT4 is channel-relative
+(`libdg/chanl.c` sets channel 1's `env.ofs`), so a screenshot cannot settle a
+quad constant. USA's own value is **2**, a 12-row difference. **Copy USA's
+constants; do not derive them.** The other four quads in that block were already
+byte-identical to USA's, which is exactly why copying the fifth is safe under any
+coordinate system.
+
+### Why the fifth quad rides the existing loop
+
+Two ways to add it. Appending a `POLY_FT4` to the end of `Work` and copying it
+explicitly leaves every existing field offset alone - but it needs a per-frame
+40-byte struct copy, and measured **+156 bytes against 92 reclaimed**. Growing
+`field_5D4[4]`/`f2AFC[4]` to 5 lets the existing copy loop carry it for nothing:
+**-12**. The real allocation bound was neither array but `GM_MakePrim`'s pack
+count for `field_2C`, 4 -> 5, which is heap.
+
+Growing `f2AFC` shifts which `f2B0C` slots retail's key-config init overrun
+zeroes, from `[3..12]` to `[2..11]`. That is inert, twice over: those writes
+store literal `0` into memory `GV_NewActor` has already zeroed, and entering KEY
+CONFIG sets **all 17** of `f2B0C[0..16]` before the screen draws. The
+`f924` -> `kcb[0]` overrun relationship also survives, because `field_5D4` shifts
+`f924` and `kcb` together.
+
+### A correction on the overlay size limit
+
+The Gotchas section says the option overlay must not exceed retail's 25,842
+bytes, from a `+108` / `+32` / `+0` bisection. **That bisection was confounded**:
+the commit that took it to +0 also reverted `f924[12]` to `[8]`, and *that* is a
+real freeze mechanism - retail indexes `f924[work->f920]` with cursor states up
+to 11, so states 8..11 read and write `kcb[0]`'s first bytes, and enlarging the
+array redirects those reads to zeroed slots and changes which branch each state
+takes. Meanwhile overlays load into the BSS tail at `StageCharacterEntries` with
+roughly 118 KB of headroom - the largest stage overlay on the disc is 143,856
+bytes against option's 25,842 - so +32 bytes cannot plausibly overflow anything.
+Treat "stay at or under retail" as cheap insurance rather than the mechanism, and
+treat **any** change to `f924` as the thing to be afraid of.
+
+### Verification before deploying
+
+`optsctext.py` asserts, and these all passed: a loader-style DAR walk consuming
+exactly 57 entries with `remaining` hitting 0 and every entry 4-aligned; UV fit
+(`off_x` 0 + 232 <= 255, `off_y` 0 + 70 <= 255, 58 units from a 64-aligned x so a
+single tpage); DUMMY3M disjointness against the composited PPF map plus a
+blankness read of all 78 target sectors on both discs; the STAGE.DIR entry
+reading retail's 27,136 before being repointed. Then, end to end on **both**
+discs: applying the emitted PPF to the disc image in `dlc_japan.bin` resolves
+`option` to DUMMY3M idx 384 and reads the 78-sector block back byte-identical,
+with exactly one record outside the slot (the entry repoint).
+
+Not verified: anything in game. Five adversarial lenses found no blocker, but the
+quad's exact placement rests on USA's constant rather than an observation.
+
+### Reverting
+
+`work/backup_before_sctext/` holds all 12 PPFs from before this change, and
+`fonttext_disc{1,2}_option.ppf` in that folder is specifically the previous
+font-text option build. Copy those two back over
+`mods/INTEGRAL/INTEGRAL/{0,1}/INTEGRAL_disc{1,2}_en_option.ppf` and the
+brightness screen returns to the re-wrapped font text, which is positionally
+exact but not pixel-exact.
+
+**Re-running the builder after deployment needs the deployed option PPF moved
+aside first.** `composite()` applies every deployed PPF's STAGE.DIR writes,
+including this one's own entry repoint, and would then follow the relocated
+pointer out of the file and die.
 
 ### Building and deploying
 
