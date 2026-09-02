@@ -246,16 +246,59 @@ chain is exactly +737 bytes over retail (Metal Gear wrapped at 45 characters,
 ## Wrap width
 
 `c_width = (rect.w * 4) / 12` suggests a 42-character limit, but that assumes
-12-pixel glyphs. The font is proportional and English is narrower: 45-character
-lines render complete (verified in game on Metal Gear page 11/12). Shipped as
-Metal Gear 45 / 12 pages, Metal Gear 2 42 / 19 pages.
+12-pixel glyphs; the font is proportional. Compute real widths from `font.res`
+(`glyph_widths()` in `optbright.py`) — see the Gotchas.
+
+Previous Operations no longer wraps at all: it uses USA's own line breaks
+verbatim (to 54 characters), because the recap draws each line as two sprites
+totalling 384 px. The option screen is the tight one at 240 px, which is why
+the brightness paragraph is re-wrapped to 36.
+
+## Not ported yet: the KEY CONFIG screen
+
+**The Master Collection intercepts KEY CONFIG with its own UI, so porting these
+is invisible there.** It is recorded here for a future patch aimed at raw PSX
+disc images, where the in-game screen *is* what you see — and it is still
+Japanese.
+
+Eight `option` DAR textures need USA's art. All are 4bpp; sizes differ because
+the Japanese and English labels differ, so this is the same job as the 20
+briefing labels (swap the art, place it in VRAM, keep the quad equal to the
+texture — see the briefing section):
+
+| texture | Integral | USA | USA VRAM | USA CLUT | colours | reads |
+|---------|----------|-----|----------|----------|---------|-------|
+| `key_button`  | 88x12  | 88x13  | (128,492) | (1008,234) | 15 | ボタンタイプ → button type |
+| `key_sykan`   | 88x12  | 112x13 | (80,480)  | (928,234)  | 16 | シュカンモード → first person view |
+| `key_syukan`  | 60x7   | 88x10  | (208,480) | (960,234)  | 16 | |
+| `key_normal`  | 52x6   | 40x10  | (175,492) | (992,235)  | 11 | NORMAL → normal |
+| `key_reverse` | 64x6   | 44x6   | (11,504)  | (768,236)  | 10 | REVERSE → reverse |
+| `key_action`  | 64x7   | 32x8   | (175,502) | (976,235)  | 11 | アクションボタン → action |
+| `key_buki`    | 44x7   | 44x7   | (0,504)   | (896,235)  | 12 | ブキボタン → weapon (same size, 287 px differ) |
+| `key_hohuku`  | 52x7   | 28x8   | (120,256) | (1008,235) | 10 | |
+
+Everything else on that screen is already pixel-identical: `key_option`,
+`key_symbol`, `key_a`, `key_b`, `key_c` byte-for-byte, and `key_back_l`,
+`key_back_r`, `key_pad` identical once rendered (their indices differ, their
+colours do not).
+
+Note `key_normal` and `key_reverse` are already Latin in Integral, but in a
+bolder all-caps face; porting them changes the style to USA's lowercase.
+
+## Also not matched: the brightness grey ramp
+
+`sc_back_r`'s greys are uniformly **7 levels darker** than USA's
+(72/64/56/48/40 against 79/71/63/55/47), which moves 40% of that half's pixels
+by delta 7, plus ~68 pixels of real element difference; `sc_back_l` differs in
+550 pixels. Invisible in normal use, but this is a brightness *calibration*
+screen, so the ramp values are arguably the content. Both are straight art
+swaps if it ever matters.
 
 ## Not tested
 
-Disc 2 in game (its `preope` stage is byte-identical to disc 1's, so the same
-build is used); the option submenus (SCREEN, KEY CONFIG, VIBRATION TEST), which
-use the VRAM columns this changes; and the `f924[12]` fix, which corrects a real
-out-of-bounds write but was not what fixed the EXIT freeze.
+Disc 2 in game — its `preope` stage is byte-identical to disc 1's and its option
+stage produced an identical PPF record set, so the same builds are used and both
+discs' PPFs are generated together.
 
 ## Briefing menu (`brf` stage)
 
