@@ -538,11 +538,43 @@ What the port actually changes:
    shifts. A large negative shift has crashed this script before. The padding
    goes on the *shortest* line, because trailing spaces widen `max_width` too —
    padding a near-limit line would push it into a wrap.
+5. The font atlas is retail's again — `option_column_x` gone, entry 12 back to a
+   64-word rect, `option_char_width` deleted. Against `font.res` the three
+   ported strings measure 174, 142 and 137 px in a 240 px lane, so none of that
+   widening was ever needed, and removing it is most of what got the overlay
+   back to retail's size.
 
-The overlay stays 25,950 bytes (the table edit is size-neutral and the relocated
-call moves 16 bytes from one switch case to another — visible in the build as
-two jump-table targets shifting −16), so it stays inside its 26,624-byte
-footprint and the stage keeps its 75 sectors.
+### The overlay must not exceed retail's byte count
+
+This is the hardest-won constraint in the whole stage, and it is not about
+sectors. `option`'s overlay loads at a fixed address, so **one byte past
+retail's 25,842 corrupts whatever follows it** — and the symptom is a freeze on
+an option row that has nothing to do with the edit. Measured, by bisecting one
+build at a time against a stock run:
+
+| overlay | vs retail | KEY CONFIG row | EXIT row |
+|---------|-----------|----------------|----------|
+| 25,950  | +108      | freeze         | freeze   |
+| 25,874  | +32       | ok             | freeze   |
+| 25,842  | **+0**    | ok             | ok       |
+
+The 26,624-byte padded slot is *not* the limit and is far too generous to
+protect you; `optbright.py` asserts against retail's actual size, read from the
+base image. Note how badly this misleads: at +32 only EXIT broke, which looks
+exactly like a bug in the EXIT row. The earlier option work grew `f924[8]` to
+`[12]` chasing that freeze, and that change — plus `option_char_width`, entry
+12's 128-word rect and the column move — is *what pushed the overlay over*.
+Growing a struct or adding a helper to fix an option-screen freeze is very
+likely to cause one.
+
+So before theorising about any option-screen freeze: **compare the overlay's
+size with retail's.** Then bisect against a stock run. Both were skipped here,
+at the cost of a dozen relaunches.
+
+`f924` is back at retail's `[8]` for the same reason. Retail reads *and writes*
+past its end into `kcb[0]` because the cursor states run to 11; retail tolerates
+that, and correcting it costs 16 bytes of struct plus every offset after it.
+Leave retail's quirks alone unless there is evidence they hurt.
 
 The texture route was rejected: Integral's overlay has neither the `Init_Res`
 call nor a spare poly — the screen submenu's list is `POLY_FT4 field_5D4[4]`

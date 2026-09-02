@@ -13,21 +13,23 @@ the port is a text port, not an art port:
 
 All six strings come verbatim off USA's own `sc_text`, including the O-button
 sentence - USA has the English for it, it simply does not display those two rows
-on this screen.  Nothing is translated or reworded; USA's own line breaks are
-kept.
+on this screen.  Nothing is translated or reworded, but the lines are re-wrapped
+to 36 characters: see the WRAP_LIMIT notes below, USA's own 41-43 character
+breaks do not render here.
 
-Why no VRAM work is needed, despite `c_width = (rect.w * 4) / 12` implying a
-42-character limit: `put_hankaku_4bpp` returns each glyph's own advance, so
-ASCII is proportional, and the wrap test in `font_print_string` compares
-*pixels* against `kcb->width` (252 px at the default 21-character budget).
-Measured off USA's texture these lines render 222, 226, 224, 31, 227 and 37 px,
-so every one fits the default 64-unit lane with ~25 px to spare.  `max_width` is
-read `lbu` (verified in both retail's and our overlay at 0x800C3598), so the
-255 px ceiling is the same bound.
+Two limits govern this, and both cost a broken build before being understood:
 
-The chain delta is held at exactly zero by padding "game." with trailing spaces,
-so no container size field moves and nothing after chain[27] shifts.  (A large
-negative shift has crashed the script before - see the preope notes.)
+  * every line must render inside `buf_width` = 240 px.  Sizing them off USA's
+    `sc_text` art does not work; compute from font.res's own width table via
+    glyph_widths() below.
+  * the rebuilt overlay must not exceed **retail's byte count**.  It loads at a
+    fixed address, so one byte over corrupts what follows, and the symptom is a
+    freeze on an unrelated option row.  Asserted in main().
+
+The chain delta is held at exactly zero by padding the shortest line with
+trailing spaces, so no container size field moves and nothing after chain[27]
+shifts.  (A large negative shift has crashed the script before - see the preope
+notes.)
 
 usage: optbright.py            (reads work/, writes work/ and the two PPFs)
 """
@@ -80,9 +82,34 @@ TEXT = {
 }
 PAD_INDEX = 27          # absorbs the delta with trailing spaces - it must be the
                         # shortest line, since padding widens max_width too
-WRAP_LIMIT = 240        # px, buf_width
-PX_ASCII   = 6.0        # conservative: measured 5.83 px/char over 41 characters
-PX_ZENKAKU = 12.0       # font_get_glyph_width returns 12 for anything non-hankaku
+WRAP_LIMIT = 240        # px: kcb->width (12 * 21) less the 12 font_print_string
+                        # subtracts because opt.c leaves FONT_NO_KINSOKU clear
+PX_ZENKAKU = 12         # font_get_glyph_width returns 12 for anything non-hankaku
+FONT_RES_SIG = struct.pack('>II', 392, 2306)   # table-1 end, then zendata offset
+
+
+def glyph_widths(stagedir):
+    """The real per-glyph advances, out of the game's own font.res (which lives
+    in the `init` stage).  Table 1 is 96 big-endian words for ASCII 32..127,
+    laid out Y-offset:31-28, width:27-24, table-2 index:23-0 - the same
+    `(entry >> 24) & 0xF` that font_get_glyph_width reads.  Computing widths
+    from this is the whole point: sizing lines off USA's sc_text art instead
+    shipped a build whose lines wrapped and smashed the heap."""
+    d = open(stagedir, 'rb').read()
+    at = d.find(FONT_RES_SIG)
+    assert at >= 0, 'font.res not found in %s' % stagedir
+    end = struct.unpack('>I', d[at:at+4])[0]
+    return {32 + i: (struct.unpack('>I', d[at+8+4*i:at+12+4*i])[0] >> 24) & 0xF
+            for i in range((end - 8) // 4)}
+
+
+def text_width(s, W):
+    """Rendered advance in pixels.  c_skip is 0 for these entries."""
+    px, i = 0, 0
+    while i < len(s):
+        if s[i] >= 0x81: px += PX_ZENKAKU; i += 2
+        else:            px += W[s[i]];    i += 1
+    return px
 
 
 def pad(x, a=2048): return (x + a - 1) // a * a
@@ -183,19 +210,22 @@ def main():
     lbas, version = {}, 2
     for disc, lba, name in DISCS:
         path = os.path.join(MODS, str(disc), name)
-        raw = open(path, 'rb').read()
-        version = raw[5]
+        # the PPF may be absent: bisect runs move it aside to test stock
+        raw = open(path, 'rb').read() if os.path.exists(path) else None
+        version = raw[5] if raw else version
         lbas[disc] = lba
         base_ppf = build_ppf(ship, lba, DESC, version)
         open(BASELINE % (disc + 1), 'wb').write(base_ppf)
-        n = cross_check(ship, read_ppf(path), lba)
+        n = cross_check(ship, read_ppf(path), lba) if raw else None
         if n is not None:
             assert base_ppf == raw, 'round-trip of the deployed PPF for disc %d differs' % (disc + 1)
             print('disc %d: lba=%-7d deployed PPF still the SHIP state - reproduced exactly (%d records)'
                   % (disc + 1, lba, n))
         else:
-            print('disc %d: lba=%-7d deployed PPF already rewritten by this script; '
-                  'baseline saved to %s' % (disc + 1, lba, BASELINE % (disc + 1)))
+            print('disc %d: lba=%-7d deployed PPF %s; baseline saved to %s'
+                  % (disc + 1, lba,
+                     'absent' if raw is None else 'already rewritten by this script',
+                     BASELINE % (disc + 1)))
 
     base, span, tags, offs = stage_geom(buf, 'option')
     print('option stage: base 0x%X, %d sectors' % (base, span // 2048))
@@ -203,13 +233,25 @@ def main():
     # --- 1. the rebuilt overlay
     ovl = open(OVL, 'rb').read()
     old = tags[0][3]
+    _rb, _rs, r_tags, _ro = stage_geom(bytearray(retail), 'option')
+    retail_ovl = r_tags[0][3]
     assert pad(len(ovl)) == pad(old), \
         'overlay %d -> %d crosses a sector boundary; the stage would have to move' % (old, len(ovl))
-    assert len(ovl) <= 26624, 'overlay past retail footprint (limit 2 in the preope notes)'
+    # THE hard limit, learned the slow way.  The overlay loads at a fixed
+    # address, so a single byte over retail's footprint corrupts whatever
+    # follows it - and the symptom is a freeze on an unrelated option row, not
+    # anything that points at size.  Measured: +108 froze the KEY CONFIG and
+    # EXIT rows, +32 froze EXIT alone, +0 is clean.  Sector padding is NOT the
+    # limit; 26,624 is the padded slot and is far too generous to protect you.
+    assert len(ovl) <= retail_ovl, (
+        'overlay is %d bytes, %+d over retail\'s %d.  It loads at a fixed address: '
+        'anything over freezes option rows (see the size table in the README).'
+        % (len(ovl), len(ovl) - retail_ovl, retail_ovl))
     if len(ovl) < old:
         buf[offs[0]+len(ovl):offs[0]+old] = b'\x00' * (old - len(ovl))
     buf[offs[0]:offs[0]+len(ovl)] = ovl
     struct.pack_into('<i', buf, tags[0][4], len(ovl))
+    print('overlay: retail %d, ours %d (%+d - MUST be <= 0)' % (retail_ovl, len(ovl), len(ovl) - retail_ovl))
     print('overlay: %d -> %d bytes (pad %d, headroom %d)'
           % (old, len(ovl), pad(len(ovl)), 26624 - len(ovl)))
 
@@ -231,15 +273,15 @@ def main():
 
     # Every line must render inside buf_width or font_print_string wraps into
     # the CLUT row and past the heap buffer.  Trailing padding counts.
+    W = glyph_widths(BASE)
+    worst = 0
     for k, t in sorted(TEXT.items()):
-        px = 0.0
-        i = 0
-        while i < len(t):
-            if t[i] >= 0x81: px += PX_ZENKAKU; i += 2
-            else:            px += PX_ASCII;   i += 1
-        assert px <= WRAP_LIMIT - 16, \
-            'record %d estimates %.0f px, too close to the %d px wrap limit' % (k, px, WRAP_LIMIT)
-        print('   [%2d] %2d bytes  ~%3.0f px of %d' % (k, len(t), px, WRAP_LIMIT))
+        px = text_width(t, W)
+        worst = max(worst, px)
+        assert px < WRAP_LIMIT, \
+            'record %d renders %d px, at or past the %d px wrap limit' % (k, px, WRAP_LIMIT)
+        print('   [%2d] %2d bytes  %3d px of %d' % (k, len(t), px, WRAP_LIMIT))
+    print('   worst %d px, margin %d px' % (worst, WRAP_LIMIT - worst))
 
     out = bytearray()
     for k, (p, L, pl) in enumerate(recs):
