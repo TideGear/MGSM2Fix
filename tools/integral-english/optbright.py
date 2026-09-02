@@ -79,6 +79,10 @@ TEXT = {
     16: b'brightness to play this game.',
     24: b'Press the ' + CIRCLE + b' button to return to the',
     27: b'option screen.',
+    # The vibration help line for the other button-type state - the same string
+    # USA has in record 12, which was already ported.  Left Japanese until now,
+    # so that screen was English or Japanese depending on a toggle.
+    26: b'use directional buttons to test',
 }
 PAD_INDEX = 27          # absorbs the delta with trailing spaces - it must be the
                         # shortest line, since padding widens max_width too
