@@ -340,12 +340,57 @@ the brightness paragraph is re-wrapped to 36.
 
 ## Not ported yet: the KEY CONFIG screen
 
-**The Master Collection intercepts KEY CONFIG with its own UI, so porting these
-is invisible there.** It is recorded here for a future patch aimed at raw PSX
-disc images, where the in-game screen *is* what you see — and it is still
-Japanese.
+**The screen IS visible in the collection with its patch flags on** (verified
+2026-09-03 with `DisableRAM`/`DisableCDROM` `true`): the collection substitutes
+its own button UI in its wrapper menus, but the game's own KEY CONFIG screen
+renders normally, so this port is no longer invisible — it is the one screen
+still fully Japanese in a build that is otherwise English. It also matters for a
+future patch aimed at raw PSX disc images. Reference shots of both games,
+unintercepted, are in `reference/keyconfig_*.{usa,int}.jpg`, and every label's
+art from both discs is rendered side by side in `keyconfig-textures.png`.
 
-Eight `option` DAR textures need USA's art. All are 4bpp; sizes differ because
+The collection's button involvement elsewhere is real but separate: its Squirrel
+`_update_option_button_setting` (`play_standalone_mgs.nut:844`) rewrites the
+whole `GM_Configuration` word (`0xB4D9C`) every frame with its own button-type
+bits — see the language-bit race under Unlocks.
+
+**Label mapping, confirmed from the rendered art — the two `sykan` names are
+swapped from what you would guess:**
+
+| texture | Integral | USA | where it is drawn |
+|---|---|---|---|
+| `key_button` | ボタンタイプ | `button type` | top row selector, in a hexagon |
+| `key_sykan` | シュカンモード | `first person view` | **bottom row selector**, in a hexagon |
+| `key_syukan` | シュカンボタン | `first person view` | the △ button's label, top right |
+| `key_buki` | ブキボタン | `weapon` | □ or ○, side depends on button type |
+| `key_action` | アクションボタン | `action` | ○ or □, side depends on button type |
+| `key_hohuku` | ホフクボタン | `crawl` | ✕, left |
+| `key_normal` | NORMAL | `normal` | first-person mode value |
+| `key_reverse` | REVERSE | `reverse` | first-person mode value |
+
+`key_sykan` is the MODE row and `key_syukan` is the BUTTON label, despite the
+names reading the other way round; both say `first person view` in USA, at
+different sizes (112x13 in the hexagon, 88x10 as the button label), so swapping
+them would look almost right and be wrong.
+
+**Three things the shots settle beyond the label art:**
+
+- **The labels change sides with the button type.** Type A draws `weapon` on the
+  □ (left) and `action` on the ○ (right); type C swaps them. The same texture is
+  therefore drawn at more than one position, so a port must place every quad for
+  each type, not once.
+- **`normal` / `reverse` are already Latin in Integral but in a bold all-caps
+  face** (`NORMAL`, `REVERSE`), against USA's lowercase. Porting changes the
+  style, which is a visible change with no text change — allowed under the scope
+  rule, since it is USA's own art for the same words.
+- **Integral has a bottom help line that USA has none of at all**, one per
+  selected row: `ボタン設定 ： タイプA`, `主観モード時の操作 ： 通常操作`,
+  `オプション画面に戻ります。` These are the same family as the option screen's
+  Japanese help lines (the colon of record 7) and **stay Japanese** — Integral's
+  own additions with no USA counterpart, exactly like 完了しました / 中です.
+
+Eight `option` DAR textures need USA's art (all eight sizes below re-measured
+from both discs 2026-09-03 and unchanged). All are 4bpp; sizes differ because
 the Japanese and English labels differ, so this is the same job as the 20
 briefing labels (swap the art, place it in VRAM, keep the quad equal to the
 texture — see the briefing section):
@@ -354,12 +399,12 @@ texture — see the briefing section):
 |---------|----------|-----|----------|----------|---------|-------|
 | `key_button`  | 88x12  | 88x13  | (128,492) | (1008,234) | 15 | ボタンタイプ → button type |
 | `key_sykan`   | 88x12  | 112x13 | (80,480)  | (928,234)  | 16 | シュカンモード → first person view |
-| `key_syukan`  | 60x7   | 88x10  | (208,480) | (960,234)  | 16 | |
+| `key_syukan`  | 60x7   | 88x10  | (208,480) | (960,234)  | 16 | シュカンボタン → first person view (the △ label) |
 | `key_normal`  | 52x6   | 40x10  | (175,492) | (992,235)  | 11 | NORMAL → normal |
 | `key_reverse` | 64x6   | 44x6   | (11,504)  | (768,236)  | 10 | REVERSE → reverse |
 | `key_action`  | 64x7   | 32x8   | (175,502) | (976,235)  | 11 | アクションボタン → action |
 | `key_buki`    | 44x7   | 44x7   | (0,504)   | (896,235)  | 12 | ブキボタン → weapon (same size, 287 px differ) |
-| `key_hohuku`  | 52x7   | 28x8   | (120,256) | (1008,235) | 10 | |
+| `key_hohuku`  | 52x7   | 28x8   | (120,256) | (1008,235) | 10 | ホフクボタン → crawl |
 
 Everything else on that screen is already pixel-identical: `key_option`,
 `key_symbol`, `key_a`, `key_b`, `key_c` byte-for-byte, and `key_back_l`,
