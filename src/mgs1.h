@@ -58,6 +58,12 @@ public:
             SQHook<Squirk::Standard>::SetPatchDataBlacklist(MGS1_DataBlacklist_Medicine);
         }
 
+        if (M2Config::bPatchesRestoreBrightnessText) {
+            for (auto & MGS1_FileBlacklist_Brightness : MGS1_FileBlacklist_BrightnessText) {
+                SQHook<Squirk::Standard>::SetPatchFileBlacklist(MGS1_FileBlacklist_Brightness);
+            }
+        }
+
         if (M2Config::bPatchesDisableFont) {
             for (auto & MGS1_TextureWhitelist_Font : MGS1_TextureWhitelist_Fonts) {
                 SQHook<Squirk::Standard>::SetTextureWhitelist(MGS1_TextureWhitelist_Font);
@@ -208,6 +214,21 @@ private:
     };
 
     const std::string MGS1_FileBlacklist_Ghosts = "shinrei";
+
+    // The collection replaces the Option -> SCREEN help texture (`sc_text` in
+    // the `option` stage's archive) with a four-line version on the same 232x70
+    // canvas: it drops "Press the O button to return to the option screen." -
+    // that button's name is not the same on every platform - and it centres
+    // what is left, which also pushes the paragraph 12 rows down and paints an
+    // opaque band over the background above it. Filtering these four restores
+    // the game's own six-line texture in its own place. They are the four
+    // pieces of one archive entry, addressed by image offset, so the names are
+    // per version: these are MGS1 (USA) disc 1's. Other versions need their own,
+    // found the same way - map a filtered patch name's offset onto the option
+    // stage's archive entry. Integral needs none: it has no `sc_text` of its own.
+    const std::vector<std::string> MGS1_FileBlacklist_BrightnessText = {
+        "disc1_165A34CC", "disc1_165A3BD8", "disc1_165A4508", "disc1_165A4E38",
+    };
 
     const std::vector<unsigned char> MGS1_DataBlacklist_Medicine = {
         0, 152, 0, 72, 152, 72, 152, 152, 152
