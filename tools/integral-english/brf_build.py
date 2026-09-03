@@ -20,7 +20,9 @@ from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BAS
                        advance_patches, INT_FN, xl_patches, S00_X_ADDRS, LINE_DELTA,
                        quads, UNSHARE, unshare_patches, RULE, START_Y,
                        DETAIL_ADDR, DETAIL_OLD, DETAIL_NEW, FRAME_ADDR, FRAME_OLD,
-                       FRAME_NEW, USA_ABOVE,
+                       FRAME_NEW, USA_ABOVE, OUTLINE_T8_ADDR, OUTLINE_T8_OLD, OUTLINE_T8_NEW,
+                       MEMBER_ADDR, MEMBER_OLD, MEMBER_NEW, MEMBER_ADV, CONNECTOR_X,
+                       S01_ADDR, S01_OLD, S01_NEW,
                        RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX, ANIM_X)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
@@ -128,13 +130,27 @@ for addr, old_v, new_v, what in START_Y:
     struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
     print('start y   @%08X: %+d -> %+d  (%s)' % (addr, old_v, new_v, what))
 for label, addr, oldw, neww in (('detailed start: 9 - (16n + 10d - 11)/2, USA', DETAIL_ADDR, DETAIL_OLD, DETAIL_NEW),
-                                ('frame polys 27-38: USA geometry, K by poly', FRAME_ADDR, FRAME_OLD, FRAME_NEW)):
+                                ('frame polys 27-38: USA geometry, K = t8 (+8 / 14) + member helper', FRAME_ADDR, FRAME_OLD, FRAME_NEW),
+                                ('outline: t8 = 10 (frame K base)', OUTLINE_T8_ADDR, OUTLINE_T8_OLD, OUTLINE_T8_NEW),
+                                ('member block: USA two-branch layout, advance in t9', MEMBER_ADDR, MEMBER_OLD, MEMBER_NEW),
+                                ('br_s01 reveal: x0 29, x1 = 29 + 52*step/6 (USA)', S01_ADDR, S01_OLD, S01_NEW)):
     o = addr - BASEADDR
     have = list(struct.unpack('<%dI' % len(oldw), ovl[o:o+4*len(oldw)]))
     assert have == oldw, '%s: block at %08X not as expected: %s' % (label, addr, [hex(x) for x in have])
     struct.pack_into('<%dI' % len(neww), ovl, o, *neww)
     print('rewrite   @%08X: %d words  (%s)' % (addr, len(neww), label))
 
+for addr, old_w, new_w, what in MEMBER_ADV:
+    o = addr - BASEADDR
+    assert struct.unpack('<I', ovl[o:o+4])[0] == old_w, 'member adv %08X' % addr
+    struct.pack_into('<I', ovl, o, new_w)
+    print('row advance @%08X: 20 -> t9 (20 | 17)  %s' % (addr, what))
+for addr, old_v, new_v in CONNECTOR_X:
+    o = addr - BASEADDR
+    w = struct.unpack('<I', ovl[o:o+4])[0]
+    assert (w >> 26) == 9 and ((w >> 21) & 31) == 0 and (w & 0xFFFF) == old_v, 'connector x %08X: %08X' % (addr, w)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | new_v)
+    print('connector @%08X: %d -> %d  (L-connector polys 27-38, USA)' % (addr, old_v, new_v))
 NM = {9+i: 'br_s%02d' % i for i in range(16)}
 for addr, old_v, new_v, idx in advance_patches(bytes(pi[0]), pu[0]):
     o = addr - BASEADDR

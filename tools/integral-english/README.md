@@ -503,11 +503,8 @@ rewrite fits in the block's own three `nop`s and drops the redundant signed
 halving (the value is always positive). For the user's save (n = 1 / 3 / 6)
 all three now compute exactly USA's `-43 / -48 / -38`.
 
-**Still different:** USA's member block has a second branch — with 4 or 5
-items it switches `br_s03..s06` to a 17-row advance, `br_s02` to 27, and
-`s0 = -21 - (17n - 2) / 2`. Integral's advances are fixed immediates with no
-free register to make them conditional, so once Meryl / support crew unlock
-the member rows will sit 4 rows apart from USA's. Everything else follows `n`.
+USA's member block also has a second branch for four or five items; see "The
+member submenu with four or five items" below — it is now replicated.
 
 ### The rule constants are USA's own
 
@@ -517,21 +514,69 @@ USA's immediates verbatim. The earlier `-43` / `-12` were corrections for the
 different `v`; the lengths already matched (12.8 / 62.8 / 102.8 game px) and
 only the tops move with the rows.
 
-### `brf_800C6930` is not the selection highlight
+### `brf_800C6930` is not the selection highlight: it draws the tree connectors
 
-It was patched as one (box `[y, y+5]`, bar `[y+5, y+6]`), on the belief that
-USA's `above` was the label's. It is not: the function positions two
-untextured polys per **flag-gated item** — (27,28) `br_s01`, (29,30) `br_s03`,
-(31,32) `br_s05`, (33,34) `br_s10`, (35,36) `br_s13`, (37,38) `br_s15` — drawn
-only while that item's flag is 1, at that item's row, coloured 0x46/0x50/0x4B.
-Integral draws box `[y-4, y+10]` and bar `[y+10, y+11]`; USA's version
-(`800C910C`) takes a fifth argument `K` and draws bar `[y+3, y+4]`, box
-`[y-K, y+3]`, with `K = 10` except `br_s03`'s site (18) and `br_s13`'s (14).
-The function is rewritten to USA's geometry, deriving `K` from the box poly
-index in `a2`, in the twelve dead x-copy slots. **Unverified in game**: the
-user's save has none of those flags set, so nothing draws them yet. The real
-selection glow follows the label quad and already measured identical to USA on
-every highlighted label (top/bottom gaps to the text equal within 0.3 px).
+It was patched as the highlight once (box `[y, y+5]`, bar `[y+5, y+6]`), on the
+belief that USA's `above` was the label's. It is not. The function positions,
+per **flag-gated, indented item** — (27,28) `br_s01`, (29,30) `br_s03`, (31,32)
+`br_s05`, (33,34) `br_s10`, (35,36) `br_s13`, (37,38) `br_s15` — the two textured
+`br_line2` quads of an **L-shaped connector**: a *drop* from the parent row down
+to the item and a short *bar* into its label. Both games draw them only while
+the item's flag is 1, which is why they were invisible until the unlock.
+
+Geometry, from USA's `800C910C` (its fifth argument is `K`):
+
+    bar   [y+3, y+4]        x 14..22   (Integral had [y+10, y+11], x 30..44)
+    drop  [y-K, y+3]        x 13..17   (Integral had [y-4,  y+10], x 29..33; the
+                                        texture's line sits one texel in: draws at 14 / 30)
+    K = s4, except br_s03's site (s4+8) and br_s13's (14)
+    s4 = 10 in the outline block, 7 if the member block takes its 17-row branch,
+         and 6 in the detailed block (800C99AC)
+
+Integral's function takes no `K`, so it now reads it from `t8` (seeded 10 in the
+outline block, set to `t9-10` by the member block, 6 by the detailed block),
+adds 8 when `a2 == 30` and uses 14 when `a2 == 36`. The x's live in
+`GetResources` (twelve `br_line2` calls, six per quad type) and are patched to
+USA's; the first attempt moved only the bars and changed nothing visible, since
+the drop is what shows. The last pixel found was the detailed drops being one
+row taller: USA's `s4 = 6` there, not the member's 7.
+
+### The member submenu with four or five items: USA's second branch
+
+USA's member block has two branches. Three items: advance 20 (`br_s02` 30),
+start `-21 - (20n-5)/2`, connector `K` 10. Four or five (Meryl and/or the
+support crew unlocked): advance **17** (`br_s02` 27 = `17|10`), start
+`-21 - (17n-2)/2`, `K` 7. Integral's advances were fixed immediates, so the
+block is rewritten (same 44 words, two spare): the advance lives in `t9`, the
+K base in `t8`, and the start is `(t9*(n-1) + 15) / 2`, which is `20n-5` or
+`17n-2` in one expression (`mult`/`mflo`, no branch). The four `br_s03..s06`
+positioner calls take `addu a3, t9, zero`; `br_s02` takes `ori a3, t9, 10`.
+`t9` itself is computed by a five-word helper — `slti v1,a0,4; sll; addu; jr
+ra; addiu t9,v0,17` — parked in the frame function's dead tail at `800C69A0`,
+because the block had no room for it. `t8`/`t9` survive the block: its only
+calls are our positioner (a0,a1,v0,v1) and frame function (t0,t1,a1,a3,v0,v1).
+Simulated for n = 3, 4, 5 against USA's formulas before building: identical.
+
+### `br_s01` (time limit) has its own reveal animation
+
+Like `br_s00`, its x is animated every frame (`x0 = xl`, `x1 = xl + w*step/6`),
+so the `GetResources` `xl` patch alone left it at Integral's 46 and 84 wide.
+Integral's `w` is 84, which divides by 6, so the compiler folded the chain to
+`14*step` and hardcoded 46 twice; USA's 52 does not, so it multiplies by the ÷6
+reciprocal that `a0` still holds from the `br_s00` block (loaded at `800C7648`,
+untouched in between). Rebuilt in place as `52*step/6 + 29`: the block's four
+y-normalising stores are dead (the positioner writes all four y's each frame),
+and the signed-quotient fixup is unnecessary for a non-negative numerator.
+Settled widths 0, 8, 17, 26, 34, 43, 52 — USA's.
+
+**Verified in game 2026-09-02, unlocked state (all sixteen items), sixteen shot
+pairs against the user's USA set:** outline (2), member (5) and detailed (9),
+after the `K = 6` fix every pair differs in 18–43 screenshot pixels (of 2.3 M),
+all at game x≈155, y≈162–167 — left of the rule, grey 41 vs 97, identical in
+every pair since the very first comparison, so a background detail rather than
+anything the menu draws; no game pixel of the menu differs. Before the `K = 6`
+fix each detailed shot had exactly two extra pixels, the tops of two drops. The
+selection glow itself never differed: it follows the label quad.
 
 **Verified in game 2026-09-02** against the user's USA set, ten shot pairs
 (outline; member with each of three rows highlighted; detailed with each of six):

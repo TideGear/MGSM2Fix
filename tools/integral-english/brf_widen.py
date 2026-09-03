@@ -155,11 +155,11 @@ FRAME_NEW = [0x24840780,   # addiu a0, a0, 1920
              0xA4450012,   # sh    a1, 18(v0)
              0xA443001A,   # sh    v1, 26(v0)
              0xA4430022,   # sh    v1, 34(v0)
-             0x2408000A,   # addiu t0, zero, 10     K = 10
+             0x03004021,   # addu  t0, t8, zero     K = t8 (10, or 7 with 4-5 member items)
              0x24C9FFE2,   # addiu t1, a2, -30
              0x15200002,   # bne   t1, zero, +2     a2 != 30 -> skip
              0x24C9FFDC,   # addiu t1, a2, -36      (delay slot, always)
-             0x24080012,   # addiu t0, zero, 18     br_s03's frame
+             0x27080008,   # addiu t0, t8, 8        br_s03's frame: K = t8 + 8
              0x15200002,   # bne   t1, zero, +2     a2 != 36 -> skip
              0x00061080,   # sll   v0, a2, 2        (delay slot, needed anyway)
              0x2408000E,   # addiu t0, zero, 14     br_s13's frame
@@ -172,7 +172,15 @@ FRAME_NEW = [0x24840780,   # addiu a0, a0, 1920
              0xA445001A,   # sh    a1, 26(v0)       box bottom = y + 3
              0xA4450022,   # sh    a1, 34(v0)
              0x03E00008,   # jr    ra
-             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000]
+             # --- 800C69A0: member-layout helper, entered by jal from the member block.
+             # In: a0 = item count n. Out: t9 = row advance for br_s03..s06 (USA's s6):
+             # 20 with three items, 17 with more. Lives in the frame function's dead
+             # tail; the block has no room for these four words itself.
+             0x28830004,   # slti  v1, a0, 4        v1 = (n < 4)
+             0x00031040,   # sll   v0, v1, 1
+             0x00431021,   # addu  v0, v0, v1       3 * v1
+             0x03E00008,   # jr    ra
+             0x24590011]   # addiu t9, v0, 17       (delay) t9 = 17 + 3 * (n < 4)
 assert len(FRAME_OLD) == len(FRAME_NEW) == 33
 
 # Where each submenu's list starts.  Both builds centre the list on the total
@@ -187,8 +195,122 @@ assert len(FRAME_OLD) == len(FRAME_NEW) == 33
 #   detailed  s0 =   9 - (16n + 10d - 11) / 2    d = two-line items (1, or 2 with
 #             br_s13); Integral had ~((17n - 4) / 2).  Rewritten in place using
 #             the block's three nops.
-START_Y = [(0x800C6EEC, -7, -15, 'outline start: (20n-15)/2, USA'),
-           (0x800C6FE4, -7,  -5, 'member start: (20n-5)/2, USA 3-item branch')]
+START_Y = [(0x800C6EEC, -7, -15, 'outline start: (20n-15)/2, USA')]
+# The outline block's signed halving is redundant (20n-15 > 0); its two spare
+# words seed t8 = 10, USA's s4: the frame polys' K, which the member block
+# lowers to 7 when it takes the 17-row branch.
+OUTLINE_T8_ADDR = 0x800C6EF0
+OUTLINE_T8_OLD = [0x00041FC2, 0x00831821, 0x00031843]   # srl v1,a0,31 / addu v1,a0,v1 / sra v1,v1,1
+OUTLINE_T8_NEW = [0x00041843, 0x2418000A, 0x00000000]   # sra v1,a0,1  / addiu t8,zero,10 / nop
+# USA's member block has two branches: three items -> advance 20 (br_s02 30),
+# start -21 - (20n-5)/2; four or five -> advance 17 (br_s02 27, i.e. 17|10),
+# start -21 - (17n-2)/2, and the frame K base drops from 10 to 7. Integral's
+# advances were fixed immediates, so the block is rewritten: the advance lives
+# in t9 (the helper above computes it), the K base in t8, and the start is
+# (t9*(n-1) + 15) / 2, which is 20n-5 or 17n-2 in one expression. t8/t9 are
+# safe across the block: the only calls are our positioner (a0,a1,v0,v1) and
+# frame function (t0,t1,a1,a3,v0,v1). Same 44 words, two nops to spare.
+MEMBER_ADDR = 0x800C6FB0
+MEMBER_OLD = [0x8E420088, 0x24130001, 0x14530002, 0x24040003, 0x24040004, 0x8E420090,
+              0x00000000, 0x14530003, 0x00041080, 0x24840001, 0x00041080, 0x00441021,
+              0x00021080, 0x2444FFF9, 0x000417C2, 0x00821021, 0x00021043, 0x2403FFEB,
+              0x00628023, 0x02402021, 0x2405000B, 0x02003021, 0x24070014, 0x2408FFE8,
+              0xA6230622, 0xA623062A, 0x2403FFEC, 0xA6230632, 0xA623063A, 0x24C3FFFC,   # (RULE already applied)
+              0x2442FFF0, 0xA6280620, 0xA6340628, 0xA6280630, 0xA6340638, 0xA6360648,
+              0xA623064A, 0xA6350650, 0xA6230652, 0xA6360658, 0xA622065A, 0xA6350660,
+              0x0C031A6D, 0xA6220662]
+MEMBER_NEW = [0x8E420088,   # lw    v0, 136(s2)     br_s03 flag
+              0x24130001,   # addiu s3, zero, 1
+              0x14530002,   # bne   v0, s3, +2
+              0x24040003,   # addiu a0, zero, 3     (delay) n = 3
+              0x24040004,   # addiu a0, zero, 4
+              0x8E420090,   # lw    v0, 144(s2)     br_s05 flag
+              0x2408FFE8,   # addiu t0, zero, -24   connector left end (load slot)
+              0x14530002,   # bne   v0, s3, +2
+              0x2405000B,   # addiu a1, zero, 11    (delay) br_s02's poly
+              0x24840001,   # addiu a0, a0, 1
+              0x0C031A68,   # jal   800C69A0        t9 = 20 or 17
+              0x2489FFFF,   # addiu t1, a0, -1      (delay) n - 1
+              0x2738FFF6,   # addiu t8, t9, -10     frame K base: 10 or 7
+              0x03290018,   # mult  t9, t1
+              0x00001012,   # mflo  v0
+              0x2442000F,   # addiu v0, v0, 15      20n-5 | 17n-2
+              0x00021043,   # sra   v0, v0, 1       v = half
+              0x2403FFEB,   # addiu v1, zero, -21
+              0x00628023,   # subu  s0, v1, v0      s0 = -21 - v
+              0x02402021,   # addu  a0, s2, zero
+              0x02003021,   # addu  a2, s0, zero
+              0x3727000A,   # ori   a3, t9, 10      br_s02 advance: 30 or 27
+              0xA6230622,   # sh    v1, 1570(s1)    connector y0 = -21
+              0xA623062A,   # sh    v1, 1578(s1)
+              0x2403FFEC,   # addiu v1, zero, -20
+              0xA6230632,   # sh    v1, 1586(s1)
+              0xA623063A,   # sh    v1, 1594(s1)
+              0x24C3FFFC,   # addiu v1, a2, -4      rule top = s0 - 4
+              0x2442FFF0,   # addiu v0, v0, -16     rule bottom = v - 16
+              0xA6280620,   # sh    t0, 1568(s1)    connector x0
+              0xA6340628,   # sh    s4, 1576(s1)    connector x1
+              0xA6280630,   # sh    t0, 1584(s1)
+              0xA6340638,   # sh    s4, 1592(s1)
+              0xA6360648,   # sh    s6, 1608(s1)    rule x0
+              0xA623064A,   # sh    v1, 1610(s1)    rule y0
+              0xA6350650,   # sh    s5, 1616(s1)
+              0xA6230652,   # sh    v1, 1618(s1)
+              0xA6360658,   # sh    s6, 1624(s1)
+              0xA622065A,   # sh    v0, 1626(s1)    rule y2
+              0xA6350660,   # sh    s5, 1632(s1)
+              0xA6220662,   # sh    v0, 1634(s1)
+              0x00000000,
+              0x0C031A6D,   # jal   800C69B4        position br_s02
+              0x00000000]
+assert len(MEMBER_OLD) == len(MEMBER_NEW) == 44
+# br_s03..s06 take their advance from t9 instead of the immediate 20
+MEMBER_ADV = [(0x800C7094, 0x24070014, 0x03203821, 'br_s03'), (0x800C70AC, 0x24070014, 0x03203821, 'br_s04'),
+              (0x800C70E4, 0x24070014, 0x03203821, 'br_s05'), (0x800C70FC, 0x24070014, 0x03203821, 'br_s06')]
+# The L-shaped connectors GetResources sets up for the six flag-gated, indented
+# items are TWO textured br_line2 quads each (polys 27-38): the bar (Integral
+# 30..44, USA 14..22) and the drop (29..33, USA 13..17; the texture's line sits
+# one texel in, so it draws at 30 / 14). Both move to USA's. Measured before
+# the fix: Integral's drops at screen x 190, USA's at 174; the first pass
+# patched only the bars and changed nothing visible.
+CONNECTOR_X = [(0x800CA3EC, 30, 14), (0x800CA480, 30, 14), (0x800CA510, 30, 14), (0x800CA5A0, 30, 14),
+               (0x800CA630, 30, 14), (0x800CA6C0, 30, 14), (0x800CA3F0, 44, 22),
+               (0x800CA438, 29, 13), (0x800CA4C8, 29, 13), (0x800CA558, 29, 13), (0x800CA5E8, 29, 13),
+               (0x800CA678, 29, 13), (0x800CA708, 29, 13),
+               (0x800CA43C, 33, 17), (0x800CA4CC, 33, 17), (0x800CA55C, 33, 17), (0x800CA5EC, 33, 17),
+               (0x800CA67C, 33, 17), (0x800CA70C, 33, 17)]
+# br_s01 (time limit) has an animated reveal like br_s00's: x0 = xl, x1 = xl +
+# w*step/6. Integral's w is 84, which divides by 6, so the compiler folded it to
+# 14*step and hardcoded xl 46 twice; USA's is 52, so it multiplies by the 1/6
+# reciprocal that a0 still holds from the br_s00 block (loaded at 800C7648, and
+# nothing between writes a0). Rebuilt as 52*step/6 + 29 in the same words (the handler's closing jr ra stays):
+# the block's four y-normalising stores (y0->y1, y3->y2) are dead because the
+# row positioner writes all four y's every frame, and the compiler's negative-
+# quotient fixup is unnecessary for a non-negative numerator.
+S01_ADDR = 0x800C76BC
+S01_OLD = [0x000510C0, 0x00451023, 0x00024040, 0xA1630036, 0xA1630047, 0xA1630048,
+           0x2403002E, 0x84E9019A, 0x84EA01B2, 0x2502002E, 0xA4E30198, 0xA4E201A0,
+           0xA4E301A8, 0xA4E201B0, 0xA4E9019A, 0xA4E901A2, 0xA4EA01AA, 0x03E00008, 0xA4EA01B2]
+S01_NEW = [0x000510C0,   # sll   v0, a1, 3        8*step
+           0x00451021,   # addu  v0, v0, a1       9*step
+           0x00024080,   # sll   t0, v0, 2        36*step
+           0xA1630036,   # sb    v1, 54(t3)       (kept: reveal state bytes)
+           0xA1630047,   # sb    v1, 71(t3)
+           0xA1630048,   # sb    v1, 72(t3)
+           0x2403001D,   # addiu v1, zero, 29     x0 = USA's xl
+           0x00051100,   # sll   v0, a1, 4        16*step
+           0x00481021,   # addu  v0, v0, t0       52*step
+           0x00440018,   # mult  v0, a0           * 0x2AAAAAAB
+           0xA4E30198,   # sh    v1, 408(a3)      x0
+           0xA4E301A8,   # sh    v1, 424(a3)      x2
+           0x00004010,   # mfhi  t0               52*step/6
+           0x2502001D,   # addiu v0, t0, 29       x1 = 29 + width
+           0xA4E201A0,   # sh    v0, 416(a3)      x1
+           0xA4E201B0,   # sh    v0, 432(a3)      x3
+           0x00000000,
+           0x03E00008,   # jr    ra               (unchanged: the block ends the handler)
+           0x00000000]   # (delay slot: was `sh t2, 434(a3)`, t2 is no longer loaded)
+assert len(S01_OLD) == len(S01_NEW) == 19
 DETAIL_ADDR = 0x800C7100
 DETAIL_OLD = [0x8E4200A4, 0x00000000, 0x14530002, 0x24040006, 0x24040007, 0x8E4200B0,
               0x00000000, 0x14530002, 0x00000000, 0x24840001, 0x8E4200B8, 0x00000000,
@@ -215,7 +337,7 @@ DETAIL_NEW = [0x8E4200A4,   # lw    v0, 164(s2)     br_s10 flag
               0x00021043,   # sra   v0, v0, 1       / 2  (always positive here)
               0x00028027,   # nor   s0, zero, v0    -v0 - 1
               0x2610000A,   # addiu s0, s0, 10      = 9 - v0
-              0x00000000]
+              0x24180006]   # addiu t8, zero, 6     USA's s4 = 6 here: the detailed drops' K (member left 7 or 10)
 assert len(DETAIL_OLD) == len(DETAIL_NEW) == 22
 # The operation-outline submenu's vertical rule.  Integral draws it centred,
 # top = (-41 - v1) - 2 and bottom = v1 - 38 with v1 = (20n - 7)/2, so its length
@@ -350,11 +472,11 @@ INT_FN, USA_BASE, USA_FN = 0x800C69B4, 0x800C5970, 0x800C9194
 # 19.89 is the 20 path, which is exactly what Integral already had.  So leave
 # those four alone.  (br_s02 is `ori a3, s6, 10`, i.e. 27 or 30; its measured
 # gap is 27.1, so its patch to 27 stays.)
-CONDITIONAL_ADV = {12, 13, 14, 15}          # poly idx for br_s03..br_s06
+CONDITIONAL_ADV = {11, 12, 13, 14, 15}      # br_s02..br_s06: set by the member block rewrite (t9)
 # br_s02 is `ori a3, s6, 10`, so it follows the same conditional s6: 27 when
 # s6 = 17, 30 when s6 = 20.  USA renders the 20 path here (its br_s03..s06 gaps
 # measure 20), so br_s02 is 20 | 10 = 30, not the 27 the other branch gives.
-ADV_OVERRIDE = {11: 30}                     # poly idx -> advance
+ADV_OVERRIDE = {}                           # (br_s02's 30/27 is `ori a3, t9, 10` in the rewrite)
 
 def advance_patches(int_ovl, usa_ovl):
     from rowargs import run_bytes
