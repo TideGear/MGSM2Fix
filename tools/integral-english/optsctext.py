@@ -133,10 +133,13 @@ KEY_LABELS = {                    # id: (name, vram, clut)
     0xAF48: ('key_syukan',  (486, 460), (352, 233)),
     0x2CA5: ('key_normal',  (364, 460), (400, 233)),
     0xC627: ('key_reverse', ( 16, 504), (384, 233)),
-    0x03A8: ('key_action',  (  0, 504), (416, 233)),
+    0x03A8: ('key_action',  (374, 460), (416, 233)),
     0x1D5E: ('key_buki',    (108, 504), (368, 233)),
-    0x41E9: ('key_hohuku',  ( 64, 504), (432, 233)),
+    0x41E9: ('key_hohuku',  (512, 460), (432, 233)),
 }
+# Nothing needs padding: opt.c now carries USA's own rectangles, and every one
+# of those is exactly its art's size.
+KEY_PAD_TO = {}
 
 
 def pad(x, a=2048): return (x + a - 1) // a * a
@@ -336,11 +339,26 @@ def build_stage():
         src = ue[tid][2]
         iw, ih, _p, _r = pcx4.decode(mine[0][2])
         uw, uh, upal, urows = pcx4.decode(src)
+        padded = ''
+        if name in KEY_PAD_TO:
+            want = KEY_PAD_TO[name]
+            assert want >= uw, '%s: cannot pad %d down to %d' % (name, uw, want)
+            bg = max(set(v for r in urows for v in r), key=lambda v: sum(r.count(v) for r in urows))
+            urows = [list(r) + [bg] * (want - uw) for r in urows]
+            src = pcx4.encode(src, want, uh, upal, urows)
+            src += bytes((-len(src)) % 4)
+            padded = '  padded %d -> %d wide with index %d' % (uw, want, bg)
+            uw = want
+            rw, rh, _rp, rr = pcx4.decode(src)
+            assert (rw, rh) == (uw, uh) and rr == urows, '%s padding does not round-trip' % name
         blob, old = set_pcxinfo(src, vram[0], vram[1], clut[0], clut[1])
         assert len(blob) % 4 == 0, '%s payload %d not 4-aligned' % (name, len(blob))
-        # one tpage, and inside the lower VRAM half it was allocated in
-        assert (vram[0] % 64) * 4 + uw <= 256, '%s crosses its tpage' % name
-        assert vram[1] % 256 + uh <= 256, '%s crosses a VRAM page row' % name
+        # UVs are 8-bit: SetPacketTexture computes u1 = off_x + w and
+        # v1 = off_y + h, where off_x = (px % 64) * 4 and off_y = py % 256
+        # (DG_SetTexture). Reaching 256 wraps to 0 and the quad then samples the
+        # whole texture page, which renders as garbage - this shipped once.
+        assert (vram[0] % 64) * 4 + uw <= 255, '%s: u1 = %d overflows 8-bit UV' % (name, (vram[0] % 64) * 4 + uw)
+        assert vram[1] % 256 + uh <= 255, '%s: v1 = %d overflows 8-bit UV' % (name, vram[1] % 256 + uh)
         rw, rh, rpal, rrows = pcx4.decode(blob)
         assert (rw, rh) == (uw, uh) and rrows == urows and rpal == upal, '%s does not round-trip' % name
         for (ox, oy, ow, oh, on) in used_vram:
@@ -351,9 +369,8 @@ def build_stage():
         assert clut not in used_clut, '%s shares a CLUT slot with %s' % (name, used_clut.get(clut))
         used_clut[clut] = name
         mine[0][2] = blob
-        print('  %-12s %dx%d -> USA %dx%d  vram(%d,%d) clut(%d,%d)  (was vram(%d,%d) clut(%d,%d))'
-              % (name, iw, ih, uw, uh, vram[0], vram[1], clut[0], clut[1],
-                 old[0], old[1], old[2], old[3]))
+        print('  %-12s Integral %dx%d -> USA %dx%d  vram(%d,%d) clut(%d,%d)%s'
+              % (name, iw, ih, uw, uh, vram[0], vram[1], clut[0], clut[1], padded))
 
     newdar = b''.join(struct.pack('<HhI', t, x, len(b)) + b for t, x, b in de)
     print('DAR: %d -> %d bytes (+%d), %d entries' % (tags[1][3], len(newdar), len(newdar) - tags[1][3], len(de)))
