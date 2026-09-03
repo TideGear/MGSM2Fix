@@ -1059,5 +1059,26 @@ tool that re-saved the file would have silently dropped the byte.
 ## Achievements
 
 Per upstream (nuggs), the `DisableRAM` + `DisableCDROM` combination in
-`MGSM2Fix.ini` will work for suppressing achievements. There is no dedicated
-option. Untested here.
+`MGSM2Fix.ini` suppresses achievements. There is no dedicated option.
+
+**In effect since 2026-09-02** (to progress the save for the briefing unlocks
+without earning achievements). Both flags filter the Master Collection's own
+Squirrel patch tables (`SQNative_setRamValue` / `SQNative_entryCdRomPatch` in
+`src/sqhook.cpp`). Verified from `MGSM2Fix.log`: the session filtered 348
+CD-ROM offsets, 848 CD-ROM files and 88 RAM patches, against a pre-flag
+baseline of 48 / 30 / 0 (the blacklist paths log the same message).
+
+**Ketchup is unaffected.** All 5,542 `[Ketchup] CD-ROM write` lines in that
+session have no `filtering` line immediately before them — the pre-hook runs
+synchronously inside the call and Ketchup logs right after, so a dropped write
+would always show one — and the executable-side RAM patches applied (3,068
+bytes, 54 blocks). Likely because the filter resolves its data argument as an
+`SQBinary` instance while Ketchup passes a plain array, but that is inferred,
+not traced. The English text should be checked visually after any MGSM2Fix
+update, since a change to that hook would silently drop every PPF.
+
+The deployed ini is a symlink into Vortex's mod folder
+(`%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-*\MGSM2Fix.ini`); edit the
+target, not the link (`sed -i` on the link replaces it with a plain file).
+Pre-change copy: `scratchpad/MGSM2Fix.ini.before_achievements`. To restore
+achievements, set both back to `false`.
