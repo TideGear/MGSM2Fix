@@ -533,6 +533,12 @@ user's save has none of those flags set, so nothing draws them yet. The real
 selection glow follows the label quad and already measured identical to USA on
 every highlighted label (top/bottom gaps to the text equal within 0.3 px).
 
+**Verified in game 2026-09-02** against the user's USA set, ten shot pairs
+(outline; member with each of three rows highlighted; detailed with each of six):
+label row bands, rule extents and highlight boxes identical, and a pixel diff of
+the right-column region (game x 150-320, y 55-190, tolerance 60/255) is 0.00%
+on every pair. The FILE column was already identical.
+
 ### The vertical rule
 
 The rule left of the submenu items is **poly 26** (the first `br_line2`), found
