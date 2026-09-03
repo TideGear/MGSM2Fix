@@ -264,6 +264,13 @@ MEMBER_NEW = [0x8E420088,   # lw    v0, 136(s2)     br_s03 flag
               0x0C031A6D,   # jal   800C69B4        position br_s02
               0x00000000]
 assert len(MEMBER_OLD) == len(MEMBER_NEW) == 44
+# The detailed submenu's horizontal connector (poly 41) ends at the rule in USA
+# (`sh zero` into x1/x3); Integral stores fp = 20 and the connector runs 20 px
+# past the rule as a faint additive line - one row +24 brighter from x 160 on,
+# 25 screenshot pixels over threshold. fp is br_s00's advance reused as an x,
+# like s4 was for polys 25/39.
+CONNECTOR_END = [(0x800C7180, 0xA63E0678, 0xA6200678, 'poly 41 x1: fp (20) -> 0'),
+                 (0x800C718C, 0xA63E0688, 0xA6200688, 'poly 41 x3: fp (20) -> 0')]
 # br_s03..s06 take their advance from t9 instead of the immediate 20
 MEMBER_ADV = [(0x800C7094, 0x24070014, 0x03203821, 'br_s03'), (0x800C70AC, 0x24070014, 0x03203821, 'br_s04'),
               (0x800C70E4, 0x24070014, 0x03203821, 'br_s05'), (0x800C70FC, 0x24070014, 0x03203821, 'br_s06')]
