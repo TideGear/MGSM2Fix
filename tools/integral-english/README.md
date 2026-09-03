@@ -602,6 +602,37 @@ Still unseen, because they need those states: the other captions on that screen
 (save failed, formatting, no empty block, the card-undetected line) and the six
 slots where Integral's Japanese is kept.
 
+## Sweep: is any UI text still Japanese? (`jpsweep.py`, 2026-09-03)
+
+The photo album's messages were found by accident, from a screenshot, which
+raised the obvious question: what else is hiding in an overlay? `jpsweep.py`
+answers it with the same trick that made that port small. Overlays load at a
+fixed address per game, so a word equal to `base + offset` is a pointer, and the
+pointer word's **offset is the same index in both games** - so a slot where
+Integral's target reads as Japanese and USA's reads as an English sentence is a
+port candidate, paired exactly.
+
+**Result: across all 82 stages present in both disc 1 images, only `camera`.**
+24 slots, which are the ones `en_camsave` now ports. Nothing else on disc 1 has
+pointer-referenced Japanese UI text with a USA English counterpart.
+
+Two things had to be right for that to mean anything:
+
+- **The Japanese test must look at the LEAD byte of each pair.** The encoding is
+  two-byte pairs whose first byte is 0x80-0xdf and whose second is often low
+  (`82 1b`, `d0 06`). Testing every byte for the high range only reaches ~50%,
+  so a 55% threshold found 2 slots instead of 24 and would have reported the
+  game clean.
+- **Validate the sweep against the known positive.** It is only trustworthy
+  because it lights up `camera` at 24 slots. A sweep that reports "nothing" and
+  has never been shown to find anything is worth nothing.
+
+Blind spots, stated so the result is not over-read: strings reached by
+`lui`+`addiu` rather than a pointer word, strings whose USA counterpart is a
+single word with no space, text in the GCL scripts rather than the overlays
+(which is where the ported menus live, and those are handled), and anything on
+disc 2 or the VR disc.
+
 ## Not ported at all: the VR disc (SLPM-86249)
 
 Integral's third disc — VR training — is untouched. `mods/INTEGRAL/VR-DISK/` is
