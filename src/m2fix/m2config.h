@@ -13,6 +13,7 @@ public:
         bPatchesEnableMosaic = true;
         bPatchesRestoreGhosts = true;
         bPatchesRestoreMedicine = true;
+        bPatchesRestoreBrightnessText = true;
         bPatchesPreserveConfiguration = true;
     }
 
@@ -68,6 +69,7 @@ public:
     static inline bool bPatchesEnableMosaic;
     static inline bool bPatchesRestoreGhosts;
     static inline bool bPatchesRestoreMedicine;
+    static inline bool bPatchesRestoreBrightnessText;
     static inline bool bPatchesPreserveConfiguration;
     static inline bool bShouldCheckForUpdates;
     static inline bool bConsoleUpdateNotifications;
