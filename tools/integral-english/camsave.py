@@ -49,8 +49,16 @@ HDR = 24
 
 
 def overlay(path):
-    sect, tags, F, pay = stage(path, 'camera')
+    """-> (the stage's SECTOR in STAGE.DIR, overlay payload).
+
+    `stage()` returns the stage's sector COUNT as its first value, not its
+    position - taking that for the position put the first build's records about
+    27,000 sectors early, so the patch loaded and wrote nothing useful. The
+    position comes from the entry table, via `ents()`.
+    """
+    _count, tags, F, pay = stage(path, 'camera')
     assert chr(tags[0][1]) == 's', 'camera tag 0 is not the overlay'
+    sect = dict(ents(open(path, 'rb').read()))['camera']
     return sect, pay[0]
 
 
