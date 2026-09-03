@@ -1397,9 +1397,10 @@ GM_Configuration word at 0xB4D9C about sixty times a second**, with values such
 as 0x100 (English, button type A) and 0x110 (the same plus the game's
 "options changed" bit 0x10 once the option screen has been visited). It is how
 the collection imposes its own button-type setting on the game — and the reason
-the KEY CONFIG screen is "intercepted" by the collection. Since bits the
-collection does not own (0x10, 0x100) travel through unchanged, the write is a
-read-modify-write of the live word, so any game-side write to GM_Configuration
+the KEY CONFIG screen is "intercepted" by the collection. It is a
+read-modify-write of the live word — confirmed by the read trace: the same
+function does `getRamValue(16, 0xB4D9C)` at line 837 and `setRamValue` at line
+844, every frame — so any game-side write to GM_Configuration
 that lands between the collection's read and its write is lost, and the
 language bit is one of those. The run in which 1P MODE played in Japanese
 happened without these diagnostics; the next run, with them, kept English
