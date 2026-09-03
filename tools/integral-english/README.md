@@ -592,8 +592,15 @@ Other checks before deploying: overlay size unchanged, every changed byte inside
 the pool or the table, every rewritten pointer resolving to a NUL-terminated
 string inside the pool, and the three function pointers untouched.
 
-**Deployed 2026-09-03. Not yet seen in game** - the photo album needs a shot of
-PHOTO ALBUM → SELECT MEMORY CARD, which should now read `No save file.`
+**Confirmed in game 2026-09-03.** PHOTO ALBUM → SELECT MEMORY CARD now reads
+`No save file.` where it read `セーブファイルがありません。`, and the string is
+byte-identical to USA's own for that pointer slot. Placement needs no check: the
+port changes string bytes and pointer words only - every other byte is asserted
+unchanged - so the caption is drawn by the same code in both games.
+
+Still unseen, because they need those states: the other captions on that screen
+(save failed, formatting, no empty block, the card-undetected line) and the six
+slots where Integral's Japanese is kept.
 
 ## Not ported at all: the VR disc (SLPM-86249)
 
