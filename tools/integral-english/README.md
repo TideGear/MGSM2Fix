@@ -35,7 +35,7 @@ briefing comparison surfaced differences that are real but not text:
 | `br_back_l` right-edge seam | 154 stencil-mask bits differ along texture x 155–159; every other briefing texture is pixel-identical (palettes differ only in unused entries). |
 | vertical rule brightness, FILE-box interiors, a few collage rows | Integral's rule renders ~201 grey against USA's 166, box interiors 24–32 against 0. Not attributed; the background fade (`(frame-28)*8`, identical in both) is not the cause. Nothing the port touched. |
 | 1P MODE's twenty-one explanation pages (Japanese) | An Integral-only mode: USA has no 1P MODE, and Integral ships no English for the pages, so there is nothing to port and no translation is made. See "1P MODE" under Unlocks. |
-| KEY CONFIG's background contrast | Integral's `key_back_l`/`key_back_r` render at visibly higher contrast than USA's, though the two textures are **colour-identical** (only their palette indices are permuted) — so the difference is elsewhere in that screen's art, not in those two. Noticed by the user 2026-09-03, who decided to keep it. Not attributed further. |
+| KEY CONFIG's background contrast | Integral's `key_back_l`/`key_back_r` look higher-contrast than USA's, though the two textures are **colour-identical** — so it is not those two. Noticed by the user 2026-09-03, who decided to keep it. **Not attributed, and not confirmed by measurement**: the grey-ramp claim below looked just as solid and turned out to be an artefact of comparing 24-bit data on 5-bit hardware. Measure the rendered pixels before acting on this one. |
 | KEY CONFIG's connector rules run longer at their far ends | Each label's rule extends further from the label in Integral (e.g. ~14 game px further left under `weapon`). The end that meets the *label* is in USA's place in both games — checked per label — so text placement is right and only the tail differs. Art, and stays. |
 
 So "pixel-identical to USA" for this project means: every glyph and every
@@ -901,14 +901,34 @@ changing the patch flags changes the target. Before deriving any constant from a
 shot, check the session's `bPatchesDisable*` lines, and check whether the asset
 appears in the log's filtered patch list.
 
-## Also not matched: the brightness grey ramp
+## WITHDRAWN: the brightness grey ramp is not actually different
 
-`sc_back_r`'s greys are uniformly **7 levels darker** than USA's
-(72/64/56/48/40 against 79/71/63/55/47), which moves 40% of that half's pixels
-by delta 7, plus ~68 pixels of real element difference; `sc_back_l` differs in
-550 pixels. Invisible in normal use, but this is a brightness *calibration*
-screen, so the ramp values are arguably the content. Both are straight art
-swaps if it ever matters.
+This section used to say `sc_back_r`'s greys were uniformly **7 levels darker**
+than USA's (72/64/56/48/40 against 79/71/63/55/47) across 40% of that half, and
+flagged it as arguably the content of a calibration screen. **That was wrong,
+and the user caught it by simply noticing the two screenshots look identical.**
+
+They look identical because they **are** identical. `LoadPalette`
+(`libdg/loader.c`) builds the 15-bit CLUT the hardware uses with `>> 3` per
+channel, and every one of those differing pairs collapses to the same 5-bit
+value:
+
+    Integral 72 -> 9    USA 79 -> 9        Integral 48 -> 6    USA 55 -> 6
+    Integral 64 -> 8    USA 71 -> 8        Integral 40 -> 5    USA 47 -> 5
+    Integral 56 -> 7    USA 63 -> 7
+
+Measured: of `sc_back_r`'s 14,553 pixels that differ as 24-bit RGB, **529
+survive the conversion** - and none of those are the ramp. On screen, 47 sampled
+bands across both halves of the rendered screen differ by **0.0** levels.
+`sc_back_l`'s 550 differing pixels do survive, but they are edge and element
+pixels, not the ramp.
+
+**The lesson, which cost this a second time:** a difference in 24-bit texture
+data is not a difference on screen. This hardware holds 5 bits per channel, so
+compare palettes *after* the `>> 3`, or compare the rendered pixels. The same
+mistake produced the withdrawn claim about the KEY CONFIG background's contrast
+- see that row in the Scope table, which is now the only one of these left
+standing and is itself unattributed.
 
 ## Not tested
 
