@@ -34,6 +34,8 @@ briefing comparison surfaced differences that are real but not text:
 | `br_back_l` right-edge seam | 154 stencil-mask bits differ along texture x 155–159; every other briefing texture is pixel-identical (palettes differ only in unused entries). |
 | vertical rule brightness, FILE-box interiors, a few collage rows | Integral's rule renders ~201 grey against USA's 166, box interiors 24–32 against 0. Not attributed; the background fade (`(frame-28)*8`, identical in both) is not the cause. Nothing the port touched. |
 | 1P MODE's twenty-one explanation pages (Japanese) | An Integral-only mode: USA has no 1P MODE, and Integral ships no English for the pages, so there is nothing to port and no translation is made. See "1P MODE" under Unlocks. |
+| KEY CONFIG's background contrast | Integral's `key_back_l`/`key_back_r` render at visibly higher contrast than USA's, though the two textures are **colour-identical** (only their palette indices are permuted) — so the difference is elsewhere in that screen's art, not in those two. Noticed by the user 2026-09-03, who decided to keep it. Not attributed further. |
+| KEY CONFIG's connector rules run longer at their far ends | Each label's rule extends further from the label in Integral (e.g. ~14 game px further left under `weapon`). The end that meets the *label* is in USA's place in both games — checked per label — so text placement is right and only the tail differs. Art, and stays. |
 
 So "pixel-identical to USA" for this project means: every glyph and every
 piece of chrome that positions text lands on the same pixels; brightness and
@@ -793,9 +795,20 @@ swaps if it ever matters.
 
 ## Not tested
 
-Disc 2 in game — its `preope` stage is byte-identical to disc 1's and its option
-stage produced an identical PPF record set, so the same builds are used and both
-discs' PPFs are generated together.
+- **Disc 2 in game.** Never launched. Its `preope` stage is byte-identical to
+  disc 1's and its option stage produced an identical PPF record set, so the
+  same builds are used and both discs' PPFs are generated together — but no one
+  has watched it run.
+- **The save side of the memory-card messages.** Only LOAD has been shot. The
+  save flow (a Mei Ling call) would exercise the "no empty block", "failed" and
+  "now checking" captions, and slot 1's kept Japanese line after a success.
+- **USA's forced title unlocks.** `unlock_title.py` deploys to the USA discs too
+  and its patched words are asserted against retail, but the USA title screen
+  has not been shot since, so `spe_rank` 3 and EXTREME are unconfirmed there.
+  Integral's were confirmed in game 2026-09-03.
+- **`[Patches] PreserveConfiguration` catching a real stale write.** Three clean
+  runs; the race it guards is intermittent and has not been caught in the act.
+  See `UPSTREAM.md`.
 
 ## Briefing menu (`brf` stage)
 
