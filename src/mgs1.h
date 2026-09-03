@@ -159,6 +159,15 @@ private:
     unsigned MGS1_LanguageHeld = 0;
     bool MGS1_LanguageDone = false;
     constexpr static unsigned MGS1_LanguageHoldFrames = 120;
+    // libgcl's var_buf (variable.c) - the GCL `$f:`/`$w:` variable memory. Not a
+    // memory define; a static whose address is read off GCL_GetVar's constants
+    // in each executable. The briefing menu's sixteen items are gated by the
+    // flags at var_buf+0x4C..0x4E (bits 0x4C.1-7, 0x4D.0-7, 0x4E.0), which the
+    // brf stage script passes to the menu as its `-f` option.
+    uintptr_t MGS1_VarBufPTR = 0;
+    bool MGS1_UnlockLogged = false;
+    constexpr static unsigned MGS1_BriefingFlagsOffset = 0x4C;
+    constexpr static unsigned char MGS1_BriefingFlagsMask[3] = { 0xFE, 0xFF, 0x01 };
     static inline HSQOBJECT<Squirk::Standard> SQ_EmuTask_getHeight = {};
 
 #ifndef _WIN64

@@ -79,6 +79,26 @@ void MGS1::SQOnMemoryDefine()
         spdlog::info("[MGS 1] language_setting is 0x{:x}, mask is 0x{:x}.",
             MGS1_LanguagePTR, MGS1_LanguageMask);
     }
+
+    // GCL's variable buffer is a static in each executable (libgcl/variable.c
+    // var_buf), recovered from GCL_GetVar's address constants. Same on both
+    // discs of each release. The VR disk has no briefing menu. RAM offsets, as
+    // the memory defines are (KSEG0 0x800B3CC8 / 0x800B6448).
+    MGS1_VarBufPTR = 0;
+    MGS1_UnlockLogged = false;
+    switch (SQGlobals<Squirk::Standard>::GetTitle()) {
+        case 99:  // INTEGRAL: SLPM-86247 / SLPM-86248
+            if (SQSystemData<Squirk::Standard>::SettingETC::GetVersion() == "INTEGRAL") {
+                MGS1_VarBufPTR = 0xB3CC8;
+            }
+            break;
+        case 981: // MGS1_US: SLUS-00594 / SLUS-00776
+            MGS1_VarBufPTR = 0xB6448;
+            break;
+    }
+    if (MGS1_VarBufPTR != 0) {
+        spdlog::info("[MGS 1] GCL var_buf is 0x{:x}.", MGS1_VarBufPTR);
+    }
 }
 
 void MGS1::SQOnUpdateGadgets()
@@ -123,6 +143,31 @@ void MGS1::SQOnUpdateGadgets()
                 && ++MGS1_LanguageHeld >= MGS1_LanguageHoldFrames) {
                 MGS1_LanguageDone = true;
                 spdlog::info("[MGS 1] English text is set; leaving language_setting alone.");
+            }
+        }
+
+        // The briefing menu shows an item only while its GCL `$f:` flag is set.
+        // Those flags live in var_buf, which GCL_InitVar zeroes on boot and the
+        // stage scripts set as the story advances, so a fresh boot shows 1 / 3 / 6
+        // of the sixteen. Hold all of them set while the title screens and the
+        // briefing itself are up - and never once a stage is running, because
+        // var_buf is then the live game's flag memory.
+        if (M2Config::bGameUnlockBriefing && MGS1_VarBufPTR != 0
+            && (!strcmp(MGS1_StageName, "title") || !strcmp(MGS1_StageName, "brf"))) {
+            bool changed = false;
+            for (unsigned i = 0; i < sizeof(MGS1_BriefingFlagsMask); i++) {
+                uintptr_t addr = MGS1_VarBufPTR + MGS1_BriefingFlagsOffset + i;
+                SQInteger flags = SQEmuTask<Squirk::Standard>::GetRamValue(CHAR_BIT, addr) & 0xFF;
+                if ((flags & MGS1_BriefingFlagsMask[i]) != MGS1_BriefingFlagsMask[i]) {
+                    SQEmuTask<Squirk::Standard>::SetRamValue(CHAR_BIT, addr,
+                        flags | MGS1_BriefingFlagsMask[i]);
+                    changed = true;
+                }
+            }
+            if (changed && !MGS1_UnlockLogged) {
+                spdlog::info("[MGS 1] Unlocked every briefing item (var_buf+0x{:x}..).",
+                    MGS1_BriefingFlagsOffset);
+                MGS1_UnlockLogged = true;
             }
         }
     }

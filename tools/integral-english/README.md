@@ -1056,6 +1056,67 @@ binary to `grep` and `diff`. psyq compiled it identically (`obj/preope.bin` is
 byte-for-byte the same before and after, entry still at `800C4DA4`), but any
 tool that re-saved the file would have silently dropped the byte.
 
+## Unlocks: what gates the title-screen extras, and how the briefing is forced
+
+Needed because the briefing-menu port can only be checked in the unlocked
+states (Meryl / support crew / `br_s10` / `br_s13` / `br_s15`) and the user's
+save has none of them. Read from the decomp (`onoda/brf/b_select.c`,
+`onoda/open/open.c`, `libgcl/variable.c`) and the stage scripts.
+
+**Briefing items are GCL `$f:` flags.** `GetResources` (`brf_800C99C0`) reads
+the menu's `-f` option — sixteen values — with `GCL_GetOption('f')` /
+`GCL_NextStr` / `GCL_StrToInt`, and the brf stage script (tag `c?`, offset
+0x374, byte-identical in Integral and USA) supplies them as sixteen variable
+references `14 bb 00 4c/4d/4e`: `GCL_GetVarTypeCode` 4 = bool, offset 0x4C–0x4E
+into `var_buf`, bit `bb` — i.e. bits 0x4C.1–7, 0x4D.0–7, 0x4E.0. An item is
+counted and drawn only while its flag == 1. `var_buf` is `libgcl/variable.c`'s
+static 1024-short GCL variable memory: zeroed by `GCL_InitVar` on boot (a stage
+init with `-v`), set by the stage scripts as the story advances, saved and
+restored with the game. So a fresh boot shows 1 / 3 / 6 items in both games,
+and the earlier idea that the flags meant "watched" was wrong — after a movie
+ends the overlay stores `field_80[idx] = 1` too (800C9240), which is the same
+state.
+
+    var_buf     Integral SLPM-86247/86248  0x800B3CC8    USA SLUS-00594/00776  0x800B6448
+    linkvarbuf  Integral                   0x800B4D98    USA                   0x800B7518
+
+MGSM2Fix's `GetRamValue`/`SetRamValue` take **RAM offsets**, not KSEG0
+addresses — the memory defines log as `0xb4d9d`, and Ketchup's `PSX_ImageBase`
+is `0x10000` — so the code uses `0xB3CC8` / `0xB6448`. (The first build used the
+`0x800B...` form; the log still said "Unlocked", because the read-back was of
+the wrong place too. Check the convention before trusting a poke's log line.)
+
+Both from `GCL_GetVar`'s address constants (Integral: `lui 0x800B; addiu
+15560 / 19864`; USA's compiler hoisted var_buf into `a3` at the function head,
+`addiu a3, a3, 25672`). Same on both discs of each release.
+
+**`[Game] UnlockBriefing = true`** (MGSM2Fix, `src/mgs1.cpp`) holds all sixteen
+flags set while the scene name is `title` or `brf`, and never otherwise —
+var_buf is the live game's flag memory once a stage runs. Relies on the brf
+stage's init not carrying `-v` (which would zero var_buf on entry, ahead of any
+per-frame poke); the title script's `-v` sites are on other commands. Log shows
+`GCL var_buf is 0xb3cc8` / `Unlocked every briefing item` on Integral; in-game
+confirmation pending. Setting the flags also makes the flag-gated frame polys
+(27–38, see the brf section) draw, which is what USA does in the same state.
+
+**Everything else on the title screen comes from the memory-card scan**
+(`open.c` ~7600–7800), which reads only the *names* of the saves on the card:
+
+    name[12] == 'G'   a game save; `(name[17] - '@') & 7` is the clear rank ->
+                      fB2C[0..3] -> demo_rank 0..6 (EXTREME needs demo_rank != 0)
+                      and, non-zero, has_clear_data = 1 (title BSS 0x800D92D0)
+    name[12] == 'C'   photo data  -> photo_flag
+    name[12] == 'V'   VR data     -> vr_flag
+
+`spe_rank = photo_flag + 2*(demo_rank != 0) + 4*has_clear_data` picks the
+SPECIAL menu page, and `has_clear_data` also runs the title script's `-k`
+proc (0x0A1E). Not forced here: `demo_rank`/`photo_flag`/`vr_flag` live in the
+title actor's heap Work, and the Master Collection keeps its saves in
+`userdata/<id>/2131630/remote/data_008_0000.bin`, not as a raw card image. If
+those states are ever needed, the honest lever is a cleared save (rank 6) plus
+photo and VR saves; the cheap one is a PPF on the `title` overlay forcing the
+scan's results.
+
 ## Achievements
 
 Per upstream (nuggs), the `DisableRAM` + `DisableCDROM` combination in
