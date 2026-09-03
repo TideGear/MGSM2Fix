@@ -13,7 +13,7 @@ counts and line breaks change.
 | `en_menu`, `en_menu2` | menu strings |
 | `en_option` | `screen brightness setup`, `key configuration setup`, `use directional buttons to test` |
 | `en_preope` | Previous Operations: Metal Gear (12 pages), Metal Gear 2 (19 pages) |
-| `en_brf` | briefing menu labels (20 PCX textures + quad constants) |
+| `en_brf` | briefing menu labels (20 PCX textures, quads, USA's row arithmetic and `above`) |
 
 `en_menu3` is disabled — it crashes with `GCL:WRONG CODE` walking a RAM buffer,
 cause never found.
@@ -167,6 +167,13 @@ detail; this is the index.
 - Scale is **9 display px per game px** (2160/240) with a 480 px x offset.
   Verify it against something with a known texture row — the brightness screen's
   green line is `sc_back_l` row 92, i.e. game y 100.
+- **Measure against the user's shots of both games, per submenu, before
+  concluding anything is exact.** The briefing rows were believed within 1 px;
+  against the user's USA shots they were 4 / 1 / 12 rows off per submenu, and
+  the shots also showed the "highlight" function being patched was a different
+  feature entirely. Use a fixed element (the FILE column) as the framing
+  control, exclude the rule from the label band, and compare highlighted to
+  highlighted.
 - Measure **ink centroids, not band tops**: a highlighted row's glow moves a
   threshold's idea of where ink starts by 2–3 px, the same size as the effects
   being chased.
@@ -450,56 +457,81 @@ the highlight uniform) and `advance - 6` (which left it 0–3 rows tall). Measur
 before the fix: highlight 14.0 game px against USA's 11.0, both with their top
 2.0 px above the ink — the tops already agreed, only the height was over.
 
-### The `above` offset: left alone deliberately, and why
+### The `above` offset: read back from the texture's VRAM row
 
-USA's box is `[y - above, y + below + 5]`; ours is `[y, y + h]`. Since
-`above + below + 5 == h`, the only difference is that USA **translates** the box
-up by a per-label `above` (2–4). Rows therefore sit slightly lower here than in
-USA. This is the last known deviation and it is not fixed. The reasoning, so it
-does not have to be redone:
+USA's box is `[y - above, y + below + 5]` with a per-label `above` of 2, 3 or 4
+(its positioner's fifth argument; `rowargs.py` extracts all 16). Ours was
+`[y, y + h]`, so every label sat `above` rows low relative to its row anchor —
+and, worse, the row anchors themselves were not USA's (next section), which is
+why an earlier pass measured "9 of 16 exact" and concluded the shift was not
+worth fixing. Measured against the user's USA shots, no label was exact.
 
-**The translation itself is free.** It is a move, not a resize, so the highlight
-height is unaffected, and it fits in the positioner's spare slots — using `a0`,
-dead after the two `lbu`s, so that `a2` survives for the `y + advance` return:
+`above` is not derivable from the poly, and the positioner has no slot for a
+table lookup — but it already reads the poly's `v0`, which is the texture's
+VRAM row (`off_y = py % 256`), and **we choose `py`**. So the builder places
+each `br_sNN` at `py % 8 == above` and the positioner reads it back:
 
-    lbu   a0, 29(v0)          v2
-    lbu   a1, 13(v0)          v0
-    subu  v1, a0, a1          h
-    addiu a0, a2, -K          top    = y - K
-    addu  v1, a0, v1          bottom = y - K + h     height still h
+    lbu  a0, 29(v0)      v2
+    lbu  a1, 13(v0)      v0 = py % 256
+    subu v1, a0, a1      h = texture height
+    andi a1, a1, 7       above
+    subu a0, a2, a1      top    = y - above
+    addu v1, a0, v1      bottom = top + h        (== y + below + 5)
     sh a0,10 / a0,18 / v1,26 / v1,34
 
-Nine instructions in the eleven slots, `a2` intact, highlight unchanged.
+Ten of the eleven slots, `a2` intact for the `y + advance` return. Box height
+is unchanged, so the selection glow (which follows the quad) is unchanged. The
+placement constraint moved 15 of the 16 labels in VRAM; `brf_build.py` asserts
+`py % 8 == USA_ABOVE[tid]` for every label after the rebuild.
 
-**But a uniform `K` cannot beat `K = 0`.** Measured against USA in the
-detailed-information submenu, the error is exactly `above - 2` — our row anchors
-already sit where USA's `above = 2` labels want them:
+### Where each list starts: USA's arithmetic, not Integral's
 
-    br_s11 br_s12 br_s14   above 2   ~0.0 game px   already exact
-    br_s07 br_s08 br_s09   above 3   ~1.0           1 low
-    br_s05                 above 4   ~2.0           2 low
+Both builds centre a submenu's list on the total height of its items, from
+different formulas. Measured from the user's shots (left FILE column identical
+in every pair, so the framing is the same), the right column sat **4 rows high
+in operation outline, 1 row low in operation member and 12 rows high in
+detailed information** once `above` was accounted for. The item count `n` is a
+runtime variable (briefing flags at `work+128/136/144/164/176/184`), so the
+constants had to become USA's formulas, not USA's values:
 
-Across all 16 (nine at `above` 2, six at 3, one at 4):
+    outline    s0 = -41 - (20n - 15) / 2        Integral: (20n - 7)     800C6EEC  -7 -> -15
+    member     s0 = -21 - (20n -  5) / 2        Integral: (20n - 7)     800C6FE4  -7 -> -5
+    detailed   s0 =   9 - (16n + 10d - 11) / 2  Integral: ~((17n-4)/2)  800C7100  22-word rewrite
 
-    K = 0 (shipped)   mean |error| 0.50   9 exact, 6 off by 1, 1 off by 2
-    K = 1             mean |error| 0.63   6 exact, 10 off by 1
+`d` is the number of two-line labels (1, or 2 once `br_s13` unlocks); the
+rewrite fits in the block's own three `nop`s and drops the redundant signed
+halving (the value is always positive). For the user's save (n = 1 / 3 / 6)
+all three now compute exactly USA's `-43 / -48 / -38`.
 
-So any uniform shift trades nine exact labels for six.
+**Still different:** USA's member block has a second branch — with 4 or 5
+items it switches `br_s03..s06` to a 17-row advance, `br_s02` to 27, and
+`s0 = -21 - (17n - 2) / 2`. Integral's advances are fixed immediates with no
+free register to make them conditional, so once Meryl / support crew unlock
+the member rows will sit 4 rows apart from USA's. Everything else follows `n`.
 
-**Exact per-label correction costs something either way.** `above` is not
-derivable from the texture — the UVs give the height, which the quad already
-uses — and nothing else per-label is reachable in the two remaining slots (a
-table lookup indexed by `a1` needs four). Encoding it in the artwork means one
-of:
+### The rule constants are USA's own
 
-- pad the canvas top by `Kmax - above` and shift the box up by `Kmax`: exact
-  ink, but the box grows by that padding, so the **highlight** gets 0–2 rows
-  taller on 15 of 16 labels — undoing the thing the V-coordinate fix got right;
-- pad the top and crop the bottom by the same amount: box height preserved, but
-  the art is tight-cropped, so it cuts descenders.
+With each submenu's half-height `v` now USA's, the rule needs no compensation:
+top `s0 - 4` (Integral drew `s0 - 2`), bottoms `v - 36`, `v - 16`, `v + 14` —
+USA's immediates verbatim. The earlier `-43` / `-12` were corrections for the
+different `v`; the lengths already matched (12.8 / 62.8 / 102.8 game px) and
+only the tops move with the rows.
 
-Nine of sixteen labels are already pixel-exact and the rest are within 1 px, so
-this is the one place where matching USA exactly costs more than it returns.
+### `brf_800C6930` is not the selection highlight
+
+It was patched as one (box `[y, y+5]`, bar `[y+5, y+6]`), on the belief that
+USA's `above` was the label's. It is not: the function positions two
+untextured polys per **flag-gated item** — (27,28) `br_s01`, (29,30) `br_s03`,
+(31,32) `br_s05`, (33,34) `br_s10`, (35,36) `br_s13`, (37,38) `br_s15` — drawn
+only while that item's flag is 1, at that item's row, coloured 0x46/0x50/0x4B.
+Integral draws box `[y-4, y+10]` and bar `[y+10, y+11]`; USA's version
+(`800C910C`) takes a fifth argument `K` and draws bar `[y+3, y+4]`, box
+`[y-K, y+3]`, with `K = 10` except `br_s03`'s site (18) and `br_s13`'s (14).
+The function is rewritten to USA's geometry, deriving `K` from the box poly
+index in `a2`, in the twelve dead x-copy slots. **Unverified in game**: the
+user's save has none of those flags set, so nothing draws them yet. The real
+selection glow follows the label quad and already measured identical to USA on
+every highlighted label (top/bottom gaps to the text equal within 0.3 px).
 
 ### The vertical rule
 
@@ -523,25 +555,9 @@ reveal (`y0/y1 = -55`, `y2/y3 = a3 - 55`, x ramped by a timer) rather than a
 centred bar — and measures 12.6 and 62.8 for the same two submenus, i.e. it
 grows ~25 per item against Integral's 20, in the opposite direction on each.
 
-Only the outline case is safely correctable: the bottom constant is independent
-of the row start, so shortening it moves the rule without moving any text.
-`800C6F3C  -38 -> -43` gives `2*v1` = 12 game px against USA's 12.6.
-
-Each submenu has its **own** rule poly, which is why one `-38` edit only moved
-the outline one. They are found by looking for `sh` into the y0/y2 of polys 27+
-(the ones GetResources never sets up, so they carry no texture):
-
-    poly 26   operation outline    top s0-2,  bottom v0-38   (the -38 above)
-    poly 40   operation member     top s0-2,  bottom v0-18   -> -12
-    poly 42   detailed information top s0-2,  bottom v0+2    matches USA already
-
-They share their x with poly 26 via `s6`/`s5` (19 and 23), left in those
-registers by the outline block — which is why every submenu's rule sits at the
-same x even though only one block sets it.
-
-Length is `2*v0 + K`. For the member submenu that is 57 game px against USA's
-62.8, so `800C7028  -18 -> -12` adds the 6. `v0` feeds only that poly's y2/y3
-and `s0` was computed from it earlier, so the rows do not move.
+All three rules now use USA's constants; see "The rule constants are USA's
+own" above. (An earlier version compensated for Integral's different `v` with
+`-43` / `-12`; those are gone.)
 
 ### Horizontal: move the whole group, not just the labels
 

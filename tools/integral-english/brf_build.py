@@ -18,7 +18,9 @@ from PIL import Image
 from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BASEADDR,
                        ROW_H_ADDR, ROW_H_OLD, ROW_H_NEW, S00_ADDR, S00_OLD, S00_NEW,
                        advance_patches, INT_FN, xl_patches, S00_X_ADDRS, LINE_DELTA,
-                       quads, HILITE, UNSHARE, unshare_patches, RULE,
+                       quads, UNSHARE, unshare_patches, RULE, START_Y,
+                       DETAIL_ADDR, DETAIL_OLD, DETAIL_NEW, FRAME_ADDR, FRAME_OLD,
+                       FRAME_NEW, USA_ABOVE,
                        RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX, ANIM_X)
 
 si, ti, Fi, pi = stage('work/int1_stage.dir')
@@ -57,7 +59,7 @@ _off = ROW_H_ADDR - BASEADDR
 _have = list(struct.unpack('<11I', ovl[_off:_off+44]))
 assert _have == ROW_H_OLD, 'row positioner not as expected: %s' % [hex(x) for x in _have]
 struct.pack_into('<11I', ovl, _off, *ROW_H_NEW)
-print('row height @%08X: fixed 13 -> v2 - v0 (the texture height), per label'
+print('row box    @%08X: [y, y+13] -> [y - above, y - above + texture height], above = py %% 8'
       % ROW_H_ADDR)
 # br_s00's animated width: rebuild the 52n shift/add chain as 100n
 _o = S00_ADDR - BASEADDR
@@ -118,14 +120,20 @@ for addr, old_v, new_v, what in RULE:
     struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
     print('rule      @%08X: %+d -> %+d  (%s)' % (addr, old_v, new_v, what))
 
-for addr, old_v, new_v, what in HILITE:
+for addr, old_v, new_v, what in START_Y:
     o = addr - BASEADDR
     w = struct.unpack('<I', ovl[o:o+4])[0]
-    assert (w >> 26) == 9 and ((w >> 21) & 31) == 7, 'highlight %08X: %08X' % (addr, w)
     cur = w & 0xFFFF; cur -= 0x10000 if cur >= 0x8000 else 0
-    assert cur == old_v, 'highlight %08X: %d != %d' % (addr, cur, old_v)
+    assert (w >> 26) == 9 and cur == old_v, 'start y %08X: %08X' % (addr, w)
     struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
-    print('highlight @%08X: base_y%+d -> base_y%+d  (%s)' % (addr, old_v, new_v, what))
+    print('start y   @%08X: %+d -> %+d  (%s)' % (addr, old_v, new_v, what))
+for label, addr, oldw, neww in (('detailed start: 9 - (16n + 10d - 11)/2, USA', DETAIL_ADDR, DETAIL_OLD, DETAIL_NEW),
+                                ('frame polys 27-38: USA geometry, K by poly', FRAME_ADDR, FRAME_OLD, FRAME_NEW)):
+    o = addr - BASEADDR
+    have = list(struct.unpack('<%dI' % len(oldw), ovl[o:o+4*len(oldw)]))
+    assert have == oldw, '%s: block at %08X not as expected: %s' % (label, addr, [hex(x) for x in have])
+    struct.pack_into('<%dI' % len(neww), ovl, o, *neww)
+    print('rewrite   @%08X: %d words  (%s)' % (addr, len(neww), label))
 
 NM = {9+i: 'br_s%02d' % i for i in range(16)}
 for addr, old_v, new_v, idx in advance_patches(bytes(pi[0]), pu[0]):
@@ -192,6 +200,9 @@ for tid, g in G2.items():
                 tid, (g['px'] % 64) * (16 // g['bpp']) + g['w'])
         assert vfits(g['py'], g['h']),             '0x%04X: v2 = %d > 255, the V coordinate would wrap' % (
                 tid, (g['py'] % 256) + g['h'])
+        if tid in USA_ABOVE:                              # the positioner reads it back as py % 8
+            assert g['py'] % 8 == USA_ABOVE[tid], '0x%04X: py %d encodes above %d, USA has %d' % (
+                tid, g['py'], g['py'] % 8, USA_ABOVE[tid])
     rects.append((g['px'], g['py'], u, g['h'], tid))
 for i in range(len(rects)):
     for j in range(i+1, len(rects)):

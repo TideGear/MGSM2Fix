@@ -127,12 +127,96 @@ def unshare_patches(xl_of, w_of):
 S00_X_ADDRS = (0x800C7674, 0x800C76A4)      # br_s00's animated x0 and x1 base
 S00_X_OLD, S00_X_NEW = 26, 10               # to USA's family-A xl
 
-# Selection highlight (brf_800C6930, decompiled in b_select.c).  Integral draws
-# a box [base_y-4, base_y+10] plus a 1px bar [base_y+10, base_y+11] - 15 rows.
-# USA's equivalent takes `above` as a stack argument and draws [y-above, y+3]
-# plus [y+3, y+4], i.e. above+4 = 6 rows, with its top ON the text top.  Our
-# text top is y (we pad rather than offset by `above`), so the same-sized
-# highlight aligned to our text is [y, y+5] plus [y+5, y+6].
+# brf_800C6930 is NOT the selection highlight (the glow follows the label quad
+# and already matches USA).  It sets two untextured polys per flag-gated item -
+# (27,28) br_s01, (29,30) br_s03, (31,32) br_s05, (33,34) br_s10, (35,36) br_s13,
+# (37,38) br_s15 - drawn only while that item's flag == 1, at that item's row y.
+# Integral: box [y-4, y+10], bar [y+10, y+11].  USA (800C910C) takes a 5th arg K:
+# bar [y+3, y+4], box [y-K, y+3], K = s4 (10) except br_s03's site (s4+8 = 18)
+# and br_s13's (14).  K is derived here from the box poly index in a2, using
+# the twelve dead x-copy instructions as slots.  Not visible in a save with none
+# of those flags set, so unverified in game; the previous HILITE patch here
+# (box [y, y+5]) was a misreading of this function as the selection highlight.
+FRAME_ADDR = 0x800C6930
+FRAME_OLD = [0x24840780, 0x00051080, 0x00451021, 0x000210C0, 0x00441021, 0x24E5000A,
+             0x84480008, 0x84490020, 0x24E3000B, 0xA445000A, 0xA4450012, 0xA443001A,
+             0xA4430022, 0xA4480008, 0xA4490010, 0xA4480018, 0xA4490020, 0x00061080,
+             0x00461021, 0x000210C0, 0x00441021, 0x84480008, 0x84490020, 0x24E7FFFC,
+             0xA447000A, 0xA4470012, 0xA445001A, 0xA4450022, 0xA4480008, 0xA4490010,
+             0xA4480018, 0x03E00008, 0xA4490020]
+FRAME_NEW = [0x24840780,   # addiu a0, a0, 1920
+             0x00051080,   # sll   v0, a1, 2
+             0x00451021,   # addu  v0, v0, a1
+             0x000210C0,   # sll   v0, v0, 3
+             0x00441021,   # addu  v0, v0, a0       poly[idx1]
+             0x24E50003,   # addiu a1, a3, 3        bar top    (USA)
+             0x24E30004,   # addiu v1, a3, 4        bar bottom (USA)
+             0xA445000A,   # sh    a1, 10(v0)
+             0xA4450012,   # sh    a1, 18(v0)
+             0xA443001A,   # sh    v1, 26(v0)
+             0xA4430022,   # sh    v1, 34(v0)
+             0x2408000A,   # addiu t0, zero, 10     K = 10
+             0x24C9FFE2,   # addiu t1, a2, -30
+             0x15200002,   # bne   t1, zero, +2     a2 != 30 -> skip
+             0x24C9FFDC,   # addiu t1, a2, -36      (delay slot, always)
+             0x24080012,   # addiu t0, zero, 18     br_s03's frame
+             0x15200002,   # bne   t1, zero, +2     a2 != 36 -> skip
+             0x00061080,   # sll   v0, a2, 2        (delay slot, needed anyway)
+             0x2408000E,   # addiu t0, zero, 14     br_s13's frame
+             0x00461021,   # addu  v0, v0, a2
+             0x000210C0,   # sll   v0, v0, 3
+             0x00441021,   # addu  v0, v0, a0       poly[idx2]
+             0x00E83823,   # subu  a3, a3, t0       box top = y - K
+             0xA447000A,   # sh    a3, 10(v0)
+             0xA4470012,   # sh    a3, 18(v0)
+             0xA445001A,   # sh    a1, 26(v0)       box bottom = y + 3
+             0xA4450022,   # sh    a1, 34(v0)
+             0x03E00008,   # jr    ra
+             0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000]
+assert len(FRAME_OLD) == len(FRAME_NEW) == 33
+
+# Where each submenu's list starts.  Both builds centre the list on the total
+# height of its items, but from different arithmetic; measured against USA's
+# shots the rows sat 4 high (outline), 1 low (member) and 12 high (detailed)
+# once the per-label `above` was accounted for.  USA's formulas:
+#   outline   s0 = -41 - (20n - 15) / 2          Integral had (20n - 7)
+#   member    s0 = -21 - (20n -  5) / 2          Integral had (20n - 7); this is
+#             USA's 3-item branch - with 4 or 5 items USA switches to a 17-row
+#             advance and (17n - 2) / 2, which Integral's fixed-immediate
+#             advances cannot follow, so that state still differs (documented)
+#   detailed  s0 =   9 - (16n + 10d - 11) / 2    d = two-line items (1, or 2 with
+#             br_s13); Integral had ~((17n - 4) / 2).  Rewritten in place using
+#             the block's three nops.
+START_Y = [(0x800C6EEC, -7, -15, 'outline start: (20n-15)/2, USA'),
+           (0x800C6FE4, -7,  -5, 'member start: (20n-5)/2, USA 3-item branch')]
+DETAIL_ADDR = 0x800C7100
+DETAIL_OLD = [0x8E4200A4, 0x00000000, 0x14530002, 0x24040006, 0x24040007, 0x8E4200B0,
+              0x00000000, 0x14530002, 0x00000000, 0x24840001, 0x8E4200B8, 0x00000000,
+              0x14530003, 0x00041100, 0x24840001, 0x00041100, 0x00441021, 0x2444FFFC,
+              0x000417C2, 0x00821021, 0x00021043, 0x00028027]
+DETAIL_NEW = [0x8E4200A4,   # lw    v0, 164(s2)     br_s10 flag
+              0x2405FFFF,   # addiu a1, zero, -1    10*1 - 11
+              0x14530002,   # bne   v0, s3, +2
+              0x24040006,   # addiu a0, zero, 6
+              0x24040007,   # addiu a0, zero, 7
+              0x8E4200B0,   # lw    v0, 176(s2)     br_s13 flag
+              0x00000000,
+              0x14530003,   # bne   v0, s3, +3
+              0x00000000,
+              0x24840001,   # addiu a0, a0, 1
+              0x24050009,   # addiu a1, zero, 9     10*2 - 11
+              0x8E4200B8,   # lw    v0, 184(s2)     br_s15 flag
+              0x00000000,
+              0x14530002,   # bne   v0, s3, +2
+              0x00041100,   # sll   v0, a0, 4       (delay slot)
+              0x24840001,   # addiu a0, a0, 1
+              0x00041100,   # sll   v0, a0, 4       16n
+              0x00451021,   # addu  v0, v0, a1      16n + 10d - 11
+              0x00021043,   # sra   v0, v0, 1       / 2  (always positive here)
+              0x00028027,   # nor   s0, zero, v0    -v0 - 1
+              0x2610000A,   # addiu s0, s0, 10      = 9 - v0
+              0x00000000]
+assert len(DETAIL_OLD) == len(DETAIL_NEW) == 22
 # The operation-outline submenu's vertical rule.  Integral draws it centred,
 # top = (-41 - v1) - 2 and bottom = v1 - 38 with v1 = (20n - 7)/2, so its length
 # is 2*v1 + 5 = 20n - 2 - the 20 being Integral's original row advance.  For the
@@ -169,13 +253,16 @@ ANIM_X = [(0x800C73A0, -46, -66, 'p25 connector right end'),
           (0x800C75B8, -47, -67, 'p42 detailed rule x0/x2'),
           (0x800C75C4, -43, -63, 'p42 detailed rule x1/x3')]
 
-RULE = [(0x800C6F3C, -38, -43, 'operation-outline rule bottom'),
-        # The operation-member rule is poly 40 (its x comes from s6/s5 = 19/23,
-        # left by the outline block).  top = s0 - 2, bottom = v0 - 18, so the
-        # length is 2*v0 + 5 = 57 game px for the three drawn items; USA's is
-        # 62.8, so the bottom moves 6 rows down.  v0 feeds only these two
-        # stores, and s0 was computed from it earlier, so the rows do not move.
-        (0x800C7028, -18, -12, 'operation-member rule bottom')]
+# With each submenu's v (half-height) now USA's, the rule constants can simply
+# be USA's own: top = s0 - 4 (Integral: s0 - 2), bottoms v - 36 / v - 16 /
+# v + 14.  Lengths were already equal (12.8 / 62.8 / 102.8 game px measured in
+# both); only the tops moved with the rows.
+RULE = [(0x800C6F34, -2, -4, 'operation-outline rule top'),
+        (0x800C6F3C, -38, -36, 'operation-outline rule bottom'),
+        (0x800C7024, -2, -4, 'operation-member rule top'),
+        (0x800C7028, -18, -16, 'operation-member rule bottom'),
+        (0x800C7174, -2, -4, 'detailed-information rule top'),
+        (0x800C7178, 2, 14, 'detailed-information rule bottom')]
 
 HILITE = [(0x800C6944, 10,  5, 'bar top / box bottom'),
           (0x800C6950, 11,  6, 'bar bottom'),
@@ -232,15 +319,15 @@ ROW_H_OLD = [0x84440008,   # lh   a0,  8(v0)      x0   <- redundant
              0xA4440018,   # sh   a0, 24(v0)      x2 = x0  <- redundant
              0xA4450020]   # sh   a1, 32(v0)      x3 = x3  <- redundant
 ROW_H_NEW = [0x9044001D,   # lbu  a0, 29(v0)      v2
-             0x9045000D,   # lbu  a1, 13(v0)      v0
+             0x9045000D,   # lbu  a1, 13(v0)      v0  (= py % 256)
              0x00851823,   # subu v1, a0, a1      v1 = texture height
-             0x00C31821,   # addu v1, a2, v1      v1 = y + height
-             0xA446000A,   # sh   a2, 10(v0)      y0
-             0xA4460012,   # sh   a2, 18(v0)      y1
+             0x30A50007,   # andi a1, a1, 7       above = py % 8  (see USA_ABOVE)
+             0x00C52023,   # subu a0, a2, a1      top    = y - above
+             0x00831821,   # addu v1, a0, v1      bottom = top + height
+             0xA444000A,   # sh   a0, 10(v0)      y0
+             0xA4440012,   # sh   a0, 18(v0)      y1
              0xA443001A,   # sh   v1, 26(v0)      y2
              0xA4430022,   # sh   v1, 34(v0)      y3
-             0x00000000,
-             0x00000000,
              0x00000000]
 # br_s00 has no stored quad: its right edge is animated as x1 = 52n/6 + 26,
 # with the 52 baked into a shift/add chain at 800C7658.  Rebuilding the chain
@@ -290,6 +377,14 @@ USA_ADV = {}
 for _a, _i, _adv, _ab, _be in _rb(pu[0], USA_BASE, USA_FN):
     if _i is not None and 9 <= _i <= 24: USA_ADV[strcode('br_s%02d' % (_i - 9))] = _adv
 assert len(USA_ADV) == 16 and all(v for v in USA_ADV.values()), 'USA advances incomplete'
+# USA's positioner draws [y - above, y + below + 5]; `above` (2-4) is its 5th
+# argument.  Ours reads it back as the texture's VRAM row mod 8, so placement
+# below must put each br_sNN at py % 8 == above.
+USA_ABOVE = {}
+for _a, _i, _adv, _ab, _be in _rb(pu[0], USA_BASE, USA_FN):
+    if _i is not None and 9 <= _i <= 24: USA_ABOVE[strcode('br_s%02d' % (_i - 9))] = _ab
+assert len(USA_ABOVE) == 16 and all(0 <= v <= 7 for v in USA_ABOVE.values()), USA_ABOVE
+def row_ok(tid, py): return tid not in USA_ABOVE or py % 8 == USA_ABOVE[tid]
 
 XL = dict(xl_patches(pi[0], pu[0]))
 # nothing may cross the right edge now that xl is USA's
@@ -357,14 +452,14 @@ def tgt(t):
 for tid in sorted(WIDEN, key=lambda t: -tgt(t)[2]):
     ig = geo(I0[tid]); tw, th, need = tgt(tid)
     bpp = geo(U[tid])['bpp']
-    if ufits(ig['px'], tw, bpp) and vfits(ig['py'], th)        and not busy(ig['px'], ig['py'], need, th):
+    if ufits(ig['px'], tw, bpp) and vfits(ig['py'], th) and row_ok(tid, ig['py']) and not busy(ig['px'], ig['py'], need, th):
         place[tid] = (ig['px'], ig['py'])
     else:
         found = None
         for page in (896, 960, 832, 768, 704, 640, 576, 512):
             for ny in range(0, 512 - th):
                 for nx in range(page, page + 64 - need + 1):
-                    if ufits(nx, tw, bpp) and vfits(ny, th) and not busy(nx, ny, need, th):
+                    if ufits(nx, tw, bpp) and vfits(ny, th) and row_ok(tid, ny) and not busy(nx, ny, need, th):
                         found = (nx, ny); break
                 if found: break
             if found: break
