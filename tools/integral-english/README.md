@@ -516,6 +516,42 @@ full-width Shift-JIS (`ＭＧＳ．［ＮＭ］ time area`, `datasave.c` ~2261) 
 uses ASCII; the Master Collection's own storage UI shows those names, so this
 is a separate question.
 
+## Not ported: the PHOTO ALBUM's own memory-card messages (found 2026-09-03)
+
+`en_savemsg` ports `datasave.c`'s two caption tables **in the executable**,
+which is what the LOAD DATA and in-game save screens use. The PHOTO ALBUM has
+its **own, independent copy of the same message family inside the `camera`
+overlay**, and those are still Japanese. Found by shooting the unlocked SPECIAL
+page: PHOTO ALBUM → SELECT MEMORY CARD reads `セーブファイルがありません。`
+where the LOAD DATA screen (correctly) reads `No save file.`
+
+Proof it is a separate copy, not a failure of the port: the Japanese
+"no save file" byte sequence appears **once** in retail Integral's executable
+and **zero** times in the ported executable (the pool was repacked), yet **once**
+in the `camera` overlay - which the port never touches.
+
+    Integral camera overlay   54,668 bytes   ~19 game-encoded messages at
+                                             +0x0CB2C .. +0x0CD00 (~460 bytes)
+    USA camera overlay        55,668 bytes   the same family in ASCII
+
+USA's `camera` overlay carries its own English set, so this is a straight port
+with a known target: `Data loaded.`, `Data saved.`, `Error occured while
+loading.`, `Error occured while saving.`, `Formating failed.`, `Load failed.`,
+`Memory Card is not formated.`, `Memory Card undetected.`, `No empty block.`,
+`No save file.`, `Now checking Memory Card.`, `Now formating Memory Card.`,
+`Now saving.`, `Save completed.`, `Save failed.` - plus the album's own
+`FREE: %d BLOCK%s`, `NEW FILE [ NEED %d BLOCK%s ]` and `PHOTO %02d`.
+
+Likely approach: the same in-place repack `savemsg.py` uses (the English is no
+longer than the Japanese), but on the overlay rather than the executable, so the
+references to those strings have to be found and rewritten - they are overlay
+addresses, not a neat table at a known offset like `datasave.c`'s. Note USA's
+overlay is 1,000 bytes **larger** than Integral's, so do not assume USA's layout
+transplants; and the option stage's lesson applies - check the rebuilt overlay
+against retail's byte count before shipping.
+
+**Not started.**
+
 ## Not ported at all: the VR disc (SLPM-86249)
 
 Integral's third disc — VR training — is untouched. `mods/INTEGRAL/VR-DISK/` is
@@ -802,10 +838,6 @@ swaps if it ever matters.
 - **The save side of the memory-card messages.** Only LOAD has been shot. The
   save flow (a Mei Ling call) would exercise the "no empty block", "failed" and
   "now checking" captions, and slot 1's kept Japanese line after a success.
-- **USA's forced title unlocks.** `unlock_title.py` deploys to the USA discs too
-  and its patched words are asserted against retail, but the USA title screen
-  has not been shot since, so `spe_rank` 3 and EXTREME are unconfirmed there.
-  Integral's were confirmed in game 2026-09-03.
 - **`[Patches] PreserveConfiguration` catching a real stale write.** Three clean
   runs; the race it guards is intermittent and has not been caught in the act.
   See `UPSTREAM.md`.
