@@ -1312,6 +1312,38 @@ those states are ever needed, the honest lever is a cleared save (rank 6) plus
 photo and VR saves; the cheap one is a PPF on the `title` overlay forcing the
 scan's results.
 
+## Unlock everything (test aid): `unlock_title.py`
+
+Both games gate their title-screen extras on the memory-card scan in the
+`title` overlay (`open.c`, `title_open_800D1CB4`): a cleared game save gives
+`demo_rank` 1–6 (EXTREME difficulty, DEMO THEATER) and `has_clear_data` (1P
+MODE, Integral only), a photo save gives `photo_flag` (PHOTO ALBUM), a VR save
+`vr_flag`; `spe_rank = photo + 2*(demo≠0) + 4*clear` selects the SPECIAL page.
+`unlock_title.py` patches the *derivation* of those results in the overlay, so a
+fresh save sees everything, and emits one PPF per disc addressed at the `title`
+stage's sectors (not relocated): `INTEGRAL_disc{1,2}_unlock_title.ppf` and, for
+the USA reference game, `mods/MGS1_US/{0,1}/MGS1_disc{1,2}_unlock_title.ppf`.
+Named `_unlock_`, not `en_`: delete them to restore normal gating.
+
+| site | Integral | USA |
+|---|---|---|
+| `if (photo == 1)` / `if (vr == 1)` guards on the work stores | `bne` → `nop` ×2 | same |
+| "no clear save" branch (`demo_rank = 0`) | store 6 instead, jump past the rank chain | same |
+| `if (has_clear_data == 1) spe_rank += 4` | store 1 into `has_clear_data` where it was read, drop the test | absent in USA (no 1P MODE, no `has_clear_data`) |
+
+Result: Integral `spe_rank` 7 (page with PHOTO ALBUM, DEMO THEATER, 1P MODE),
+USA `spe_rank` 3 (its maximum: PHOTO ALBUM, DEMO THEATER); EXTREME selectable
+in both. Every patched word is asserted against retail first.
+
+**USA title overlay addresses are label −8.** The USA `title` payload's code
+sits 8 bytes later than a base-plus-offset label predicts — its header entry
+(`800D5578` vs the labelled `NewOpen` at `800D5580`), its printf references and
+every `j` target agree — while USA's `brf` overlay does not have this offset.
+File offsets are label-based, so patches land; encoded jump targets must use
+the true (label −8) address. This is also why the USA release build's
+`demo_rank` chain read as nonsense on first sight ("default 4"): the labels
+were off, not the code.
+
 ## Achievements
 
 Per upstream (nuggs), the `DisableRAM` + `DisableCDROM` combination in
