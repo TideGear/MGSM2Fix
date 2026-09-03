@@ -15,6 +15,7 @@ counts and line breaks change.
 | `en_preope` | Previous Operations: Metal Gear (12 pages), Metal Gear 2 (19 pages) |
 | `en_brf` | briefing menu labels (20 PCX textures, quads, USA's row arithmetic and `above`) |
 | `en_savemsg` | memory-card messages (`datasave.c` save/load caption tables in the executable) |
+| `en_camsave` | the PHOTO ALBUM's own copy of those messages, inside the `camera` overlay |
 
 `en_menu3` is disabled — it crashes the title stage with `GCL:WRONG CODE`. See
 "Why `en_menu3` crashes" below; diagnosed 2026-09-03, not yet rebuilt.
@@ -516,7 +517,7 @@ full-width Shift-JIS (`ＭＧＳ．［ＮＭ］ time area`, `datasave.c` ~2261) 
 uses ASCII; the Master Collection's own storage UI shows those names, so this
 is a separate question.
 
-## Not ported: the PHOTO ALBUM's own memory-card messages (found 2026-09-03)
+## The PHOTO ALBUM's own memory-card messages (`en_camsave`, 2026-09-03)
 
 `en_savemsg` ports `datasave.c`'s two caption tables **in the executable**,
 which is what the LOAD DATA and in-game save screens use. The PHOTO ALBUM has
@@ -542,15 +543,42 @@ loading.`, `Error occured while saving.`, `Formating failed.`, `Load failed.`,
 `Now saving.`, `Save completed.`, `Save failed.` - plus the album's own
 `FREE: %d BLOCK%s`, `NEW FILE [ NEED %d BLOCK%s ]` and `PHOTO %02d`.
 
-Likely approach: the same in-place repack `savemsg.py` uses (the English is no
-longer than the Japanese), but on the overlay rather than the executable, so the
-references to those strings have to be found and rewritten - they are overlay
-addresses, not a neat table at a known offset like `datasave.c`'s. Note USA's
-overlay is 1,000 bytes **larger** than Integral's, so do not assume USA's layout
-transplants; and the option stage's lesson applies - check the rebuilt overlay
-against retail's byte count before shipping.
+**Ported the same day: `camsave.py`, patch `en_camsave`.**
 
-**Not started.**
+The references turned out to be **pointer words in one region** of the overlay
+payload, 0x600..0x740, and both games' overlays are the same program - so **the
+pointer word's offset is the index**: slot 0x648 is the same message in both,
+wherever each game's string sits. That makes the mapping exact rather than
+inferred from order or content, and it is why this port was small.
+
+    overlay base    Integral 0x800C3208, USA 0x800C5968 (the same bases as their
+                    `option` overlays: stages load at a fixed address)
+    Japanese        815 bytes across the paired slots
+    English         509 bytes, 306 SHORTER - so the pool repacks in place, the
+                    overlay stays 54,668 bytes and the stage stays 38 sectors
+    result          33 pointer words rewritten, 23 distinct strings,
+                    428 of the pool's 492 bytes used, 528 bytes in 44 records
+
+Six slots point at an **empty** string in USA (0x60C, 0x62C, 0x63C, 0x65C,
+0x668, 0x66C). Integral's Japanese stays there, the same decision `savemsg.py`
+made for its "saving" and "save completed" captions. Slots already identical in
+both (`OVERWRITE OK?`, `FORMAT OK?`, `COMPLETE`, `ERROR`, `MEMORY CARD 1/2`,
+`YES`, `NO`, `SAVE DATA`) keep their address and their pointer word untouched -
+only strings that actually move are re-laid.
+
+**The trap here: that same region also holds FUNCTION pointers.** Slots 0x6E0,
+0x6E4 and 0x6E8 aim at code, and `addiu sp, sp, -N` reads as bytes over 0x80, so
+a "has high bytes therefore Japanese" test called them text and the first build
+would have rewritten three function pointers. Every real string in these
+overlays sits past 0x0C000, well clear of the code, so `read_table` requires
+that. Verified afterwards that all three still hold their original values.
+
+Checks before deploying: overlay size unchanged, every changed byte inside the
+pool or the table, every rewritten pointer resolving to a NUL-terminated string
+inside the pool, and the three function pointers untouched.
+
+**Deployed 2026-09-03. Not yet seen in game** - the photo album needs a shot of
+PHOTO ALBUM → SELECT MEMORY CARD, which should now read `No save file.`
 
 ## Not ported at all: the VR disc (SLPM-86249)
 
