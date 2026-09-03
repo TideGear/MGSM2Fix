@@ -358,6 +358,23 @@ colours do not).
 Note `key_normal` and `key_reverse` are already Latin in Integral, but in a
 bolder all-caps face; porting them changes the style to USA's lowercase.
 
+## Not ported at all: the VR disc (SLPM-86249)
+
+Integral's third disc — VR training — is untouched. `mods/INTEGRAL/VR-DISK/` is
+empty, so Ketchup applies nothing to it, and no tool here targets it. What is
+known so far, for whoever starts it:
+
+- USA's counterpart is `SLUS-00957` (VR Missions), inside `alldata.bin` at image
+  base `0xD39B7000`; its STAGE.DIR has the same 106-stage layout as Integral's
+  VR disc, so stage-by-stage comparison is possible.
+- Its option/text chain is **not** at `+0x1B8` like the main game's `option`
+  stage — the offsets in `optscan.py` do not apply unchanged.
+- MGSM2Fix's Ketchup table lists it as title 99, version `VR-DISK` (disk 0, exe
+  range `0x99800`); `EnglishText` and `UnlockBriefing` deliberately skip that
+  version (no option language toggle to hold; no briefing menu).
+- The VR disc has its own overlays and executable, so nothing from the main-game
+  port (overlay patches, stage relocations, chain edits) carries over.
+
 ## Also not matched: the brightness grey ramp
 
 `sc_back_r`'s greys are uniformly **7 levels darker** than USA's
