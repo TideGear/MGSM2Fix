@@ -137,13 +137,12 @@ detail; this is the index.
   reveal dispatched from a jump table — and which one wins varies per submenu.
 - To find version-exclusive art, **diff the two builds' DARs**: that is how
   USA's `sc_text` turned up as the only texture Integral's option stage lacks.
-- **Copy USA's quad constants; never derive them from a screenshot.** I measured
-  USA's paragraph, converted `134 - 120` and got `y0` 14 where USA's own constant
-  is 2 — a 12-row error, and the "something moves it at runtime" theory it
-  spawned was false (`sc_text` is referenced exactly once in USA's overlay, with
-  no second writer to that poly). The KCB text path uses absolute SPRT
-  coordinates; a `POLY_FT4` is channel-relative, with the offset set in
-  `libdg/chanl.c`. A screenshot cannot settle a quad constant.
+- **A quad constant is settled only by a like-for-like screenshot after
+  deploying — not by copying USA's, not by deriving it.** USA draws `sc_text` at
+  `y0 = 2`; the same constant here landed 12 rows high. The measurement-derived
+  `y0 = 14` was right and an adversarial review talked me out of it. The two
+  builds' draw environments differ in a way neither the decomp nor USA's binary
+  shows. Deploy, shoot both, diff.
 
 ### Reading disassembly
 
@@ -822,11 +821,11 @@ the font path's limits. Built by `optsctext.py`.
 | | |
 |---|---|
 | overlay | 25,830 bytes |
-| DAR | 121,680 -> 127,540, 56 -> 57 entries |
-| stage | 75 -> 78 sectors, relocated to **DUMMY3M idx 384** |
+| DAR | 121,680 -> 125,856, 56 -> 57 entries |
+| stage | 75 -> 77 sectors, relocated to **DUMMY3M idx 384** |
 | sc_text | VRAM (512,256), CLUT (1008,237) |
 | key_pad | moved (512,256) -> (512,326), which is what USA does |
-| quad | `Init_Res(work, GV_StrCode("sc_text"), po, -121, 2, 111, 72, 0, 0)` |
+| quad | `Init_Res(work, GV_StrCode("sc_text"), po, -121, 14, 111, 60, 0, 0)` — texture cropped to rows 0..45 |
 
 ### The three things that would have shipped as bugs
 
@@ -845,14 +844,21 @@ to Japanese. The relocated image is therefore built from a **composite** of
 retail plus every deployed PPF's STAGE.DIR writes, and the build asserts records
 4/5/12/26 are English before emitting.
 
-**The quad's y was derived, and derived wrong.** I measured USA's paragraph on
-screen and converted: 134 - 120 = `y0` 14. That is invalid - the KCB text path
-uses absolute SPRT coordinates while a POLY_FT4 is channel-relative
-(`libdg/chanl.c` sets channel 1's `env.ofs`), so a screenshot cannot settle a
-quad constant. USA's own value is **2**, a 12-row difference. **Copy USA's
-constants; do not derive them.** The other four quads in that block were already
-byte-identical to USA's, which is exactly why copying the fifth is safe under any
-coordinate system.
+**The quad's y: the two engines do not place the same constant in the same
+place.** USA's own call is `(-121, 2, 111, 72)`. Deployed here, that rendered the
+paragraph exactly **12 rows above** USA's on-screen position — measured `dy -12`
+on all four lines with `dx 0`, i.e. horizontally pixel-identical, vertically
+shifted. The measurement-derived `y0 = 14` (which an adversarial review had
+talked me out of in favour of "just copy USA") turned out to be correct. Lesson:
+neither copying USA's constant nor deriving one from a screenshot settles a quad
+position — **only a like-for-like screenshot comparison after deploying does**,
+because the two builds' draw environments evidently differ. One shot, measured,
+fixed it.
+
+**USA shows four lines; the texture has six.** Rows 47–69 (the ○-button
+sentence) never appear on USA's screen, so the texture is cropped to rows 0..45
+in the DAR (line 4 ends at row 45, row 46 is blank). Data-only, keeps the quad
+1:1, and the crop is asserted to decode round-trip.
 
 ### Why the fifth quad rides the existing loop
 
