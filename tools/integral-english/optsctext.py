@@ -96,10 +96,19 @@ OPTION_ENTRY_FO = 744    # STAGE.DIR file offset of the `option` entry's u32 sec
 # silently reverts every one of those records to retail Japanese (shipped once,
 # 2026-09-02: 'use directional buttons to test' came back as Japanese).
 CHAIN_PPF = 'work/fonttext_disc%d_option.ppf'
-EXPECT_CHAIN = {3: b' \x00', 7: b' \x00',
+EXPECT_CHAIN = {3: b' \x00', 7: b'\x80:\x00',
                 4: b'screen brightness setup\x00', 5: b'key configuration setup\x00',
                 12: b'use directional buttons to test\x00', 26: b'use directional buttons to test\x00',
-                13: b'Adjust the monitor brightness so the\x00', 24: b'Press the \x90\x1b button to return to the\x00'}
+                13: b'Adjust the monitor brightness so the\x00', 24: b'Press the \x90\x1b button to return to the\x00',
+                27: b'option screen.         \x00'}
+# Records the port owns. Every other record must equal retail byte for byte -
+# the font-text build had written an 'e' and a space into record 6 (the EXIT
+# row's help line, which then rendered two wrong glyphs) and blanked record 7
+# (the colon Integral's Japanese help lines use: 字幕設定：オン). Both are
+# repaired from retail in repair_chain(); 27's padding absorbs the +1 byte so
+# the chain length, and every container field after it, stays put.
+PORTED_RECORDS = {3, 4, 5, 12, 13, 14, 15, 16, 24, 26, 27}
+CHAIN_OFF, CHAIN_TAG = 0x1B8, 6
 
 # where the two textures go
 SCT_VRAM, SCT_CLUT = (512, 256), (1008, 237)
@@ -167,6 +176,41 @@ def composite(disc):
     return bytes(base), applied
 
 
+def chain_records(scr, off=CHAIN_OFF):
+    """The option stage's text records: 07 <len> <payload incl. NUL> at `off`."""
+    p, out = off, []
+    while p < len(scr) and scr[p] == 7:
+        n = scr[p+1]; out.append(bytes(scr[p+2:p+2+n])); p += 2 + n
+    return out, p
+
+
+def repair_chain(scr, retail_scr):
+    """Restore every record the port does not own to retail, keeping the chain
+    length constant by trading the difference against record 27's padding."""
+    recs, end = chain_records(scr); ret, _ = chain_records(retail_scr)
+    assert len(recs) == len(ret) == 31
+    fixed = []
+    for i, (r, o) in enumerate(zip(recs, ret)):
+        if i not in PORTED_RECORDS and r != o:
+            fixed.append(i); recs[i] = o
+    if 7 in fixed or recs[7] != ret[7]:
+        pass
+    # record 7: the colon, restored from retail (it is "owned" only in the sense
+    # that the font-text build blanked it; the port has no English for it)
+    if recs[7] != ret[7]:
+        fixed.append(7); recs[7] = ret[7]
+    body = b''.join(bytes([7, len(r)]) + r for r in recs)
+    delta = len(body) - (end - CHAIN_OFF)
+    if delta:
+        pad = recs[27]
+        assert pad.endswith(b' \x00') and pad.count(b' ') > delta, 'record 27 cannot absorb %+d' % delta
+        recs[27] = pad[:-1 - delta] + b'\x00'
+        body = b''.join(bytes([7, len(r)]) + r for r in recs)
+    assert len(body) == end - CHAIN_OFF, 'chain length changed'
+    out = bytearray(scr); out[CHAIN_OFF:end] = body
+    return bytes(out), fixed
+
+
 def stage_of(d, name):
     base = [s for n, s, _p in ents(d) if n == name][0] * 2048
     ver, _p, sect = struct.unpack('<BBh', d[base:base+4])
@@ -207,6 +251,16 @@ def build_stage():
     for k in FILE:
         pay[k] = comp[base+off:base+off+tags[k][3]]; off += pad(tags[k][3])
     assert off == sect * 2048, 'layout %d != %d' % (off, sect * 2048)
+
+    # --- chain: everything the port does not own must be retail
+    rbase, _rs, rtags = stage_of(open(RETAIL, 'rb').read(), 'option')
+    roff = 2048
+    for kk in FILE:
+        if kk == CHAIN_TAG: break
+        roff += pad(rtags[kk][3])
+    retail_scr = open(RETAIL, 'rb').read()[rbase+roff:rbase+roff+rtags[CHAIN_TAG][3]]
+    pay[CHAIN_TAG], fixed = repair_chain(pay[CHAIN_TAG], retail_scr)
+    print('chain: records restored to retail: %s' % (fixed or 'none'))
 
     # --- overlay
     ovl = open(OVL, 'rb').read()
@@ -334,6 +388,15 @@ def verify(stage, newsect):
     assert len(recs) == 31, 'chain has %d records' % len(recs)
     for i, want in EXPECT_CHAIN.items():
         assert recs[i] == want, 'chain record %d is %r, want %r (composite lost the font-text edits?)' % (i, recs[i], want)
+    rbase, _rs, rtags = stage_of(open(RETAIL, 'rb').read(), 'option')
+    roff = 2048
+    for kk in FILE:
+        if kk == CHAIN_TAG: break
+        roff += pad(rtags[kk][3])
+    rrecs, _ = chain_records(open(RETAIL, 'rb').read()[rbase+roff:rbase+roff+rtags[CHAIN_TAG][3]])
+    for i in range(31):
+        if i not in PORTED_RECORDS:
+            assert recs[i] == rrecs[i], 'chain record %d differs from retail: %r vs %r' % (i, recs[i], rrecs[i])
     print('verify: %d sectors, DAR walk consumed %d entries with remaining exactly 0,'
           ' sc_text at (%d,%d) clut (%d,%d), key_pad at (%d,%d), overlay matches, %d chain records English/blank as expected'
           % (sect, n, g[2], g[3], g[4], g[5], k[2], k[3], len(EXPECT_CHAIN)))
