@@ -39,6 +39,28 @@ So "pixel-identical to USA" for this project means: every glyph and every
 piece of chrome that positions text lands on the same pixels; brightness and
 art that Integral changed on its own are not chased.
 
+### Amendment, 2026-09-03: text may MOVE where Integral's art moved
+
+The rule above assumes the art is common ground and only the text differs. It
+is not always. The user's amendment, verbatim:
+
+> "Where Integral's art/gui/hud/etc. is intentionally different, consider moving
+> the English text to fix it, but ask me first."
+
+So when Integral's own art is what differs, the target is **USA's relationship
+between the text and that art**, not USA's absolute coordinates. Port the text,
+keep Integral's art, and move the text so the relationship holds. This is a
+deliberate deviation from USA's numbers, so it is **the user's call, case by
+case — ask before doing it.**
+
+| Deliberately NOT at USA's coordinates | Why, and who decided |
+|---|---|
+| `key_syukan` — KEY CONFIG's "first person view" (the △ button's label) — sits **+11 game px right** of USA's x | Integral's background art puts the connector curve coming off the △ button 11 px further right than USA's, because USA moved its curve left to clear the longer English label and Integral never had to. At USA's absolute x the label sat **on** Integral's curve. Measured on paired shots: the rule beneath the label starts at screen x 2343 in USA, 2442 here (99 px ÷ 8.92 px per game px = 11.1). After the shift the label is +18 screen px from its rule in **both** games — the gap is now identical, which is the point. **Asked and approved by the user, 2026-09-03**, and the case that produced the amendment above. Detail: "How the KEY CONFIG port was built". |
+
+The other three KEY CONFIG labels were checked the same way and need no shift:
+each already sits USA's distance from its own rule. Only the rules' far ends run
+longer in Integral, which is art, and stays.
+
 ### Audit against the rule (2026-09-02)
 
 Every deployed change was re-checked against the scope rule. Findings:
@@ -574,7 +596,10 @@ the label starts at screen x **2343** in USA and **2442** here (99 px, at 8.92
 px per game px). After the shift the label sits **+18 screen px** from its rule
 in both games - identical. This is the user's rule of 2026-09-03: where
 Integral's own art differs on purpose, move the English text to keep USA's
-relationship to that art, and **ask first**.
+relationship to that art, and **ask first** — asked and approved for this label
+on 2026-09-03. It is also listed in the Scope section's table of deliberate
+deviations from USA's coordinates, which is the place to look for "why does this
+not match USA?".
 
 The other three labels were checked the same way and need no shift: each one's
 distance to its own rule already matches USA. Only the rules' far ends differ,
