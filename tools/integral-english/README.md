@@ -365,12 +365,19 @@ the brightness paragraph is re-wrapped to 36.
 
 ## The KEY CONFIG screen (ported 2026-09-03)
 
-Was "not ported yet" until 2026-09-03. **The screen IS visible in the collection
-with its patch flags on** (verified with `DisableRAM`/`DisableCDROM` `true`):
-the collection substitutes its own button UI in its wrapper menus, but the
-game's own KEY CONFIG screen renders normally, so porting it was never invisible
+Was "not ported yet" until 2026-09-03. **The screen IS visible in the collection**, so porting it was never invisible
 after all — before this it was the one screen still fully Japanese in a build
-that is otherwise English. It also matters for a
+that is otherwise English.
+
+**Corrected 2026-09-03 (second time on this point):** it was first thought the
+collection intercepted this screen, then that `DisableRAM`/`DisableCDROM` `true`
+was what revealed it, and a CD-ROM patch named `test_keyconfig_disc1` was named
+as the mechanism. **All of that is wrong for Integral.** With both flags back to
+`false` - every collection patch active - Integral's KEY CONFIG still renders
+normally, and the patch listing shows why: `test_keyconfig_disc1.bin` lives under
+title **980**'s patch directory, and Integral (title **099**) has no keyconfig
+patch of any kind. Whatever the earlier "normally intercepted" impression was, it
+was not this patch and not Integral. Unverified for the other versions. It also matters for a
 future patch aimed at raw PSX disc images. Reference shots of both games,
 unintercepted, are in `reference/keyconfig_*.{usa,int}.jpg`, and every label's
 art from both discs is rendered side by side in `keyconfig-textures.png`.
@@ -881,7 +888,7 @@ replacement keeps the 232x70 canvas and centres four lines in it, which is why
 the block also sat 12 rows lower: 70 − 46 = 24, split evenly. The dropped
 sentence is "Press the ○ button to return to the option screen." — the ○ name is
 platform-specific, and the collection substitutes its own button UI everywhere
-else too (it intercepts KEY CONFIG and rewrites the button bits of
+else too (it rewrites the button bits of
 `GM_Configuration` every frame).
 
 **This corrected the port.** `SC_ROWS` is back to **70** and the quad back to
@@ -1868,7 +1875,8 @@ GM_Configuration word at 0xB4D9C about sixty times a second**, with values such
 as 0x100 (English, button type A) and 0x110 (the same plus the game's
 "options changed" bit 0x10 once the option screen has been visited). It is how
 the collection imposes its own button-type setting on the game — and the reason
-the KEY CONFIG screen is "intercepted" by the collection. It is a
+the KEY CONFIG screen was once thought to be "intercepted" by the collection -
+that attribution is withdrawn, see the KEY CONFIG section. It is a
 read-modify-write of the live word — confirmed by the read trace: the same
 function does `getRamValue(16, 0xB4D9C)` at line 837 and `setRamValue` at line
 844, every frame — so any game-side write to GM_Configuration
