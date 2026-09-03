@@ -14,6 +14,7 @@ counts and line breaks change.
 | `en_option` | `screen brightness setup`, `key configuration setup`, `use directional buttons to test` |
 | `en_preope` | Previous Operations: Metal Gear (12 pages), Metal Gear 2 (19 pages) |
 | `en_brf` | briefing menu labels (20 PCX textures, quads, USA's row arithmetic and `above`) |
+| `en_savemsg` | memory-card messages (`datasave.c` save/load caption tables in the executable) |
 
 `en_menu3` is disabled — it crashes with `GCL:WRONG CODE` walking a RAM buffer,
 cause never found.
@@ -357,6 +358,55 @@ colours do not).
 
 Note `key_normal` and `key_reverse` are already Latin in Integral, but in a
 bolder all-caps face; porting them changes the style to USA's lowercase.
+
+## Memory-card messages (`en_savemsg`)
+
+`menu/datasave.c` in the executable keeps two 12-entry caption tables,
+`saveCaptions_8009EB4C` and `loadCaptions_8009EB7C`, indexed by the low byte of
+the save/load request code (`captions[(unsigned char)dword_800ABB58]`, codes
+like `0x45000003`). The request codes are identical in both games — checked by
+enumerating every `lui/ori` pair in both executables — so an index means the
+same state in both, and the port is index for index. USA's tables live at
+`0x800A12A4` / `0x800A12D4` (found from the strings they must contain, then
+confirmed against the code that indexes them at `8004EBF0` / `8004EC2C`; a
+first dump that guessed the table start was off by one and made the tables look
+shifted).
+
+| idx | Integral | USA | shipped |
+|---|---|---|---|
+| 1 | セーブが完了しました。 / ロードが完了しました。 | "" | Integral's (USA shows nothing here) |
+| 2 | セーブできませんでした。 | Save failed. / Load failed. | USA |
+| 3 | エラーが発生しました。 | Error occured while saving. / … loading. | USA |
+| 4 | 空きブロックがたりません。 / セーブファイルがありません。 | No empty block. / No save file. | USA |
+| 5 | メモリーカードが初期化されていません。 | Memory Card is not formated. | USA |
+| 6 | セーブしました。 / ロードしました。 | Data saved. / Data loaded. | USA |
+| 7 | フォーマットに失敗しました。 | Formating failed. | USA |
+| 8 | メモリーカードがさされていません。 | Memory Card undetected. | USA |
+| 9 | セーブ中です。 / ロード中です。 | "" | Integral's |
+| 10 | メモリーカードをチェックしています。 | Now checking Memory Card. | USA |
+| 11 | フォーマットしています。 | Now formating Memory Card. | USA |
+
+USA's spelling ("formated", "occured") is kept verbatim. Everything else in the
+module is already English in Integral (SAVING..., LOAD DATA, LOADING..., NO
+FILE, NO SPACE, COMPLETE, YES/NO, OVERWRITE OK?, FORMAT OK?, EZ/NM/HD/EX,
+MEMORY CARD 1/2) or is Integral-only Japanese drawn alongside the English (the
+上書きしますか？ / フォーマットしますか？ prompts) and stays.
+
+Mechanism: the same as the item descriptions. The 17 Japanese strings are one
+contiguous pool at `0x80011F18..0x800120CB` (435 bytes); the 13 English strings
+plus the 4 kept Japanese ones (338 bytes) are repacked into it and both pointer
+tables rewritten — nothing outside the pool and the tables changes, and the
+tool asserts that. `savemsg.py` emits a PPF per disc addressed at the
+executable's sectors (Ketchup mirrors executable writes into RAM, since the
+Master Collection never re-reads the executable). Both discs' executables are
+identical here. The caption is drawn into the codec message-board KCB
+(`radio.c`, `font_set_kcb(kcb, -1, -1, 0, 6, 2, 0)`, 252 px buffer), the same
+code in both games, so placement follows.
+
+Not yet built into a save title: Integral composes the save-slot name in
+full-width Shift-JIS (`ＭＧＳ．［ＮＭ］ time area`, `datasave.c` ~2261) where USA
+uses ASCII; the Master Collection's own storage UI shows those names, so this
+is a separate question.
 
 ## Not ported at all: the VR disc (SLPM-86249)
 
