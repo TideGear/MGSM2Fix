@@ -492,6 +492,51 @@ BE32 length). Then there is no padding and no early NUL, so nothing resumes
 inside the text, and the centring is correct because the string really is
 shorter. Not attempted yet.
 
+## The collection shows only four of USA's six brightness lines (found 2026-09-03)
+
+Comparing the collection against SwanStation (a much more accurate emulator)
+running the same discs:
+
+| | brightness paragraph |
+|---|---|
+| SwanStation, USA disc | **six** lines, ending "Press the ○ button to return to the option screen." |
+| the collection, USA | **four** lines, ending "game." |
+| SwanStation, Integral disc | four Japanese lines, a blank line, then the ○ line |
+
+USA's `sc_text` texture is 232x70 and **contains all six lines** (decoded with
+`pcx4.py`; the whole 70 rows are inked). The collection is therefore dropping
+two lines of USA's own help text.
+
+It is not a data or revision difference: the USA `option` stage extracted from
+the collection's `alldata.bin` (base `0xF12F8000`, STAGE.DIR lba 132344, sector
+27023, 81 sectors) is **byte-identical** to the same span of the real USA disc's
+STAGE.DIR — all 165,888 bytes.
+
+It is not caused by disabling achievements: the collection's USA shot showing
+four lines is from 2026-08-31, and that session's log records
+`bPatchesDisableRAM: false` and `bPatchesDisableCDROM: false`, i.e. every
+collection patch active.
+
+Position, measured with the text's own line pitch as the ruler so aspect ratio
+and the collection's border art cancel out (anchor: the green line):
+
+    SwanStation USA   first line 1.88 line-heights below the green line
+    collection USA    first line 2.88 line-heights below the green line
+
+So the collection draws the block **exactly one line lower** and 24 rows
+shorter. That is the same +12-row offset already met when placing the ported
+quad (`y0 = 2` in USA's code renders where `y0 = 14` puts it), and a symmetric
+12-row inset top and bottom accounts for both numbers. What inside the
+collection's renderer does it is not identified.
+
+**Consequence for this port.** `optsctext.py` crops the texture to rows 0..45
+(four lines) because that is what the collection's USA shows. If the four-line
+display is a collection artefact, the port faithfully reproduces the artefact
+rather than USA. The test that settles it: view **MGS1 USA's** brightness screen
+with `DisableRAM`/`DisableCDROM` **true** (as now). Six lines would mean a
+collection CD-ROM patch was truncating it and the crop should be reverted to the
+full 70 rows; four lines would confirm the renderer and the crop stays.
+
 ## Also not matched: the brightness grey ramp
 
 `sc_back_r`'s greys are uniformly **7 levels darker** than USA's
@@ -1497,6 +1542,45 @@ update, since a change to that hook would silently drop every PPF.
 cosmetic RAM patches — the memory-card screens revert from STORAGE 1 / 2 to
 MEMORY CARD 1 / 2 — so a shot taken with the flags on differs from one taken
 before in those strings. Not a port difference.
+
+### The collection's RAM patches collide with `en_savemsg` (found 2026-09-03)
+
+Read the filtered list out of the log
+(`filtering RAM patch offset 0x… with size 0x…`) and six of the collection's
+patches land **inside the caption pool `en_savemsg` repacks**
+(`0x80011F18..0x800120CB`):
+
+| patch address | size | retail string there | caption slots |
+|---|---|---|---|
+| `0x80011F34` | 14 | メモリーカードにエラー… | save 10, load 10 |
+| `0x80011F6C` | 14 | メモリーカードが初期化… | save 8, load 8 |
+| `0x80011F90` | 14 | フォーマットに失敗… | save 7, load 7 |
+| `0x80011FC4` | 14 | メモリーカードをチェック… | save 5, load 5 |
+| `0x80011FC8` | 14 | (into the same string) | — |
+| `0x80012020` | 14 | セーブしました。 | save 2 |
+
+Those are fixed addresses. `en_savemsg` **repacks** the pool, so after the port
+those addresses sit in the middle of different strings — `0x80011F34` now holds
+`failed.\0Error `, `0x80011FC4` holds `…\0Now chec`. With achievements enabled
+(`DisableRAM = false`, the collection's default) the collection would write its
+own 14 bytes over those offsets and corrupt the ported English mid-string. The
+port has only ever been tested with `DisableRAM = true`, which is why this has
+not been seen.
+
+Fix when it matters: make `savemsg.py` **pin** those six strings at their retail
+addresses (place them first, at the same offsets) so the collection's writes
+land on the strings they were written for, or accept that `en_savemsg` requires
+`DisableRAM = true`. Note the collection's replacements are its own wording
+(the STORAGE rename family), not USA's, so pinning means the ported English is
+overwritten by the collection's text on those six slots — the honest options are
+pin-and-lose-six or require the flag. Not yet decided.
+
+The collection also patches, outside the pool: the memory-card UI strings
+(`MEMORY CARD 1/2`, `SELECT MEMORY CARD`, `PRESS * TO SELECT MEMORY CARD`,
+`PRESS SELECT TO EXIT`) and two overlapping ~2.8 KB blocks of game-encoded text
+at `0x8001101C` (+2895) and `0x8001108C` (+2838) covering the same region —
+almost certainly one per language. All of that is the memory-card module's
+`.rodata`; none of it is the brightness screen.
 
 The deployed ini is a symlink into Vortex's mod folder
 (`%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-*\MGSM2Fix.ini`); edit the
