@@ -1414,9 +1414,21 @@ collection's writes to the word (all of them at first, then only the ones that
 change it) and its first reads, each with the Squirrel call stack; and
 **restores English whenever the bit is cleared in any scene but `option`** —
 the option screen being the only place the player can change it, a change seen
-there is followed instead. Whatever the collection's rewrite does to the bit,
-the guard puts it back on the next frame, so this is the fix; the intro pages
-are untouched by it.
+there is followed instead. The intro pages are untouched by any of it.
+
+The general fix is **`[Patches] PreserveConfiguration`** (default on, every MGS1
+version): at the collection's `getRamValue` of the word MGSM2Fix notes what it
+is about to read; at its `setRamValue` it re-reads the word as the game has it
+by then and rewrites the collection's argument in place to carry only the bits
+the collection actually changed (`(now & ~changed) | (value & changed)`), so
+the button-type enforcement survives and every other setting the game wrote in
+between survives too. It logs `Preserved GM_Configuration` when it had to
+intervene. The word's address is `scene_name + 0x14` (linkvarbuf is 0x10 above
+variable.c's `stage_name`, GM_Configuration is linkvarbuf[2]); a version where
+that did not hold would never see a collection write at that address and would
+be left alone. The EnglishText guard stays as a second layer for the language
+bit. This fix is not Integral-specific and is tracked for a separate upstream
+pull request in `UPSTREAM.md`.
 
 Also visible in that log: `Set the sixteen briefing flags (… write 3, scene
 "title")` immediately after the 1P `start -v`. UnlockBriefing re-sets the flags
