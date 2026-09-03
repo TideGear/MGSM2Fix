@@ -58,12 +58,12 @@ WHAT THIS TOUCHES
    all 17 of f2B0C[0..16] before the screen draws. Six now-dead
    option_800C3B3C calls in case 7 pay for the addition.
 
-6. The chain is left EXACTLY as it ships. Records 13-16/24/27 keep their English
-   text; nothing draws them any more. Blanking them would be extra risk for no
-   gain, and leaving them means menu.ppf's and option.ppf's existing records 4/5
-   and 12/26 survive untouched - which matters, because after relocation those
-   PPFs write to a stage the game no longer reads, so anything they contributed
-   has to already be in the image this script builds.
+6. The chain is left EXACTLY as the font-text build shipped it, taken from
+   CHAIN_PPF (not from whatever option PPF is deployed - see the note at the
+   constant). Records 13-16/24/27 keep their English text; nothing draws them
+   any more. verify() asserts the records it depends on, because after
+   relocation the old PPFs write to a stage the game no longer reads, so
+   anything they contributed has to already be in the image this script builds.
 
 usage: optsctext.py [--deploy]      (writes work/ always; PPFs only with --deploy)
 """
@@ -87,6 +87,19 @@ DISCS = [dict(disc=0, sd=136654, du=292330, ppf='INTEGRAL_disc1_en_option.ppf'),
 IMG   = {0: 0x0, 1: 0x2AE54800}
 DU_SECTORS = 13500
 OPTION_ENTRY_FO = 744    # STAGE.DIR file offset of the `option` entry's u32 sector
+
+# The chain edits (records 3/7 blanked, 4/5/12/26/13-16/24 English) come from the
+# last FONT-TEXT option build, optbright.py's output, kept here as a fixed input.
+# They are NOT taken from the deployed option PPF: once this script has shipped,
+# the deployed option PPF is our own output, whose entry repoint would send
+# composite() following the relocated pointer out of the file - and skipping it
+# silently reverts every one of those records to retail Japanese (shipped once,
+# 2026-09-02: 'use directional buttons to test' came back as Japanese).
+CHAIN_PPF = 'work/fonttext_disc%d_option.ppf'
+EXPECT_CHAIN = {3: b' \x00', 7: b' \x00',
+                4: b'screen brightness setup\x00', 5: b'key configuration setup\x00',
+                12: b'use directional buttons to test\x00', 26: b'use directional buttons to test\x00',
+                13: b'Adjust the monitor brightness so the\x00', 24: b'Press the \x90\x1b button to return to the\x00'}
 
 # where the two textures go
 SCT_VRAM, SCT_CLUT = (512, 256), (1008, 237)
@@ -121,29 +134,36 @@ def img_off(lba, within): return (lba + within // 2048) * 2352 + HDR + within % 
 
 
 def composite(disc):
-    """Retail STAGE.DIR with every deployed PPF's STAGE.DIR writes applied.
+    """Retail STAGE.DIR with every PPF's STAGE.DIR writes applied, from a FIXED
+    list of sources: the deployed PPFs other than the option one, plus CHAIN_PPF.
 
     After relocation the old option/menu PPF writes land on a stage the game no
     longer reads, so whatever they contributed must already be in the image we
     park in DUMMY3M.  Building from the composite is what carries records 4/5
     ('screen brightness setup', 'key configuration setup', which come from
-    menu.ppf, not from our option builder) and 12/26 forward.
+    menu.ppf, not from our option builder) and 3/7/12/13-16/24/26 (CHAIN_PPF)
+    forward.  Any write to the option entry's sector pointer is a hard error:
+    that would be this script's own output being fed back in.
     """
     base = bytearray(open(RETAIL, 'rb').read())
     sd = DISCS[disc]['sd']
     lo = img_off(sd, 0); hi = img_off(sd + len(base) // 2048, 0)
-    applied = {}
     d = os.path.join(MODS, str(disc))
-    for name in sorted(os.listdir(d)):
-        if not name.endswith('.ppf'): continue
+    sources = [os.path.join(d, name) for name in sorted(os.listdir(d))
+               if name.endswith('.ppf') and name != DISCS[disc]['ppf']]
+    sources.append(CHAIN_PPF % (disc + 1))
+    applied = {}
+    for path in sources:
         n = 0
-        for off, data in read_ppf(os.path.join(d, name)):
+        for off, data in read_ppf(path):
             if not (lo <= off < hi): continue
             sec, within = divmod(off - HDR, 2352)
             fo = (sec - sd) * 2048 + within
             if fo < 0 or fo + len(data) > len(base): continue
+            assert not (fo <= OPTION_ENTRY_FO < fo + len(data)),                 '%s repoints the option entry - it is a relocated build, not a source' % path
             base[fo:fo+len(data)] = data; n += len(data)
-        if n: applied[name] = n
+        assert n or not path.endswith('_option.ppf'), '%s contributed nothing' % path
+        if n: applied[os.path.basename(path)] = n
     return bytes(base), applied
 
 
@@ -307,9 +327,16 @@ def verify(stage, newsect):
     k = struct.unpack_from('<7H', got[KEY_PAD][1], 74)
     assert (k[2], k[3]) == PAD_VRAM, k
     assert pay[0] == open(OVL, 'rb').read(), 'overlay payload mismatch'
+    # the text records the KCB entries draw: 07 <len> <payload> 00 at 0x1B8 in tag 6
+    scr, q, recs = pay[6], 0x1B8, []
+    while q < len(scr) and scr[q] == 7:
+        n = scr[q+1]; recs.append(scr[q+2:q+2+n]); q += 2 + n
+    assert len(recs) == 31, 'chain has %d records' % len(recs)
+    for i, want in EXPECT_CHAIN.items():
+        assert recs[i] == want, 'chain record %d is %r, want %r (composite lost the font-text edits?)' % (i, recs[i], want)
     print('verify: %d sectors, DAR walk consumed %d entries with remaining exactly 0,'
-          ' sc_text at (%d,%d) clut (%d,%d), key_pad at (%d,%d), overlay matches'
-          % (sect, n, g[2], g[3], g[4], g[5], k[2], k[3]))
+          ' sc_text at (%d,%d) clut (%d,%d), key_pad at (%d,%d), overlay matches, %d chain records English/blank as expected'
+          % (sect, n, g[2], g[3], g[4], g[5], k[2], k[3], len(EXPECT_CHAIN)))
     return True
 
 
@@ -322,6 +349,7 @@ def emit(stage, deploy):
         used = occupancy(disc)
         clash = []
         for name, (a, b, cnt) in used.items():
+            if name == D['ppf']: continue          # our own previous build: this replaces it
             if not (b < SLOT or a >= SLOT + need): clash.append('%s uses %d..%d' % (name, a, b))
         print('disc %d DUMMY3M occupancy: %s' % (disc + 1,
               '; '.join('%s %d..%d (%d)' % (n, a, b, c) for n, (a, b, c) in used.items())))
