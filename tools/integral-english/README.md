@@ -16,8 +16,8 @@ counts and line breaks change.
 | `en_brf` | briefing menu labels (20 PCX textures, quads, USA's row arithmetic and `above`) |
 | `en_savemsg` | memory-card messages (`datasave.c` save/load caption tables in the executable) |
 
-`en_menu3` is disabled — it crashes with `GCL:WRONG CODE` walking a RAM buffer,
-cause never found.
+`en_menu3` is disabled — it crashes the title stage with `GCL:WRONG CODE`. See
+"Why `en_menu3` crashes" below; diagnosed 2026-09-03, not yet rebuilt.
 
 ## Scope: what this port changes, and what it deliberately keeps
 
@@ -456,6 +456,41 @@ known so far, for whoever starts it:
   version (no option language toggle to hold; no briefing menu).
 - The VR disc has its own overlays and executable, so nothing from the main-game
   port (overlay patches, stage relocations, chain edits) carries over.
+
+## Why `en_menu3` crashes (diagnosed 2026-09-03)
+
+`menu2.py` ports the same five disc-swap messages ("Insert DISC 1.", "Press the
+Start Button", "after inserting DISC 1.", "Now Checking...", "The correct DISC
+was not inserted.") into three places. Two of them — the `demosel` and `change`
+stages — shipped as `en_menu2` and work. The third, the `title` stage
+(`menu2.py menu3`), crashes on entry with a run of `GCL:WRONG CODE <byte>` and
+those bytes are **the English letters themselves** (`73 68 65 74 61 72 74` =
+`s h e t a r t`, every second byte of "Press the Start Button"), i.e. the
+interpreter is executing the replacement text as bytecode. It always follows
+`> set map 32249` (0x7DF9, the `-m` string every stage-load carries).
+
+The cause is *where* the title's copies live. In `demosel` and `change` the
+strings are a standalone data chain that `GCL_GetString` reads. In `title` they
+are **inline arguments inside the executable script body**: chunk offset 0x11B5
+sits within the script body (0x10DE, length 850, ends 0x1430), in the `-v`
+option of the title actor's `CMD 9906` at 0x1138. The interpreter walks that
+region as a value list.
+
+The conflict is the terminator. The renderer centres these strings, so trailing
+spaces before the NUL shift the visible text left; `menu2.py` therefore writes
+`English + NUL + spaces`, keeping the length byte untouched. In a data chain
+that is harmless. Inside the script body, something resumes parsing at the
+early NUL and lands mid-payload, where ASCII bytes are opcodes that each eat an
+operand — the double-NUL trick fixes the odd/even case but not the fact that
+execution resumes inside the text at all.
+
+The fix is the method already proven on `preope`: instead of padding, shorten
+the STRING value's length byte and shrink every enclosing container
+(`gclparse.py`'s `containers_over` returns exactly the sized nodes — the
+OPTION's `len`, the COMMAND's BE16 size, each enclosing ARG, and the script's
+BE32 length). Then there is no padding and no early NUL, so nothing resumes
+inside the text, and the centring is correct because the string really is
+shorter. Not attempted yet.
 
 ## Also not matched: the brightness grey ramp
 
