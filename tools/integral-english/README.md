@@ -573,9 +573,24 @@ would have rewritten three function pointers. Every real string in these
 overlays sits past 0x0C000, well clear of the code, so `read_table` requires
 that. Verified afterwards that all three still hold their original values.
 
-Checks before deploying: overlay size unchanged, every changed byte inside the
-pool or the table, every rewritten pointer resolving to a NUL-terminated string
-inside the pool, and the three function pointers untouched.
+**Second trap: `stage()` returns the stage's sector COUNT, not its position.**
+The first deployed build changed nothing on screen even though Ketchup logged
+the PPF as loaded, because `overlay()` took that count (38) for the position
+(27,211) and every record addressed a point ~27,000 sectors early. The position
+comes from the entry table, via `ents()`. Nothing warned: the PPF was
+well-formed, loaded fine, and wrote 528 bytes of correct data to the wrong
+place.
+
+**So the check that catches this class of bug is to read the DISC IMAGE back.**
+For every record, seek to its offset in `discs/int1.bin` and assert the bytes
+there equal retail's overlay bytes at the corresponding overlay offset. Both
+discs: 44 of 44 records matched before deploying. Every future stage patch
+should do this - the earlier builds' static checks all passed on a patch that
+pointed nowhere.
+
+Other checks before deploying: overlay size unchanged, every changed byte inside
+the pool or the table, every rewritten pointer resolving to a NUL-terminated
+string inside the pool, and the three function pointers untouched.
 
 **Deployed 2026-09-03. Not yet seen in game** - the photo album needs a shot of
 PHOTO ALBUM → SELECT MEMORY CARD, which should now read `No save file.`
