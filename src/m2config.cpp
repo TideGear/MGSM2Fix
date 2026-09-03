@@ -108,6 +108,7 @@ void M2Config::Load()
     inipp::get_value(ini.sections["Patches"], "EnableMosaic", bPatchesEnableMosaic);
     inipp::get_value(ini.sections["Patches"], "RestoreGhosts", bPatchesRestoreGhosts);
     inipp::get_value(ini.sections["Patches"], "RestoreMedicine", bPatchesRestoreMedicine);
+    inipp::get_value(ini.sections["Patches"], "PreserveConfiguration", bPatchesPreserveConfiguration);
 
     inipp::get_value(ini.sections["Game"], "StageSelect", bGameStageSelect);
     inipp::get_value(ini.sections["Game"], "EnglishText", bGameEnglishText);
@@ -175,6 +176,7 @@ void M2Config::Load()
     spdlog::info("[Config] bPatchesEnableMosaic: {}", bPatchesEnableMosaic);
     spdlog::info("[Config] bPatchesRestoreGhosts: {}", bPatchesRestoreGhosts);
     spdlog::info("[Config] bPatchesRestoreMedicine: {}", bPatchesRestoreMedicine);
+    spdlog::info("[Config] bPatchesPreserveConfiguration: {}", bPatchesPreserveConfiguration);
     spdlog::info("[Config] bGameStageSelect: {}", bGameStageSelect);
     spdlog::info("[Config] bGameEnglishText: {}", bGameEnglishText);
     spdlog::info("[Config] bGameUnlockBriefing: {}", bGameUnlockBriefing);

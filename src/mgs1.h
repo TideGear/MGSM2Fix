@@ -139,7 +139,7 @@ public:
 
     virtual void SQOnMemoryDefine() override;
     virtual void SQOnUpdateGadgets() override;
-    virtual bool SQOnRamWrite(unsigned width, unsigned offset, unsigned value) override;
+    virtual bool SQOnRamWrite(unsigned width, unsigned offset, unsigned &value) override;
     virtual bool SQOnRamRead(unsigned width, unsigned offset) override;
     virtual void EPIOnLoadImage(void *image, unsigned int size) override;
     virtual bool EPIOnMachineCommand(std::any machine, int cmd, unsigned int **args) override;
@@ -172,6 +172,17 @@ private:
     // writes and reads, and every write that actually changes the word.
     unsigned MGS1_LanguageWriteLogs = 0;
     unsigned MGS1_LanguageReadLogs = 0;
+    // GM_Configuration (libgcl's linkvarbuf[2]): linkvarbuf sits 0x10 above the
+    // "scene_name" define (variable.c's stage_name[16]), so the word is at
+    // scene_name + 0x14 in every MGS1 executable. The collection's
+    // _update_option_button_setting reads it (getRamValue) and writes the whole
+    // word back (setRamValue) once per frame; [Patches] PreserveConfiguration
+    // remembers what it read and, at the write, re-applies only the bits it
+    // changed on top of the word as the game has it by then.
+    uintptr_t MGS1_ConfigPTR = 0;
+    unsigned MGS1_ConfigSeen = 0;
+    bool MGS1_ConfigSeenValid = false;
+    unsigned MGS1_ConfigPreserved = 0;
     // libgcl's var_buf (variable.c) - the GCL `$f:`/`$w:` variable memory. Not a
     // memory define; a static whose address is read off GCL_GetVar's constants
     // in each executable. The briefing menu's sixteen items are gated by the

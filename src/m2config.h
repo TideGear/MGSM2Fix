@@ -13,6 +13,7 @@ public:
         bPatchesEnableMosaic = true;
         bPatchesRestoreGhosts = true;
         bPatchesRestoreMedicine = true;
+        bPatchesPreserveConfiguration = true;
     }
 
     static auto & GetInstance()
@@ -67,6 +68,7 @@ public:
     static inline bool bPatchesEnableMosaic;
     static inline bool bPatchesRestoreGhosts;
     static inline bool bPatchesRestoreMedicine;
+    static inline bool bPatchesPreserveConfiguration;
     static inline bool bShouldCheckForUpdates;
     static inline bool bConsoleUpdateNotifications;
     static inline bool bDisableWindowsFullscreenOptimization;

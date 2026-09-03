@@ -80,6 +80,19 @@ void MGS1::SQOnMemoryDefine()
     MGS1_LanguageLogs = 0;
     MGS1_LanguageWriteLogs = 0;
     MGS1_LanguageReadLogs = 0;
+
+    // GM_Configuration, for [Patches] PreserveConfiguration (see mgs1.h). Only a
+    // collection write to exactly this address is ever touched, so a version
+    // where the relation did not hold would simply be left alone.
+    MGS1_ConfigPTR = MGS1_GlobalsPTR != 0 ? MGS1_GlobalsPTR + 0x14 : 0;
+    MGS1_ConfigSeenValid = false;
+    MGS1_ConfigPreserved = 0;
+    if (MGS1_ConfigPTR != 0) {
+        spdlog::info("[MGS 1] GM_Configuration is 0x{:x}.", MGS1_ConfigPTR);
+        if (MGS1_LanguagePTR != 0 && MGS1_LanguagePTR != MGS1_ConfigPTR + 1) {
+            spdlog::warn("[MGS 1] language_setting (0x{:x}) is not GM_Configuration's high byte; check the layout.", MGS1_LanguagePTR);
+        }
+    }
     if (MGS1_LanguagePTR != 0) {
         spdlog::info("[MGS 1] language_setting is 0x{:x}, mask is 0x{:x}.",
             MGS1_LanguagePTR, MGS1_LanguageMask);
@@ -229,8 +242,27 @@ void MGS1::SQOnUpdateGadgets()
     }
 }
 
-bool MGS1::SQOnRamWrite(unsigned width, unsigned offset, unsigned value)
+bool MGS1::SQOnRamWrite(unsigned width, unsigned offset, unsigned &value)
 {
+    // The collection's per-frame rewrite of GM_Configuration: it read the word
+    // a moment ago (SQOnRamRead) and is writing its edited copy back. Anything
+    // the game stored in between would be lost, so re-read the word and carry
+    // over only the bits the collection changed.
+    if (M2Config::bPatchesPreserveConfiguration && MGS1_ConfigPTR != 0
+        && width == 16 && offset == MGS1_ConfigPTR && MGS1_ConfigSeenValid) {
+        MGS1_ConfigSeenValid = false;
+        unsigned now = SQEmuTask<Squirk::Standard>::GetRamValue(16, MGS1_ConfigPTR) & 0xFFFF;
+        unsigned changed = (MGS1_ConfigSeen ^ value) & 0xFFFF;
+        unsigned merged = (now & ~changed) | (value & changed);
+        if (merged != (value & 0xFFFF)) {
+            if (++MGS1_ConfigPreserved <= 32) {
+                spdlog::info("[MGS 1] Preserved GM_Configuration: the collection read 0x{:04x}, would write 0x{:04x}, the game has 0x{:04x} now; writing 0x{:04x} (scene \"{}\").",
+                    MGS1_ConfigSeen, value & 0xFFFF, now, merged, MGS1_LastStageName);
+            }
+            value = merged;
+        }
+    }
+
     // GM_Configuration is the 16-bit word ending at the language_setting byte
     // (the English bit is bit 8, so the define points at its high byte). Report
     // any write, of any width, that overlaps that word.
@@ -252,6 +284,14 @@ bool MGS1::SQOnRamWrite(unsigned width, unsigned offset, unsigned value)
 
 bool MGS1::SQOnRamRead(unsigned width, unsigned offset)
 {
+    // Remember what the collection is about to read from GM_Configuration; the
+    // read itself follows this hook on the same thread, so the two agree.
+    if (M2Config::bPatchesPreserveConfiguration && MGS1_ConfigPTR != 0
+        && width == 16 && offset == MGS1_ConfigPTR) {
+        MGS1_ConfigSeen = SQEmuTask<Squirk::Standard>::GetRamValue(16, MGS1_ConfigPTR) & 0xFFFF;
+        MGS1_ConfigSeenValid = true;
+    }
+
     if (MGS1_LanguagePTR == 0) return false;
     unsigned bytes = width / CHAR_BIT;
     if (bytes == 0) bytes = 1;

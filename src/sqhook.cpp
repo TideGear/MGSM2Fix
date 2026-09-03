@@ -501,9 +501,21 @@ SQInteger SQHook<Q>::SQNative_setRamValue(HSQUIRRELVM<Q> v)
     unsigned value = SQHelper<Q>::GetObject(4).Cast<unsigned>();
 
     // Let the game single out writes it cares about, and name the Squirrel
-    // code that made them: function, source and line for every frame.
+    // code that made them: function, source and line for every frame. The game
+    // may also rewrite the value; it is put back into the argument slot (this,
+    // width, offset, value sit at stackbase + 0..3) so the native writes it.
+    unsigned original = value;
     if (M2Fix::GameInstance().SQOnRamWrite(width, offset, value)) {
-        spdlog::info("[SQ] setRamValue({}, 0x{:x}, 0x{:x}) called from {}", width, offset, value, CallStack(v));
+        spdlog::info("[SQ] setRamValue({}, 0x{:x}, 0x{:x}) called from {}", width, offset, original, CallStack(v));
+    }
+    if (value != original) {
+        SQObjectPtr<Q> *obj = &v->_stack._vals[v->_stackbase + 3];
+        if (sq_type(*obj) == OT_INTEGER) {
+            _integer(*obj) = value;
+        }
+        else {
+            spdlog::warn("[SQ] setRamValue's value argument is not an integer; left as 0x{:x}.", original);
+        }
     }
 
     Sqrat::RootTable root = Sqrat::RootTable<Q>();
