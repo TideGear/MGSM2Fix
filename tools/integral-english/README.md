@@ -33,6 +33,7 @@ briefing comparison surfaced differences that are real but not text:
 | "watched" dimming colour RGB (70, 80, 75) | USA dims flagged items, connectors and FILE boxes to (90, 105, 95); Integral's `brf_800C6634` uses (70, 80, 75), 30 immediates 1:1. Only visible once items are flagged. |
 | `br_back_l` right-edge seam | 154 stencil-mask bits differ along texture x 155–159; every other briefing texture is pixel-identical (palettes differ only in unused entries). |
 | vertical rule brightness, FILE-box interiors, a few collage rows | Integral's rule renders ~201 grey against USA's 166, box interiors 24–32 against 0. Not attributed; the background fade (`(frame-28)*8`, identical in both) is not the cause. Nothing the port touched. |
+| 1P MODE's twenty-one explanation pages (Japanese) | An Integral-only mode: USA has no 1P MODE, and Integral ships no English for the pages, so there is nothing to port and no translation is made. See "1P MODE" under Unlocks. |
 
 So "pixel-identical to USA" for this project means: every glyph and every
 piece of chrome that positions text lands on the same pixels; brightness and
@@ -1343,6 +1344,71 @@ File offsets are label-based, so patches land; encoded jump targets must use
 the true (label −8) address. This is also why the USA release build's
 `demo_rank` chain read as nonsense on first sight ("default 4"): the labels
 were off, not the code.
+
+### 1P MODE (Integral only): its Japanese pages, and the language it starts in
+
+Selecting 1P MODE on the SPECIAL page runs the title script's `-s` proc
+(0x1137). That proc does not start the game: it opens Integral's VR-style text
+window (`koba/vr/vrwindow.c`; actor 0xD44E with `-w 32 53 256 118`,
+`-m 16 17 240 101`) on **twenty-one pages of Japanese**, five procs each
+chaining to the next through the window's `-p` option — 0x28CC (3 pages),
+0x19B7 (5), 0x19B8 (5), 0x19B9 (3), 0x19BA (5) — and the last one ends on proc
+0x963D. The pages exist only as the Japanese `-b` strings: USA has no 1P MODE
+and Integral has no English for them, so under the no-translation rule they stay
+exactly as shipped. They are a kept Integral difference, not an unported one.
+(`gclprocs.py` / `gcldump.py` in the scratchpad decode a stage script's procs;
+the title's proc table sits at chunk offset 0xEC: BE32 length, then
+`id:BE16 offset:BE16` entries ending in a zero word, bodies after it, script
+body at 0x10DE.)
+
+Proc 0x963D is the 1P game start and mirrors NEW GAME's proc 0x13EF: `start -v`
+(GCL_InitVar: zeroes var_buf and linkvarbuf but restores GM_GameLevel and
+GM_Configuration), then `$w:118000be` = GM_FirstPerson = 1, GM_GameLevel = 1
+(NORMAL — the last page says so), GM_Disk = 1, the shared item/weapon init proc
+0xC8CF, and after 24 frames proc 0xB7ED: `load d00a -m … -s 1`, the same stage
+NEW GAME loads. The log agrees: `scene_name "title" -> "d00a"`.
+
+**Language.** The 1P game ran in Japanese although English was selected. The
+language is GM_CONFIG_ENGLISH (0x0100) in GM_Configuration (linkvarbuf[2],
+0x800B4D9C; MGSM2Fix's `language_setting` define is that word's high byte,
+0xB4D9D, mask 1; `radio.c`, `radiomes.c`, `jimctrl.c`, `movie.c`,
+`font_draw_string` all test the bit at draw time). Everything that could clear
+the bit was checked against the decomp and the binaries, and nothing on this
+path does:
+
+- the 1P procs never reference `$w:11800004`. Across every stage script on both
+  discs (exact GCL encoding: type nibble via `(v<<1)>>25`, link flag
+  `v & 0xF00000 == 0x800000`, offset `v & 0xFFFF`) the only writes to it are
+  `abst`/`rank` toggling the tuxedo bit 0x20; `roll`, `s10a`, `s18a` only read
+  it (English credits and text branches).
+- the executable has no direct store to 0x800B4D9C. Stores through the
+  `linkvarbuf` base are GCL_InitVar (restores it), GCL_SetVar (scripts, above),
+  DrawReadError (VIBRATION_OFF) and five `title` sites — all `andi 0xF7FF`,
+  the RADAR_OFF clears on the DEMO THEATER items.
+- `datasave.c` rewrites the 0xE100 option bits only while loading a save; no
+  save is loaded. GCL_RestoreVar (continue) and `load -r 0` hard restarts are
+  not on the path either.
+
+So the writer is outside the game: the Master Collection's own layer. The one
+thing in the run's log that happens on this path and on no other is the
+collection's access hook on GCL_SetVar (`ACC HOOK: L80021778 R5=100`, fired by
+proc 0xC8CF's life-init `set` of 0x100) followed by `### MEDAL_MISSION_START
+unlocked` — with achievements disabled (`DisableRAM`) the medal logic still
+runs, and it never fired on the earlier title loads that hit the same hook.
+MGSM2Fix (2026-09-03) now logs every change of the language byte with its scene,
+traces any Squirrel `setRamValue` that overlaps the word with the caller's
+function, source and line (`SQOnRamWrite`), and **restores English whenever the
+bit is cleared in any scene but `option`** — the option screen being the only
+place the player can change it, a change seen there is followed instead. The
+next 1P MODE start will name the writer in `MGSM2Fix.log`; until then the
+restore is the fix, and the intro pages are untouched by it.
+
+Also visible in that log: `Set the sixteen briefing flags (… write 3, scene
+"title")` immediately after the 1P `start -v`. UnlockBriefing re-sets the flags
+GCL_InitVar has just zeroed while the scene is still `title`, so a game started
+from the title (NEW GAME or 1P MODE) begins with all sixteen briefing flags set
+in its var_buf. That is the option doing its job, but it is state a stock game
+would not carry into a new save; keep UnlockBriefing off when saves matter.
 
 ## Achievements
 
