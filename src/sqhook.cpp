@@ -474,6 +474,19 @@ SQInteger SQHook<Q>::SQNative_setRamValue(HSQUIRRELVM<Q> v)
     unsigned offset = SQHelper<Q>::GetObject(3).Cast<unsigned>();
     unsigned value = SQHelper<Q>::GetObject(4).Cast<unsigned>();
 
+    // Let the game single out writes it cares about, and name the Squirrel
+    // code that made them: function, source and line for every frame.
+    if (M2Fix::GameInstance().SQOnRamWrite(width, offset, value)) {
+        std::stringstream stack;
+        SQStackInfos si;
+        for (SQInteger level = 0; level < 16 && SQ_SUCCEEDED(sq_stackinfos(v, level, &si)); level++) {
+            stack << (level ? " < " : "")
+                  << (si.funcname ? si.funcname : "?")
+                  << " (" << (si.source ? si.source : "?") << ":" << si.line << ")";
+        }
+        spdlog::info("[SQ] setRamValue({}, 0x{:x}, 0x{:x}) called from {}", width, offset, value, stack.str());
+    }
+
     Sqrat::RootTable root = Sqrat::RootTable<Q>();
     Sqrat::Array<Q> patches = root.GetSlot("s_ram_patch_binary");
 

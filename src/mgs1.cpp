@@ -75,6 +75,9 @@ void MGS1::SQOnMemoryDefine()
     MGS1_LanguageMask = SQTitleProf<Squirk::Standard>::GetMemoryDefine("language_setting_mask");
     MGS1_LanguageDone = false;
     MGS1_LanguageHeld = 0;
+    MGS1_LanguageLast = -1;
+    MGS1_LanguageWanted = false;
+    MGS1_LanguageLogs = 0;
     if (MGS1_LanguagePTR != 0) {
         spdlog::info("[MGS 1] language_setting is 0x{:x}, mask is 0x{:x}.",
             MGS1_LanguagePTR, MGS1_LanguageMask);
@@ -137,20 +140,58 @@ void MGS1::SQOnUpdateGadgets()
         // earlier write. Anything set during "init" is gone by the time a player
         // could see it, so the hold has to span every pre-gameplay stage and end
         // only once the value has stayed put for a while on the title itself.
-        if (M2Config::bGameEnglishText && !MGS1_LanguageDone
-            && MGS1_LanguagePTR != 0 && MGS1_LanguageMask != 0) {
+        //
+        // After that the bit is only guarded. The option screen (scene "option")
+        // is the one place the player can change it, so a change seen there is
+        // the player's choice and is followed; a change seen in any other scene
+        // was made by something else and is undone. Every change is logged with
+        // its scene, and Squirrel writes to the word are traced (SQOnRamWrite):
+        // starting Integral's 1P MODE has been seen to leave English selected on
+        // the title and yet play in Japanese, and neither the game's scripts nor
+        // its code clear the bit on that path, so the writer is being looked for.
+        if (MGS1_LanguagePTR != 0 && MGS1_LanguageMask != 0) {
             SQInteger setting = SQEmuTask<Squirk::Standard>::GetRamValue(CHAR_BIT, MGS1_LanguagePTR);
-            if ((setting & MGS1_LanguageMask) == 0) {
-                SQEmuTask<Squirk::Standard>::SetRamValue(CHAR_BIT, MGS1_LanguagePTR,
-                    setting | MGS1_LanguageMask);
-                spdlog::info("[MGS 1] Selected English text (0x{:x}: 0x{:02x} -> 0x{:02x}).",
-                    MGS1_LanguagePTR, setting, setting | MGS1_LanguageMask);
-                MGS1_LanguageHeld = 0;
+            int english = (setting & MGS1_LanguageMask) != 0;
+            if (english != MGS1_LanguageLast) {
+                if (MGS1_LanguageLast >= 0 && ++MGS1_LanguageLogs <= 64) {
+                    spdlog::info("[MGS 1] language_setting is now 0x{:02x} ({}) in scene \"{}\".",
+                        setting, english ? "English" : "Japanese", MGS1_StageName);
+                }
+                MGS1_LanguageLast = english;
             }
-            else if (!strcmp(MGS1_StageName, "title")
-                && ++MGS1_LanguageHeld >= MGS1_LanguageHoldFrames) {
-                MGS1_LanguageDone = true;
-                spdlog::info("[MGS 1] English text is set; leaving language_setting alone.");
+            if (M2Config::bGameEnglishText) {
+                if (!MGS1_LanguageDone) {
+                    if (!english) {
+                        SQEmuTask<Squirk::Standard>::SetRamValue(CHAR_BIT, MGS1_LanguagePTR,
+                            setting | MGS1_LanguageMask);
+                        spdlog::info("[MGS 1] Selected English text (0x{:x}: 0x{:02x} -> 0x{:02x}).",
+                            MGS1_LanguagePTR, setting, setting | MGS1_LanguageMask);
+                        MGS1_LanguageHeld = 0;
+                        MGS1_LanguageLast = 1;
+                    }
+                    else if (!strcmp(MGS1_StageName, "title")
+                        && ++MGS1_LanguageHeld >= MGS1_LanguageHoldFrames) {
+                        MGS1_LanguageDone = true;
+                        MGS1_LanguageWanted = true;
+                        spdlog::info("[MGS 1] English text is set; leaving language_setting alone.");
+                    }
+                }
+                else if (!strcmp(MGS1_StageName, "option")) {
+                    if (MGS1_LanguageWanted != (english != 0)) {
+                        MGS1_LanguageWanted = english != 0;
+                        spdlog::info("[MGS 1] The option screen selected {} text; following it.",
+                            english ? "English" : "Japanese");
+                    }
+                }
+                else if (MGS1_LanguageWanted && !english) {
+                    SQEmuTask<Squirk::Standard>::SetRamValue(CHAR_BIT, MGS1_LanguagePTR,
+                        setting | MGS1_LanguageMask);
+                    MGS1_LanguageLast = 1;
+                    if (++MGS1_LanguageLogs <= 64) {
+                        spdlog::info("[MGS 1] Restored English text: something cleared it in scene \"{}\" (0x{:02x} -> 0x{:02x}).",
+                            MGS1_StageName, setting, setting | MGS1_LanguageMask);
+                    }
+                }
             }
         }
 
@@ -184,6 +225,20 @@ void MGS1::SQOnUpdateGadgets()
     if (M2Config::bAnalog.has_value() && M2Config::bAnalog.value()) {
         AnalogLoop();
     }
+}
+
+bool MGS1::SQOnRamWrite(unsigned width, unsigned offset, unsigned value)
+{
+    // GM_Configuration is the 16-bit word ending at the language_setting byte
+    // (the English bit is bit 8, so the define points at its high byte). Report
+    // any write, of any width, that overlaps that word.
+    if (MGS1_LanguagePTR == 0) return false;
+    unsigned bytes = width / CHAR_BIT;
+    if (bytes == 0) bytes = 1;
+    if (offset > MGS1_LanguagePTR || offset + bytes <= MGS1_LanguagePTR - 1) return false;
+    spdlog::info("[MGS 1] Squirrel is writing the language word: setRamValue({}, 0x{:x}, 0x{:x}) in scene \"{}\".",
+        width, offset, value, MGS1_LastStageName);
+    return true;
 }
 
 void MGS1::EPIOnLoadImage(void *image, unsigned int size)

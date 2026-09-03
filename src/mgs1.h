@@ -139,6 +139,7 @@ public:
 
     virtual void SQOnMemoryDefine() override;
     virtual void SQOnUpdateGadgets() override;
+    virtual bool SQOnRamWrite(unsigned width, unsigned offset, unsigned value) override;
     virtual void EPIOnLoadImage(void *image, unsigned int size) override;
     virtual bool EPIOnMachineCommand(std::any machine, int cmd, unsigned int **args) override;
 
@@ -159,6 +160,12 @@ private:
     unsigned MGS1_LanguageHeld = 0;
     bool MGS1_LanguageDone = false;
     constexpr static unsigned MGS1_LanguageHoldFrames = 120;
+    // Last value of the English bit seen (-1: not read yet), the language the
+    // player is taken to want once the hold is over, and a cap on the log lines
+    // the change tracking may emit.
+    int MGS1_LanguageLast = -1;
+    bool MGS1_LanguageWanted = false;
+    unsigned MGS1_LanguageLogs = 0;
     // libgcl's var_buf (variable.c) - the GCL `$f:`/`$w:` variable memory. Not a
     // memory define; a static whose address is read off GCL_GetVar's constants
     // in each executable. The briefing menu's sixteen items are gated by the
