@@ -53,10 +53,10 @@ Every deployed change was re-checked against the scope rule. Findings:
   against the rule. Restored; the overlap is prevented instead by entry 27 no
   longer being lit in that state, and record 27's padding absorbs the byte.
 - **Record 3, the vibration-test row's own label (振動テスト, lit with the
-  sentence in state 5), is still blank.** USA draws the sentence alone,
-  centred; Integral drew label + colon + sentence left-aligned. Keeping the
-  label under USA's centred sentence would overlap. Open decision: USA's line
-  alone (current), or Integral's arrangement with the English sentence.
+  sentence in state 5), stays blank — decided 2026-09-02.** Integral's line was
+  振動テスト：方向キー左右で振動します。, i.e. the row's name plus a sentence
+  that USA's `use directional buttons to test` already covers; the label adds
+  nothing the English does not say, so USA's line alone, centred, is kept.
 - Everything else is text, or the geometry that positions text: labels, rows,
   rules, connectors, highlight boxes, paragraph texture, pagination. Nothing
   changed a colour, blend or background texture.
