@@ -44,8 +44,12 @@ def build_maps(inv, free_names):
     return occ, clut
 
 def fits(occ, px, py, wd, h):
-    if (px % 64) * 4 + wd * 4 > 256: return False      # crosses its tpage
-    if py % 256 + h > 256: return False
+    # UVs are 8-bit and SetPacketTexture computes u1 = off_x + w, v1 = off_y + h
+    # (DG_SetTexture: off_x = (px % 64) * 4, off_y = py % 256, tex->w = w - 1).
+    # Either reaching 256 wraps to 0 and the quad then samples the whole page,
+    # which renders as garbage - so both must stay <= 255.
+    if (px % 64) * 4 + wd * 4 > 255: return False
+    if py % 256 + h > 255: return False
     if px + wd > 1024 or py + h > 512: return False
     for y in range(py, py + h):
         for x in range(px, px + wd):
@@ -86,9 +90,14 @@ def clut_slot(occ, clut, nc):
                 return (cx, cy)
     return None
 
+# Two labels are PADDED to their quad's width rather than having the quad
+# changed (the overlay has no room): allocate for the padded width.
+PAD_TO = {}          # not needed: every rectangle now equals its art (USA's own)
+
 def allocate():
     I = inventory('work/int1_stage.dir'); U = inventory('work/usa1_stage.dir')
-    ug = {n: g for _t, n, g, _b in U if n}
+    ug = {n: dict(g) for _t, n, g, _b in U if n}
+    for n, w in PAD_TO.items(): ug[n]['w'] = w
     ig = {n: g for _t, n, g, _b in I if n}
     occ, clut = build_maps(I, set(LAB))
     out = {}

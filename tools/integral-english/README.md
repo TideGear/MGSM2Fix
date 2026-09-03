@@ -524,8 +524,47 @@ call. Two traps cost real time here:
   model that writes `rd` unconditionally poisons the zero register and then
   every `addiu rX, zero, imm` yields nothing.
 
-**What the quads say.** Four of USA's eight differ from Integral's and were
-copied into `opt.c`; the other four are already identical:
+**CORRECTION: the `Init_Res` quads are not where these rectangles live.** A
+per-button-type function (`opt.c` ~line 778) rewrites `poly[13..16]` every frame
+and therefore overrides them. `kcrects.py` reads that function instead, and it
+is the authority: **every one of USA's rectangles is exactly its art's size** —
+`key_action` 32x8, `key_buki` 44x7, `key_hohuku` 28x8, `key_syukan` 88x10 — so
+USA never scales these labels. The three of them rotate between a left-middle, a
+right-middle and a lower-left slot as the button type changes, each keeping its
+own size in every slot; `key_syukan` never moves. All twelve rectangles (three
+types x four labels) now carry USA's values, and the overlay came out **25,670**,
+172 bytes under retail's ceiling — the rewrite is smaller than what it replaced.
+
+Two traps cost a build each, and both are recorded because neither is guessable:
+
+- **UVs are 8-bit.** `SetPacketTexture` computes `u1 = off_x + w` and
+  `v1 = off_y + h` from `DG_SetTexture`'s `off_x = (px % 64) * 4` and
+  `off_y = py % 256`. Either reaching **256** wraps to 0, and the quad then
+  samples the whole texture page — which renders as pixel noise, not as a
+  misplaced label. Two labels sat at VRAM y 504 with 8-row art: 248 + 8 = 256.
+  `kcplace.py` and the builder now assert `<= 255`.
+- **`abe` must be 1 on all eight.** USA's label palettes have **no (0,0,0)
+  entry** — index 0 is a visible grey — and `LoadPalette` (`libdg/loader.c`)
+  maps only pure black to the transparent 0x0000. USA therefore draws every one
+  of these labels semi-transparent, which blends the background away. Integral
+  passed a literal 0 for four of them, which its own art could afford because
+  that art did have a transparent index 0; with USA's art those four rendered an
+  opaque box behind the text. USA's textures also carry PCXINFO flag 0x18, i.e.
+  blend rate 1 (`(flag & 0x30) >> 4`), which comes along with the art.
+
+**Verified 2026-09-03 against paired USA shots** (the same six states shot in
+both games, so they pair one to one): every label band matches at **dy 0, dx 0**
+on both edges. **Outstanding:** a thin horizontal rule under two labels runs
+about 14 game pixels longer in Integral. Ruled out so far: the label art (USA's
+own), the background art (`key_back_l`/`key_back_r` are **colour**-identical
+between the games — only their palette indices are permuted), the per-type
+geometry (those four polys only, now USA's), and palette collisions (none, with
+real entry counts: widths run 1..128, so 16-alignment alone is not enough).
+Neither overlay contains any 1-2 row tall rectangle written from literal
+coordinates, so that rule's geometry is computed somewhere still to be found.
+
+**For the record, USA's `Init_Res` quads** (first frame only, since the per-type
+function overwrites them). Four differ from Integral's, four are identical:
 
 | texture | Integral quad | USA quad | USA art | note |
 |---|---|---|---|---|
