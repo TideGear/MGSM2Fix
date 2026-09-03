@@ -389,6 +389,12 @@ them would look almost right and be wrong.
   Japanese help lines (the colon of record 7) and **stay Japanese** — Integral's
   own additions with no USA counterpart, exactly like 完了しました / 中です.
 
+**Ported 2026-09-03.** `kcquads.py` reads USA's own quads out of its overlay,
+`kcplace.py` allocates VRAM and CLUT slots, and `optsctext.py` swaps the art in
+(the option stage is built by one script, so KEY CONFIG rides the same build).
+See "How the KEY CONFIG port was built" below. The table is kept because it
+records USA's VRAM layout, which the port does NOT reuse.
+
 Eight `option` DAR textures need USA's art (all eight sizes below re-measured
 from both discs 2026-09-03 and unchanged). All are 4bpp; sizes differ because
 the Japanese and English labels differ, so this is the same job as the 20
@@ -501,6 +507,79 @@ known so far, for whoever starts it:
   version (no option language toggle to hold; no briefing menu).
 - The VR disc has its own overlays and executable, so nothing from the main-game
   port (overlay patches, stage relocations, chain edits) carries over.
+
+## How the KEY CONFIG port was built (2026-09-03)
+
+**USA's quads, read from USA's binary, not measured.** `kcquads.py` derives the
+option overlay's load address (it is not in the header) as the one base that
+gives every `key_*` string exactly one adjacent `lui`+`addiu` reference — that
+is **0x800C5968** for USA, and all sixteen strings resolve, in ascending code
+order, which is the check. It then simulates the overlay linearly and reads each
+`Init_Res(work, strcode, poly, x0, sp+16=y0, sp+20=x1, sp+24=y1, abe, orient)`
+call. Two traps cost real time here:
+
+- **`jal` is opcode 3, not 0x0C.** With the wrong opcode the simulation never
+  sees a call boundary and every argument comes back empty.
+- **`r0` must be read-only in the model.** A `nop` is `sll zero,zero,0`, so a
+  model that writes `rd` unconditionally poisons the zero register and then
+  every `addiu rX, zero, imm` yields nothing.
+
+**What the quads say.** Four of USA's eight differ from Integral's and were
+copied into `opt.c`; the other four are already identical:
+
+| texture | Integral quad | USA quad | USA art | note |
+|---|---|---|---|---|
+| `key_button`  | (-149,-70,-61,-58) | (-148,-70,-60,-57) | 88x13  | quad changed |
+| `key_sykan`   | (-149,38,-61,50)   | (-148,38,-36,51)   | 112x13 | quad changed |
+| `key_normal`  | (-35,41,17,47)     | (-18,39,22,49)     | 40x10  | quad changed |
+| `key_reverse` | (29,41,93,47)      | (40,42,84,48)      | 44x6   | quad changed |
+| `key_buki`    | (-136,-18,-92,-11) | same               | 44x7   | already USA's |
+| `key_syukan`  | (78,-39,138,-32)   | same               | 88x10  | **USA stretches** 88x10 into 60x7 |
+| `key_action`  | (74,-18,138,-11)   | same               | 32x8   | **USA stretches** 32x8 into 64x7 |
+| `key_hohuku`  | (-136,2,-84,9)     | same               | 28x8   | **USA stretches** 28x8 into 52x7 |
+
+Those last three are not a mistake in the extraction: the USA localisation
+replaced the art with narrower English words and **left the Japanese-sized quad
+alone**, so USA's own screen scales them. Since the engine stretches a texture
+to its quad, keeping the quad reproduces USA's scaling exactly — which is what
+matching USA means. This is the opposite of the briefing labels, where USA's
+quads did match its art and the canvas had to be padded instead.
+
+**VRAM and CLUT.** USA's own slots are unusable here: Integral carries five
+Japanese text textures USA lacks, and four of USA's eight slots clash. So
+`kcplace.py` frees Integral's eight, then places USA's largest-first with the
+constraints one tpage imposes — `(px % 64) * 4 + w <= 256` and
+`py % 256 + h <= 256` — preferring the band the option stage already keeps these
+labels in, and staying clear of the option screen's font KCBs (x 768..960,
+y 256..344; `opt.c` sets `rect.x` 768/832/896, `w` 64, `h` 21 stacked, CLUTs at
+y 276). Result: four labels keep Integral's slot, four move to y 460, and all
+eight CLUTs go to y 233, x 320..432.
+
+| label | VRAM | was | CLUT |
+|---|---|---|---|
+| `key_button`  | (464,460) | (128,492) | (336,233) |
+| `key_sykan`   | (336,460) | (80,480)  | (320,233) |
+| `key_syukan`  | (486,460) | (208,480) | (352,233) |
+| `key_normal`  | (364,460) | (175,492) | (400,233) |
+| `key_reverse` | (16,504)  | (11,504)  | (384,233) |
+| `key_action`  | (0,504)   | (175,502) | (416,233) |
+| `key_buki`    | (108,504) | (0,504)   | (368,233) |
+| `key_hohuku`  | (64,504)  | (120,256) | (432,233) |
+
+**Checks that ran before deploying**, on the built stage rather than the plan:
+all 57 textures decoded, **zero** VRAM rectangle overlaps, 57 distinct CLUT
+slots for 57 textures, no CLUT row inside any texture (both directions), every
+texture within its tpage, and the DAR walk landing on exactly 0. Overlay 25834
+of retail's 25842 bytes; DAR 121,680 -> 128,332; stage 75 -> 78 sectors, still
+DUMMY3M 384 (384..461), disjoint from `brf` at 128..266 and `preope` at 0..89.
+Revert with `work/backup_before_keyconfig_disc{1,2}.ppf`.
+
+**Not changed:** `abe`/`orient` keep Integral's values. USA's are not reliably
+readable (they come from saved registers the simulation cannot always resolve),
+and they affect blending, not layout.
+
+**Still Japanese on that screen, by the rule:** Integral's per-row bottom help
+line, which USA has no counterpart for.
 
 ## Why `en_menu3` crashes (diagnosed 2026-09-03)
 

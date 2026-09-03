@@ -119,6 +119,25 @@ SCT_VRAM, SCT_CLUT = (512, 256), (1008, 237)
 PAD_VRAM           = (512, 326)
 SC_ROWS            = 70          # USA's whole texture: all six lines (see the docstring)
 
+# KEY CONFIG: swap in USA's eight label textures. Four of the quads change too
+# (see opt.c); the other four already carry USA's constants, and for three of
+# those USA's art is smaller than the quad, so USA stretches it - keeping the
+# quad reproduces that stretch, which is what matching USA means here.
+# VRAM and CLUT slots come from tools scratch `kcplace.py`, which frees
+# Integral's eight slots, then places USA's largest-first inside the option
+# stage's own texture band, clear of the framebuffers (0,0)/(0,256) 320x240 and
+# of the option screen's font KCBs (x 768..960, y 256..344, opt.c line ~160).
+KEY_LABELS = {                    # id: (name, vram, clut)
+    0x32C8: ('key_button',  (464, 460), (336, 233)),
+    0xAC43: ('key_sykan',   (336, 460), (320, 233)),
+    0xAF48: ('key_syukan',  (486, 460), (352, 233)),
+    0x2CA5: ('key_normal',  (364, 460), (400, 233)),
+    0xC627: ('key_reverse', ( 16, 504), (384, 233)),
+    0x03A8: ('key_action',  (  0, 504), (416, 233)),
+    0x1D5E: ('key_buki',    (108, 504), (368, 233)),
+    0x41E9: ('key_hohuku',  ( 64, 504), (432, 233)),
+}
+
 
 def pad(x, a=2048): return (x + a - 1) // a * a
 
@@ -306,6 +325,35 @@ def build_stage():
     print('           ours vram(%d,%d) clut(%d,%d), ext 0x%04X, %d bytes payload'
           % (SCT_VRAM[0], SCT_VRAM[1], SCT_CLUT[0], SCT_CLUT[1], ext, len(newblob)))
     de.append([SC_TEXT, ext, newblob])
+
+    # --- KEY CONFIG: replace the eight label textures with USA's
+    ue = {e[0]: e for e in dar_entries(stage_payload(USA, 'option', 1))}
+    used_vram, used_clut = [], {}
+    for tid, (name, vram, clut) in KEY_LABELS.items():
+        mine = [e for e in de if e[0] == tid]
+        assert len(mine) == 1, '%s found %d times in the Integral DAR' % (name, len(mine))
+        assert tid in ue, '%s missing from the USA DAR' % name
+        src = ue[tid][2]
+        iw, ih, _p, _r = pcx4.decode(mine[0][2])
+        uw, uh, upal, urows = pcx4.decode(src)
+        blob, old = set_pcxinfo(src, vram[0], vram[1], clut[0], clut[1])
+        assert len(blob) % 4 == 0, '%s payload %d not 4-aligned' % (name, len(blob))
+        # one tpage, and inside the lower VRAM half it was allocated in
+        assert (vram[0] % 64) * 4 + uw <= 256, '%s crosses its tpage' % name
+        assert vram[1] % 256 + uh <= 256, '%s crosses a VRAM page row' % name
+        rw, rh, rpal, rrows = pcx4.decode(blob)
+        assert (rw, rh) == (uw, uh) and rrows == urows and rpal == upal, '%s does not round-trip' % name
+        for (ox, oy, ow, oh, on) in used_vram:
+            if not (vram[0] + (uw + 3) // 4 <= ox or vram[0] >= ox + ow
+                    or vram[1] + uh <= oy or vram[1] >= oy + oh):
+                raise AssertionError('%s overlaps %s in VRAM' % (name, on))
+        used_vram.append((vram[0], vram[1], (uw + 3) // 4, uh, name))
+        assert clut not in used_clut, '%s shares a CLUT slot with %s' % (name, used_clut.get(clut))
+        used_clut[clut] = name
+        mine[0][2] = blob
+        print('  %-12s %dx%d -> USA %dx%d  vram(%d,%d) clut(%d,%d)  (was vram(%d,%d) clut(%d,%d))'
+              % (name, iw, ih, uw, uh, vram[0], vram[1], clut[0], clut[1],
+                 old[0], old[1], old[2], old[3]))
 
     newdar = b''.join(struct.pack('<HhI', t, x, len(b)) + b for t, x, b in de)
     print('DAR: %d -> %d bytes (+%d), %d entries' % (tags[1][3], len(newdar), len(newdar) - tags[1][3], len(de)))
