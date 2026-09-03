@@ -143,6 +143,10 @@ detail; this is the index.
   `y0 = 14` was right and an adversarial review talked me out of it. The two
   builds' draw environments differ in a way neither the decomp nor USA's binary
   shows. Deploy, shoot both, diff.
+- **Pin every build input; a step that reads "whatever is deployed" will one day
+  read its own output.** Moving that output aside is not a fix — it drops
+  whatever the *previous* deployed file contributed. And re-run the static
+  checks on the build you actually deploy, not the one before it.
 
 ### Reading disassembly
 
@@ -841,8 +845,21 @@ disjointness. Slot 384 leaves brf 256 sectors of growth room.
 configuration setup") into the option stage. After relocation those writes land
 on a stage the game no longer reads, so both labels would have silently reverted
 to Japanese. The relocated image is therefore built from a **composite** of
-retail plus every deployed PPF's STAGE.DIR writes, and the build asserts records
-4/5/12/26 are English before emitting.
+retail plus the deployed *non-option* PPFs' STAGE.DIR writes plus a **pinned**
+copy of the last font-text option build (`work/fonttext_disc{1,2}_option.ppf`,
+`CHAIN_PPF`), and `verify()` asserts the 8 records in `EXPECT_CHAIN` (3/7 blank,
+4/5/12/26 English, 13/24 English) before emitting.
+
+**Never let the builder consume its own previous output** — this shipped as a
+bug on 2026-09-02. Once the sc_text PPF was deployed, `composite()`'s "every
+deployed PPF" included it, and its entry repoint would send the walk out of the
+file; my workaround was to move the deployed option PPF aside before rebuilding.
+That silently dropped the font-text PPF's 1,519 bytes of chain edits, so records
+3/7/12/13-16/24/26 reverted to retail Japanese: "use directional buttons to
+test" came back as `振動テスト...` with a garbled glyph (the user caught it). The
+static record check had been run on the *previous* build, not the one deployed.
+Now the input is pinned, any write to the entry pointer is a hard error, and the
+record assert runs on every build.
 
 **The quad's y: the two engines do not place the same constant in the same
 place.** USA's own call is `(-121, 2, 111, 72)`. Deployed here, that rendered the
@@ -902,8 +919,9 @@ discs: applying the emitted PPF to the disc image in `dlc_japan.bin` resolves
 `option` to DUMMY3M idx 384 and reads the 78-sector block back byte-identical,
 with exactly one record outside the slot (the entry repoint).
 
-Not verified: anything in game. Five adversarial lenses found no blocker, but the
-quad's exact placement rests on USA's constant rather than an observation.
+Verified in game 2026-09-02: the four paragraph lines occupy screenshot rows
+1215-1286, 1323-1385, 1431-1502 and 1557-1601 in both the USA shot and ours —
+pixel-identical placement — and the vibration-test help line is English again.
 
 ### Reverting
 
@@ -914,10 +932,9 @@ font-text option build. Copy those two back over
 brightness screen returns to the re-wrapped font text, which is positionally
 exact but not pixel-exact.
 
-**Re-running the builder after deployment needs the deployed option PPF moved
-aside first.** `composite()` applies every deployed PPF's STAGE.DIR writes,
-including this one's own entry repoint, and would then follow the relocated
-pointer out of the file and die.
+Re-running the builder after deployment needs nothing moved aside: `composite()`
+skips the deployed option PPF by name (it is this script's own output) and
+takes the chain edits from `CHAIN_PPF` instead.
 
 ### Building and deploying
 
@@ -955,7 +972,7 @@ filename `monitor1.c` in `s08b`/`s08br`.
 USA's option chain really does have the paragraph slots empty. Its whole 680-byte
 0xFF chunk holds 28 records of which only four are non-empty — `[4] screen
 brightness setup`, `[5] key configuration setup`, `[12]` and `[26] use
-directional buttons to test` — with ` ` (a bare terminator) for the
+directional buttons to test` — with `07 01 00` (a bare terminator) for the
 rest, including 13-16.
 
 ## Audit against the decomp
