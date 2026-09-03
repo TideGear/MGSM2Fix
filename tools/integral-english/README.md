@@ -18,6 +18,25 @@ counts and line breaks change.
 `en_menu3` is disabled — it crashes with `GCL:WRONG CODE` walking a RAM buffer,
 cause never found.
 
+## Scope: what this port changes, and what it deliberately keeps
+
+**Verbatim USA text, placed where USA places it. Everything else stays as
+Integral shipped it.** Integral is the later release and its non-text
+differences may be deliberate; they are kept unless they are text, a
+translation, or the positioning of text and its chrome (rules, connectors,
+highlight boxes that frame the text). Decided 2026-09-02, after the unlocked
+briefing comparison surfaced differences that are real but not text:
+
+| Kept from Integral | What it is |
+|---|---|
+| "watched" dimming colour RGB (70, 80, 75) | USA dims flagged items, connectors and FILE boxes to (90, 105, 95); Integral's `brf_800C6634` uses (70, 80, 75), 30 immediates 1:1. Only visible once items are flagged. |
+| `br_back_l` right-edge seam | 154 stencil-mask bits differ along texture x 155–159; every other briefing texture is pixel-identical (palettes differ only in unused entries). |
+| vertical rule brightness, FILE-box interiors, a few collage rows | Integral's rule renders ~201 grey against USA's 166, box interiors 24–32 against 0. Not attributed; the background fade (`(frame-28)*8`, identical in both) is not the cause. Nothing the port touched. |
+
+So "pixel-identical to USA" for this project means: every glyph and every
+piece of chrome that positions text lands on the same pixels; brightness and
+art that Integral changed on its own are not chased.
+
 ## Gotchas
 
 Everything below cost at least one broken build. Sections further down have the
