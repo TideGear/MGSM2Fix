@@ -5,6 +5,11 @@ pixel-exact instead of re-wrapped font text.
 WHY A TEXTURE. USA never renders this paragraph with the font. It draws one
 232x70 4bpp texture, `sc_text`, on a quad:
     Init_Res(work, GV_StrCode("sc_text"), poly, -121, 2, 111, 72, 0, 0)
+We draw the same texture CROPPED to its first 46 rows at (-121,14)-(111,60):
+USA's screen only ever shows lines 1-4 (rows 47-69, the O-button sentence,
+never appear), and USA's constant of y0=2 lands the paragraph 12 rows above
+USA's own on-screen position when used here - measured dy -12 on all four
+lines with dx 0 - so the quad is placed by measurement, not copied.
 Integral has no such texture and no code naming it, so it renders the paragraph
 as KCB font text from chain records 13-16/24/27. That path cannot reproduce
 USA's line breaks: `rect.w = kcb->max_width` is a single byte and one 4bpp tpage
@@ -86,6 +91,7 @@ OPTION_ENTRY_FO = 744    # STAGE.DIR file offset of the `option` entry's u32 sec
 # where the two textures go
 SCT_VRAM, SCT_CLUT = (512, 256), (1008, 237)
 PAD_VRAM           = (512, 326)
+SC_ROWS            = 46          # texture rows kept: lines 1-4, all USA's screen shows
 
 
 def pad(x, a=2048): return (x + a - 1) // a * a
@@ -205,6 +211,17 @@ def build_stage():
     assert len(src) == 1, 'sc_text not found in USA option DAR'
     ext, blob = src[0][1], src[0][2]
     assert len(blob) % 4 == 0, 'sc_text payload %d not 4-aligned' % len(blob)
+    # USA's screen shows only lines 1-4 of this texture; rows 47-69 (the O-button
+    # sentence) never appear there.  Crop to the first SC_ROWS rows so the quad is
+    # 1:1 with no UV surgery, and prove the crop round-trips before using it.
+    import pcx4
+    w, h, pal, rows = pcx4.decode(blob)
+    assert (w, h) == (232, 70), (w, h)
+    blob = pcx4.encode(blob, w, SC_ROWS, pal, rows[:SC_ROWS])
+    blob += bytes((-len(blob)) % 4)
+    cw, ch, cpal, crows = pcx4.decode(blob)
+    assert (cw, ch) == (232, SC_ROWS) and crows == rows[:SC_ROWS] and cpal == pal, 'crop does not round-trip'
+    print('  sc_text  cropped 232x70 -> 232x%d (%d bytes), decode round-trips' % (SC_ROWS, len(blob)))
     newblob, old = set_pcxinfo(blob, SCT_VRAM[0], SCT_VRAM[1], SCT_CLUT[0], SCT_CLUT[1])
     print('  sc_text  USA vram(%d,%d) clut(%d,%d) %d colours flag 0x%X'
           % (old[0], old[1], old[2], old[3], old[4], old[5]))
@@ -284,6 +301,9 @@ def verify(stage, newsect):
     assert SC_TEXT in got, 'sc_text missing after rebuild'
     g = struct.unpack_from('<7H', got[SC_TEXT][1], 74)
     assert (g[2], g[3], g[4], g[5]) == (SCT_VRAM[0], SCT_VRAM[1], SCT_CLUT[0], SCT_CLUT[1]), g
+    import pcx4
+    sw, sh, _pal, _rows = pcx4.decode(got[SC_TEXT][1])
+    assert (sw, sh) == (232, SC_ROWS), 'sc_text in the built DAR is %dx%d' % (sw, sh)
     k = struct.unpack_from('<7H', got[KEY_PAD][1], 74)
     assert (k[2], k[3]) == PAD_VRAM, k
     assert pay[0] == open(OVL, 'rb').read(), 'overlay payload mismatch'
