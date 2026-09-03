@@ -395,6 +395,21 @@ shifted).
 | 10 | メモリーカードをチェックしています。 | Now checking Memory Card. | USA |
 | 11 | フォーマットしています。 | Now formating Memory Card. | USA |
 
+**Which entries are live** (from `init_file_mode_helper_helper_80049EDC`):
+index 9 is requested with `0x01000009` immediately before `saveFile()` /
+`loadFile()` runs, so it is on screen *during* the write or read; index 1 is
+requested with `0xC1000001` on the success path (`block_75`) right after the
+operation returns — that is the live completion message. USA's entries at both
+are blank: it shows no caption while saving and none after a success (its
+confirmation is the separate "COMPLETE" label in the file-list UI, which
+Integral also has in English). So after a save Integral flashes
+セーブが完了しました。 where USA shows nothing — Integral's own extra text, kept
+under the rule; blanking it to match USA would be a one-pointer change.
+Index 6 (セーブしました。 / "Data saved." and the load twins) is **never
+requested**: no `0x…06` code exists and the only other draw is a hard-coded
+`captions[4]`. Those strings are dead in both games; ported for completeness,
+never visible.
+
 USA's spelling ("formated", "occured") is kept verbatim. Everything else in the
 module is already English in Integral (SAVING..., LOAD DATA, LOADING..., NO
 FILE, NO SPACE, COMPLETE, YES/NO, OVERWRITE OK?, FORMAT OK?, EZ/NM/HD/EX,
