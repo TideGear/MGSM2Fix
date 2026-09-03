@@ -552,9 +552,36 @@ Two traps cost a build each, and both are recorded because neither is guessable:
   opaque box behind the text. USA's textures also carry PCXINFO flag 0x18, i.e.
   blend rate 1 (`(flag & 0x30) >> 4`), which comes along with the art.
 
+### Two more things the paired shots caught (2026-09-03)
+
+**The selection cursor has its own rectangle, and it was Integral's.** The green
+fill behind a highlighted hexagon row is the `cur_*` group, positioned by
+`option_800C449C(work, x, y, w, h, shade, type)` - not by the label. Integral
+passed `(-149, -70, 88, 12)` and `(-149, 38, 88, 12)`; USA passes
+`(-148, -70, 88, 13)` and `(-148, 38, **112**, 13)`. The 88 is why the fill
+stopped short of the wider English "first person view". Both call sites per row
+now carry USA's values, read out of USA's overlay. Note USA's cursor is
+deliberately 1 px left of its label and 1 px shorter - an inset, not flush.
+Verified: the fill spans screen x 579..1604 in both games.
+
+**`key_syukan` is shifted +11 px right of USA's own x, on purpose.** Integral's
+background art puts the connector curve coming off the triangle button 11 game
+px further right than USA's, because USA moved its curve to clear the longer
+English label and Integral never had to. USA's absolute x therefore left the
+label sitting on Integral's curve. Measured on paired shots: the rule beneath
+the label starts at screen x **2343** in USA and **2442** here (99 px, at 8.92
+px per game px). After the shift the label sits **+18 screen px** from its rule
+in both games - identical. This is the user's rule of 2026-09-03: where
+Integral's own art differs on purpose, move the English text to keep USA's
+relationship to that art, and **ask first**.
+
+The other three labels were checked the same way and need no shift: each one's
+distance to its own rule already matches USA. Only the rules' far ends differ,
+which is Integral's art and stays.
+
 **Verified 2026-09-03 against paired USA shots** (the same six states shot in
 both games, so they pair one to one): every label band matches at **dy 0, dx 0**
-on both edges. **Outstanding:** a thin horizontal rule under two labels runs
+on both edges (`key_syukan` excepted, by the deliberate +11 above). **Outstanding:** a thin horizontal rule under two labels runs
 about 14 game pixels longer in Integral. Ruled out so far: the label art (USA's
 own), the background art (`key_back_l`/`key_back_r` are **colour**-identical
 between the games — only their palette indices are permuted), the per-type
