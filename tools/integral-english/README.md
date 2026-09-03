@@ -61,6 +61,11 @@ Every deployed change was re-checked against the scope rule. Findings:
   rules, connectors, highlight boxes, paragraph texture, pagination. Nothing
   changed a colour, blend or background texture.
 
+Verified in game 2026-09-02 on all eight option rows: the four Japanese help
+lines read 字幕設定：オン, 字幕言語設定：英語, サウンド設定：ステレオ, 振動設定：オン
+with their colons; EXIT reads タイトル画面に戻ります。 cleanly; the three English
+lines are unchanged.
+
 ## Gotchas
 
 Everything below cost at least one broken build. Sections further down have the
