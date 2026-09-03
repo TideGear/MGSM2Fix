@@ -412,6 +412,13 @@ identical here. The caption is drawn into the codec message-board KCB
 (`radio.c`, `font_set_kcb(kcb, -1, -1, 0, 6, 2, 0)`, 252 px buffer), the same
 code in both games, so placement follows.
 
+**Verified in game 2026-09-02:** LOAD DATA with no save present draws
+`No save file.` on rows 211–219, x 126–195 in both games. The header above it
+differs only because `DisableRAM` (achievements off) filters the Master
+Collection's own rename of MEMORY CARD → STORAGE, so Integral shows the
+original wording; USA's reference shot predates that setting. The in-game save
+flow (Mei Ling) has not been shot yet.
+
 Not yet built into a save title: Integral composes the save-slot name in
 full-width Shift-JIS (`ＭＧＳ．［ＮＭ］ time area`, `datasave.c` ~2261) where USA
 uses ASCII; the Master Collection's own storage UI shows those names, so this
@@ -1310,6 +1317,11 @@ bytes, 54 blocks). Likely because the filter resolves its data argument as an
 `SQBinary` instance while Ketchup passes a plain array, but that is inferred,
 not traced. The English text should be checked visually after any MGSM2Fix
 update, since a change to that hook would silently drop every PPF.
+
+**Side effect on comparisons:** `DisableRAM` also filters the collection's
+cosmetic RAM patches — the memory-card screens revert from STORAGE 1 / 2 to
+MEMORY CARD 1 / 2 — so a shot taken with the flags on differs from one taken
+before in those strings. Not a port difference.
 
 The deployed ini is a symlink into Vortex's mod folder
 (`%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-*\MGSM2Fix.ini`); edit the
