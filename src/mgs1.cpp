@@ -80,20 +80,23 @@ void MGS1::SQOnMemoryDefine()
             MGS1_LanguagePTR, MGS1_LanguageMask);
     }
 
-    // GCL's variable buffer is a static in each executable (libgcl/variable.c
-    // var_buf), recovered from GCL_GetVar's address constants. Same on both
-    // discs of each release. The VR disk has no briefing menu. RAM offsets, as
-    // the memory defines are (KSEG0 0x800B3CC8 / 0x800B6448).
+    // GCL's variable buffer (libgcl/variable.c var_buf) is a static, not a memory
+    // define, and its address moves between builds - the Master Collection's USA
+    // executable has it 8 bytes below the retail disc's. What is stable is
+    // variable.c's own layout: var_buf[1024 shorts], sv_linkvarbuf[96],
+    // sv_var_buf[1024], stage_name[16], linkvarbuf[96], so var_buf sits 0x10D0
+    // below linkvarbuf and the "scene_name" define is stage_name, 0x10 below
+    // linkvarbuf. Read from RAM on Integral (0xB3CC8) and the collection's USA
+    // (0xB6440), the relation holds in both. The VR disks have no briefing menu.
     MGS1_VarBufPTR = 0;
-    MGS1_UnlockLogged = false;
+    MGS1_UnlockWrites = 0;
+    MGS1_LastStageName[0] = 0;
     switch (SQGlobals<Squirk::Standard>::GetTitle()) {
-        case 99:  // INTEGRAL: SLPM-86247 / SLPM-86248
-            if (SQSystemData<Squirk::Standard>::SettingETC::GetVersion() == "INTEGRAL") {
-                MGS1_VarBufPTR = 0xB3CC8;
-            }
-            break;
-        case 981: // MGS1_US: SLUS-00594 / SLUS-00776
-            MGS1_VarBufPTR = 0xB6448;
+        case 99:  // INTEGRAL (its VR-DISK version shares the title id)
+            if (SQSystemData<Squirk::Standard>::SettingETC::GetVersion() != "INTEGRAL") break;
+            [[fallthrough]];
+        case 980: case 981: case 982: case 983: case 984: case 985: case 986: // MGS1 JP/US/UK/DE/FR/IT/ES
+            if (MGS1_GlobalsPTR != 0) MGS1_VarBufPTR = MGS1_GlobalsPTR + 0x10 - 0x10D0;
             break;
     }
     if (MGS1_VarBufPTR != 0) {
@@ -110,6 +113,11 @@ void MGS1::SQOnUpdateGadgets()
         char MGS1_LoaderName[8] = { 0 };
         SQEmuTask<Squirk::Standard>::RamCopy(MGS1_StageName, MGS1_StageNamePTR, sizeof(MGS1_StageName));
         SQEmuTask<Squirk::Standard>::RamCopy(MGS1_LoaderName, MGS1_LoaderPTR, sizeof(MGS1_LoaderName));
+
+        if (strncmp(MGS1_StageName, MGS1_LastStageName, sizeof(MGS1_StageName)) != 0) {
+            spdlog::info("[MGS 1] scene_name \"{}\" -> \"{}\".", MGS1_LastStageName, MGS1_StageName);
+            memcpy(MGS1_LastStageName, MGS1_StageName, sizeof(MGS1_StageName));
+        }
 
         if (M2Config::bGameStageSelect) {
             if (strcmp(MGS1_LoaderName, "title") == 0 && strcmp(MGS1_StageName, "select") != 0) {
@@ -164,10 +172,11 @@ void MGS1::SQOnUpdateGadgets()
                     changed = true;
                 }
             }
-            if (changed && !MGS1_UnlockLogged) {
-                spdlog::info("[MGS 1] Unlocked every briefing item (var_buf+0x{:x}..).",
-                    MGS1_BriefingFlagsOffset);
-                MGS1_UnlockLogged = true;
+            // Log the first few writes: more than one means something cleared the
+            // flags again between the title and the briefing.
+            if (changed && ++MGS1_UnlockWrites <= 8) {
+                spdlog::info("[MGS 1] Set the sixteen briefing flags (var_buf+0x{:x}, write {}, scene \"{}\").",
+                    MGS1_BriefingFlagsOffset, MGS1_UnlockWrites, MGS1_StageName);
             }
         }
     }

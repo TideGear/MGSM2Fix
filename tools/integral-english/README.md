@@ -1077,26 +1077,30 @@ and the earlier idea that the flags meant "watched" was wrong — after a movie
 ends the overlay stores `field_80[idx] = 1` too (800C9240), which is the same
 state.
 
-    var_buf     Integral SLPM-86247/86248  0x800B3CC8    USA SLUS-00594/00776  0x800B6448
-    linkvarbuf  Integral                   0x800B4D98    USA                   0x800B7518
+    var_buf     Integral SLPM-86247/86248  0x800B3CC8    USA disc SLUS-00594/00776  0x800B6448
+    linkvarbuf  Integral                   0x800B4D98    USA disc                   0x800B7518
 
-MGSM2Fix's `GetRamValue`/`SetRamValue` take **RAM offsets**, not KSEG0
-addresses — the memory defines log as `0xb4d9d`, and Ketchup's `PSX_ImageBase`
-is `0x10000` — so the code uses `0xB3CC8` / `0xB6448`. (The first build used the
-`0x800B...` form; the log still said "Unlocked", because the read-back was of
-the wrong place too. Check the convention before trusting a poke's log line.)
+**The Master Collection's USA executable is not the retail disc's.** Read live
+through the sqdbg bridge, its `GCL_GetVar` says `addiu a3, a3, 0x6440`: var_buf
+at `0x800B6440`, 8 bytes below the `us1.bin` value, and MC's `scene_name`
+define is `0xB7500` where the disc layout predicts `0xB7508`. Writes at the
+disc-derived address landed on var_buf+0x54 and the menu never saw them — while
+the log still said "Unlocked", because the read-back was of the same wrong
+bytes. So `UnlockBriefing` does not hardcode: `variable.c` declares `var_buf`,
+`sv_linkvarbuf`, `sv_var_buf`, `stage_name`, `linkvarbuf` in that order, which
+puts var_buf 0x10D0 below linkvarbuf and MC's `scene_name` define (it is
+`stage_name`) 0x10 below it, so `var_buf = scene_name - 0x10C0`. Checked against
+live RAM in both games: Integral `0xB4D88 - 0x10C0 = 0xB3CC8`, USA
+`0xB7500 - 0x10C0 = 0xB6440`, both matching the running code's constants.
 
-Both from `GCL_GetVar`'s address constants (Integral: `lui 0x800B; addiu
-15560 / 19864`; USA's compiler hoisted var_buf into `a3` at the function head,
-`addiu a3, a3, 25672`). Same on both discs of each release.
+MGSM2Fix's `GetRamValue`/`SetRamValue` take **RAM offsets**, not KSEG0 addresses
+(the memory defines log as `0xb4d9d`; Ketchup's `PSX_ImageBase` is `0x10000`).
 
 **`[Game] UnlockBriefing = true`** (MGSM2Fix, `src/mgs1.cpp`) holds all sixteen
 flags set while the scene name is `title` or `brf`, and never otherwise —
 var_buf is the live game's flag memory once a stage runs. Relies on the brf
 stage's init not carrying `-v` (which would zero var_buf on entry, ahead of any
-per-frame poke); the title script's `-v` sites are on other commands. Log shows
-`GCL var_buf is 0xb3cc8` / `Unlocked every briefing item` on Integral; in-game
-confirmation pending. Setting the flags also makes the flag-gated frame polys
+per-frame poke); the title script's `-v` sites are on other commands. Confirmed in game on Integral (all sixteen items, 2026-09-02). Setting the flags also makes the flag-gated frame polys
 (27–38, see the brf section) draw, which is what USA does in the same state.
 
 **Everything else on the title screen comes from the memory-card scan**

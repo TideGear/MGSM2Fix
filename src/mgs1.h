@@ -165,7 +165,8 @@ private:
     // flags at var_buf+0x4C..0x4E (bits 0x4C.1-7, 0x4D.0-7, 0x4E.0), which the
     // brf stage script passes to the menu as its `-f` option.
     uintptr_t MGS1_VarBufPTR = 0;
-    bool MGS1_UnlockLogged = false;
+    unsigned MGS1_UnlockWrites = 0;
+    char MGS1_LastStageName[8] = { 0 };
     constexpr static unsigned MGS1_BriefingFlagsOffset = 0x4C;
     constexpr static unsigned char MGS1_BriefingFlagsMask[3] = { 0xFE, 0xFF, 0x01 };
     static inline HSQOBJECT<Squirk::Standard> SQ_EmuTask_getHeight = {};
