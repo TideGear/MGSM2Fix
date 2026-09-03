@@ -37,6 +37,30 @@ So "pixel-identical to USA" for this project means: every glyph and every
 piece of chrome that positions text lands on the same pixels; brightness and
 art that Integral changed on its own are not chased.
 
+### Audit against the rule (2026-09-02)
+
+Every deployed change was re-checked against the scope rule. Findings:
+
+- **Record 6 of the option chain (the EXIT row's help line, タイトル画面に
+  戻ります。) had two corrupted bytes** — an `'e'` and a space from an English
+  string, written at the wrong offset by an early font-text build and carried
+  forward by the pinned chain input. On screen it read タ¥トル¨面に戻ります。.
+  A text bug of the port. `optsctext.py` now restores every record the port
+  does not own from retail and asserts it (`PORTED_RECORDS`).
+- **Record 7, the colon Integral's Japanese help lines use (字幕設定：オン,
+  サウンド設定：ステレオ …), had been blanked** to avoid an overlap on the
+  vibration-test row. That removed Japanese text with no English counterpart —
+  against the rule. Restored; the overlap is prevented instead by entry 27 no
+  longer being lit in that state, and record 27's padding absorbs the byte.
+- **Record 3, the vibration-test row's own label (振動テスト, lit with the
+  sentence in state 5), is still blank.** USA draws the sentence alone,
+  centred; Integral drew label + colon + sentence left-aligned. Keeping the
+  label under USA's centred sentence would overlap. Open decision: USA's line
+  alone (current), or Integral's arrangement with the English sentence.
+- Everything else is text, or the geometry that positions text: labels, rows,
+  rules, connectors, highlight boxes, paragraph texture, pagination. Nothing
+  changed a colour, blend or background texture.
+
 ## Gotchas
 
 Everything below cost at least one broken build. Sections further down have the
