@@ -338,13 +338,14 @@ verbatim (to 54 characters), because the recap draws each line as two sprites
 totalling 384 px. The option screen is the tight one at 240 px, which is why
 the brightness paragraph is re-wrapped to 36.
 
-## Not ported yet: the KEY CONFIG screen
+## The KEY CONFIG screen (ported 2026-09-03)
 
-**The screen IS visible in the collection with its patch flags on** (verified
-2026-09-03 with `DisableRAM`/`DisableCDROM` `true`): the collection substitutes
-its own button UI in its wrapper menus, but the game's own KEY CONFIG screen
-renders normally, so this port is no longer invisible — it is the one screen
-still fully Japanese in a build that is otherwise English. It also matters for a
+Was "not ported yet" until 2026-09-03. **The screen IS visible in the collection
+with its patch flags on** (verified with `DisableRAM`/`DisableCDROM` `true`):
+the collection substitutes its own button UI in its wrapper menus, but the
+game's own KEY CONFIG screen renders normally, so porting it was never invisible
+after all — before this it was the one screen still fully Japanese in a build
+that is otherwise English. It also matters for a
 future patch aimed at raw PSX disc images. Reference shots of both games,
 unintercepted, are in `reference/keyconfig_*.{usa,int}.jpg`, and every label's
 art from both discs is rendered side by side in `keyconfig-textures.png`.
@@ -389,7 +390,7 @@ them would look almost right and be wrong.
   Japanese help lines (the colon of record 7) and **stay Japanese** — Integral's
   own additions with no USA counterpart, exactly like 完了しました / 中です.
 
-**Ported 2026-09-03.** `kcquads.py` reads USA's own quads out of its overlay,
+**How it was done.** `kcquads.py` reads USA's own quads out of its overlay,
 `kcplace.py` allocates VRAM and CLUT slots, and `optsctext.py` swaps the art in
 (the option stage is built by one script, so KEY CONFIG rides the same build).
 See "How the KEY CONFIG port was built" below. The table is kept because it
