@@ -78,6 +78,8 @@ void MGS1::SQOnMemoryDefine()
     MGS1_LanguageLast = -1;
     MGS1_LanguageWanted = false;
     MGS1_LanguageLogs = 0;
+    MGS1_LanguageWriteLogs = 0;
+    MGS1_LanguageReadLogs = 0;
     if (MGS1_LanguagePTR != 0) {
         spdlog::info("[MGS 1] language_setting is 0x{:x}, mask is 0x{:x}.",
             MGS1_LanguagePTR, MGS1_LanguageMask);
@@ -236,8 +238,27 @@ bool MGS1::SQOnRamWrite(unsigned width, unsigned offset, unsigned value)
     unsigned bytes = width / CHAR_BIT;
     if (bytes == 0) bytes = 1;
     if (offset > MGS1_LanguagePTR || offset + bytes <= MGS1_LanguagePTR - 1) return false;
-    spdlog::info("[MGS 1] Squirrel is writing the language word: setRamValue({}, 0x{:x}, 0x{:x}) in scene \"{}\".",
-        width, offset, value, MGS1_LastStageName);
+    // The collection rewrites this word every frame (see the header); a write
+    // that leaves it as it is only counts, a write that changes it is reported.
+    SQInteger current = SQEmuTask<Squirk::Standard>::GetRamValue(bytes * CHAR_BIT, offset);
+    unsigned mask = bytes >= 4 ? 0xFFFFFFFFu : ((1u << (bytes * CHAR_BIT)) - 1);
+    bool changes = ((unsigned)current & mask) != (value & mask);
+    if (!changes && ++MGS1_LanguageWriteLogs > 4) return false;
+    spdlog::info("[MGS 1] Squirrel is writing the language word: setRamValue({}, 0x{:x}, 0x{:x}) over 0x{:x} in scene \"{}\"{}.",
+        width, offset, value, (unsigned)current & mask, MGS1_LastStageName,
+        changes ? " - CHANGES IT" : "");
+    return true;
+}
+
+bool MGS1::SQOnRamRead(unsigned width, unsigned offset)
+{
+    if (MGS1_LanguagePTR == 0) return false;
+    unsigned bytes = width / CHAR_BIT;
+    if (bytes == 0) bytes = 1;
+    if (offset > MGS1_LanguagePTR || offset + bytes <= MGS1_LanguagePTR - 1) return false;
+    if (++MGS1_LanguageReadLogs > 4) return false;
+    spdlog::info("[MGS 1] Squirrel is reading the language word: getRamValue({}, 0x{:x}) in scene \"{}\".",
+        width, offset, MGS1_LastStageName);
     return true;
 }
 

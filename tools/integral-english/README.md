@@ -1389,19 +1389,33 @@ path does:
   save is loaded. GCL_RestoreVar (continue) and `load -r 0` hard restarts are
   not on the path either.
 
-So the writer is outside the game: the Master Collection's own layer. The one
-thing in the run's log that happens on this path and on no other is the
-collection's access hook on GCL_SetVar (`ACC HOOK: L80021778 R5=100`, fired by
-proc 0xC8CF's life-init `set` of 0x100) followed by `### MEDAL_MISSION_START
-unlocked` — with achievements disabled (`DisableRAM`) the medal logic still
-runs, and it never fired on the earlier title loads that hit the same hook.
-MGSM2Fix (2026-09-03) now logs every change of the language byte with its scene,
-traces any Squirrel `setRamValue` that overlaps the word with the caller's
-function, source and line (`SQOnRamWrite`), and **restores English whenever the
-bit is cleared in any scene but `option`** — the option screen being the only
-place the player can change it, a change seen there is followed instead. The
-next 1P MODE start will name the writer in `MGSM2Fix.log`; until then the
-restore is the fix, and the intro pages are untouched by it.
+So the writer is outside the game: the Master Collection's own layer — and a
+`setRamValue` trace added to MGSM2Fix (2026-09-03) names it. **The collection's
+script `_update_option_button_setting` (`system/script/play_standalone_mgs.nut`,
+line 844, called from `poll` every frame) writes the entire 16-bit
+GM_Configuration word at 0xB4D9C about sixty times a second**, with values such
+as 0x100 (English, button type A) and 0x110 (the same plus the game's
+"options changed" bit 0x10 once the option screen has been visited). It is how
+the collection imposes its own button-type setting on the game — and the reason
+the KEY CONFIG screen is "intercepted" by the collection. Since bits the
+collection does not own (0x10, 0x100) travel through unchanged, the write is a
+read-modify-write of the live word, so any game-side write to GM_Configuration
+that lands between the collection's read and its write is lost, and the
+language bit is one of those. The run in which 1P MODE played in Japanese
+happened without these diagnostics; the next run, with them, kept English
+throughout (2,700 writes traced, none changing the word), so the loss is
+intermittent and was not reproduced. The collection's earlier access hook on
+GCL_SetVar (`ACC HOOK: L80021778 R5=100`) and the `MEDAL_MISSION_START` unlock
+turned out to be unrelated achievement plumbing.
+
+MGSM2Fix now: logs every change of the language byte with its scene; traces the
+collection's writes to the word (all of them at first, then only the ones that
+change it) and its first reads, each with the Squirrel call stack; and
+**restores English whenever the bit is cleared in any scene but `option`** —
+the option screen being the only place the player can change it, a change seen
+there is followed instead. Whatever the collection's rewrite does to the bit,
+the guard puts it back on the next frame, so this is the fix; the intro pages
+are untouched by it.
 
 Also visible in that log: `Set the sixteen briefing flags (… write 3, scene
 "title")` immediately after the 1P `start -v`. UnlockBriefing re-sets the flags

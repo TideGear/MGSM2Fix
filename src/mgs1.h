@@ -140,6 +140,7 @@ public:
     virtual void SQOnMemoryDefine() override;
     virtual void SQOnUpdateGadgets() override;
     virtual bool SQOnRamWrite(unsigned width, unsigned offset, unsigned value) override;
+    virtual bool SQOnRamRead(unsigned width, unsigned offset) override;
     virtual void EPIOnLoadImage(void *image, unsigned int size) override;
     virtual bool EPIOnMachineCommand(std::any machine, int cmd, unsigned int **args) override;
 
@@ -166,6 +167,11 @@ private:
     int MGS1_LanguageLast = -1;
     bool MGS1_LanguageWanted = false;
     unsigned MGS1_LanguageLogs = 0;
+    // The Master Collection's _update_option_button_setting rewrites the whole
+    // GM_Configuration word every frame; only report the first few of those
+    // writes and reads, and every write that actually changes the word.
+    unsigned MGS1_LanguageWriteLogs = 0;
+    unsigned MGS1_LanguageReadLogs = 0;
     // libgcl's var_buf (variable.c) - the GCL `$f:`/`$w:` variable memory. Not a
     // memory define; a static whose address is read off GCL_GetVar's constants
     // in each executable. The briefing menu's sixteen items are gated by the
