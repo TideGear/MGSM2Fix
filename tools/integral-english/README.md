@@ -529,13 +529,42 @@ quad (`y0 = 2` in USA's code renders where `y0 = 14` puts it), and a symmetric
 12-row inset top and bottom accounts for both numbers. What inside the
 collection's renderer does it is not identified.
 
-**Consequence for this port.** `optsctext.py` crops the texture to rows 0..45
-(four lines) because that is what the collection's USA shows. If the four-line
-display is a collection artefact, the port faithfully reproduces the artefact
-rather than USA. The test that settles it: view **MGS1 USA's** brightness screen
-with `DisableRAM`/`DisableCDROM` **true** (as now). Six lines would mean a
-collection CD-ROM patch was truncating it and the crop should be reverted to the
-full 70 rows; four lines would confirm the renderer and the crop stays.
+### It is four of the collection's own CD-ROM patches (settled 2026-09-03)
+
+The test ran: with `DisableRAM`/`DisableCDROM` **true**, the collection's USA
+draws **all six lines**, at 2.05 line-heights below the green line against
+SwanStation's 2.01 — the same place. So the collection was truncating it, and
+the truncation is four CD-ROM patches, found by mapping the log's
+`filtering CD-ROM patch file disc1_<offset>_patch` names onto stage bytes:
+
+    disc1_165A34CC  disc1_165A3BD8  disc1_165A4508  disc1_165A4E38
+    -> USA option stage, tag 1 (DAR), all four inside the ONE 5852-byte
+       `sc_text` entry, at payload offsets 0, 1500, 3548 and 5596
+
+i.e. the collection replaces that whole texture, in 2048-byte pieces. Its
+replacement keeps the 232x70 canvas and centres four lines in it, which is why
+the block also sat 12 rows lower: 70 − 46 = 24, split evenly. The dropped
+sentence is "Press the ○ button to return to the option screen." — the ○ name is
+platform-specific, and the collection substitutes its own button UI everywhere
+else too (it intercepts KEY CONFIG and rewrites the button bits of
+`GM_Configuration` every frame).
+
+**This corrected the port.** `SC_ROWS` is back to **70** and the quad back to
+USA's own `Init_Res(work, "sc_text", po, -121, 2, 111, 72, 0, 0)`. The earlier
+"measured, not copied" `y0 = 14` with a 46-row crop had been fitted to the
+collection's replacement artwork, not to USA — so the adversarial review that
+argued for copying USA's constant was right, and the screenshot that appeared to
+refute it was of patched art. It also means the shipped build was **dropping a
+line of text both originals have**, which the no-abridgement rule forbids.
+Rebuilt and deployed 2026-09-03: DAR 121680 → 127508 (+5828), stage 75 → 78
+sectors, still DUMMY3M 384 (brf at 128..266 untouched); revert PPFs in
+`work/backup_sctext46_disc{1,2}.ppf`.
+
+**Lesson.** The collection's patch set is part of the baseline. A constant fitted
+to a collection screenshot is fitted to whatever the collection patched, and
+changing the patch flags changes the target. Before deriving any constant from a
+shot, check the session's `bPatchesDisable*` lines, and check whether the asset
+appears in the log's filtered patch list.
 
 ## Also not matched: the brightness grey ramp
 

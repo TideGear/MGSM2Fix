@@ -5,11 +5,15 @@ pixel-exact instead of re-wrapped font text.
 WHY A TEXTURE. USA never renders this paragraph with the font. It draws one
 232x70 4bpp texture, `sc_text`, on a quad:
     Init_Res(work, GV_StrCode("sc_text"), poly, -121, 2, 111, 72, 0, 0)
-We draw the same texture CROPPED to its first 46 rows at (-121,14)-(111,60):
-USA's screen only ever shows lines 1-4 (rows 47-69, the O-button sentence,
-never appear), and USA's constant of y0=2 lands the paragraph 12 rows above
-USA's own on-screen position when used here - measured dy -12 on all four
-lines with dx 0 - so the quad is placed by measurement, not copied.
+We draw that same texture whole, on USA's own quad constants.
+An earlier build cropped it to 46 rows and moved the quad to (-121,14)-(111,60),
+because the Master Collection's USA shows only lines 1-4, 12 rows lower than
+USA's constant puts them. Both are the COLLECTION's doing: it ships four CD-ROM
+patches replacing `sc_text` in USA's option stage with a 4-line version on the
+same 232x70 canvas, centred - dropping the O-button sentence (platform-specific
+button name) and shifting the block down 12 rows. With the collection's patches
+disabled its USA draws all six lines at SwanStation's position, so USA's own
+constants are correct and the measurement had been fitted to replaced art.
 Integral has no such texture and no code naming it, so it renders the paragraph
 as KCB font text from chain records 13-16/24/27. That path cannot reproduce
 USA's line breaks: `rect.w = kcb->max_width` is a single byte and one 4bpp tpage
@@ -113,7 +117,7 @@ CHAIN_OFF, CHAIN_TAG = 0x1B8, 6
 # where the two textures go
 SCT_VRAM, SCT_CLUT = (512, 256), (1008, 237)
 PAD_VRAM           = (512, 326)
-SC_ROWS            = 46          # texture rows kept: lines 1-4, all USA's screen shows
+SC_ROWS            = 70          # USA's whole texture: all six lines (see the docstring)
 
 
 def pad(x, a=2048): return (x + a - 1) // a * a
@@ -285,9 +289,9 @@ def build_stage():
     assert len(src) == 1, 'sc_text not found in USA option DAR'
     ext, blob = src[0][1], src[0][2]
     assert len(blob) % 4 == 0, 'sc_text payload %d not 4-aligned' % len(blob)
-    # USA's screen shows only lines 1-4 of this texture; rows 47-69 (the O-button
-    # sentence) never appear there.  Crop to the first SC_ROWS rows so the quad is
-    # 1:1 with no UV surgery, and prove the crop round-trips before using it.
+    # SC_ROWS is USA's full height: all six lines. (It was 46 while the port was
+    # matching the collection's replacement texture.) Re-encode anyway, and prove
+    # the round-trip, so a future crop cannot ship unverified.
     import pcx4
     w, h, pal, rows = pcx4.decode(blob)
     assert (w, h) == (232, 70), (w, h)
