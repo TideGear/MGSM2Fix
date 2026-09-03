@@ -160,11 +160,24 @@ def main():
         else: runs.append([k, k + 1])
     os.makedirs('work', exist_ok=True)
     open('work/int1_savemsg.exe', 'wb').write(chk)
+    # A run may cross a 2048-byte payload boundary; the image has 304 bytes of
+    # sector tail there, and Ketchup drops any byte whose in-sector position is
+    # >= 2048, so every record must stay inside one sector's payload.
+    def records(base):
+        out = []
+        for a, b in runs:
+            while a < b:
+                e = min(b, a + SECTOR_DATA - ((a - HDR) % SECTOR_DATA))
+                out.append((image_offset(base, a), chk[a:e])); a = e
+        return out
     for disc, base in INTEGRAL_BASE.items():
-        recs = [(image_offset(base, a), chk[a:b]) for a, b in runs]
+        recs = records(base)
+        for off, data in recs:      # Ketchup's own rule, replayed
+            k = off - base
+            assert k % SECTOR_RAW + len(data) <= SECTOR_DATA, 'record crosses a sector tail'
         blob = ppf3(recs, 'MGS Integral: English memory card messages')
         p = 'work/%s' % NAMES[disc]; open(p, 'wb').write(blob)
-        print('disc %d: %d runs, %d bytes -> %s' % (disc + 1, len(runs), sum(b - a for a, b in runs), p))
+        print('disc %d: %d runs -> %d records, %d bytes -> %s' % (disc + 1, len(runs), len(recs), sum(len(d) for _, d in recs), p))
         if deploy:
             d = os.path.join(MODS, str(disc), NAMES[disc]); open(d, 'wb').write(blob); print('   deployed %s' % d)
     if not deploy: print('\nNOT DEPLOYED. Re-run with --deploy to install.')

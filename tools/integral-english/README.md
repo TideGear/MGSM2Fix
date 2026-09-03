@@ -229,6 +229,15 @@ detail; this is the index.
 
 ### PPFs and deployment
 
+- **A PPF record aimed at the executable must not cross a 2048-byte payload
+  boundary.** Ketchup mirrors executable writes into RAM byte by byte with
+  `sector = k / 2352; pos = k % 2352; if (pos >= 2048) skip`, so a record that
+  runs from one sector's payload into the next spills its remainder into the
+  304-byte tail and those bytes never reach RAM — while the log still says
+  "loaded". `savemsg.py` splits every run at payload boundaries and replays
+  Ketchup's rule as an assert; the first build lost 142 of 442 bytes this way.
+  Check any executable patch with the replay: mirrored bytes must equal written.
+
 - Ketchup loads every PPF in `mods/INTEGRAL/INTEGRAL/{0,1}`; the log line
   `[Ketchup] base path is mods\INTEGRAL\INTEGRAL\0` confirms it picked them up.
   Keep patches in separate files so they can be disabled individually.
