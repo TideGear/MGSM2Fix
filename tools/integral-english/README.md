@@ -280,6 +280,30 @@ detail; this is the index.
 
 ### Toolchain and environment
 
+**Where the working data lives — and why that changed 2026-09-03.** Every tool
+here reads `work/…` relative to the current directory: the extracted
+`int1_stage.dir` / `int2_stage.dir` / `usa1_stage.dir` / `usa2_stage.dir`, both
+games' executables, the pinned `fonttext_disc*_option.ppf` chain input, every
+revert PPF, and the parked unlock PPFs. Until tonight all of it sat in the
+session scratchpad under `%LOCALAPPDATA%\Temp\claude\…` — a directory that is
+session-specific and lives under Windows Temp. Three gigabytes of re-extractable
+data plus every backup, one Disk Cleanup away from gone, and unreachable from
+any future session's scratchpad path.
+
+It now lives at **`D:\mgsbuild\integral-english-work\`**: `work\` (run the
+tools from that directory), `unlocks_parked\`, `keyconfig_test\`, and the ini,
+log and `opt.c` snapshots. The scratchpad copy is left in place for this
+session only. Anything a tool writes should go there, not to the scratchpad.
+
+**Verifiers, all of which read the deployed artefacts rather than the build:**
+
+| tool | proves |
+|---|---|
+| `ppfcheck.py --deployed` | every PPF under the mods folder parses the way Ketchup parses it |
+| `verify_integral_option.py` | the deployed Integral option PPFs rebuild to a stage whose `sc_text` has four lines at row 0 with the seam filler intact, on both discs |
+| `verify_usa_brightness.py` | the 426 bytes in the deployed `.asi`, at the offsets in its table, splice onto the collection's own USA data into that same texture, on both discs |
+| `shotcmp_brightness.py A.jpg [B.jpg]` | a screenshot's brightness paragraph position in line-heights below the green line, the notch test, and a per-band pixel diff between two shots |
+
 - Build with `PSYQ_SDK=D:/mgsbuild/psyq` from `D:/mgsbuild/d/build`
   (`py build.py`). The SDK path default in `build.py` is wrong for this machine.
 - `obj/option.bin` is the modified overlay; `build/option.matching.bin` is the
@@ -1416,6 +1440,14 @@ standing and is itself unattributed.
   game's own dialogue and codec text are already English by the language
   setting; this port is menus and UI only, and every menu stage lives on both
   discs identically.
+- **`en_savemsg` with achievements live.** The six collection RAM patches that
+  fall inside its pool land mid-run, where Ketchup's first-byte check cannot see
+  them. Enter LOAD DATA with `DisableRAM = false` and watch `Now checking Memory
+  Card.` — see "The collection's RAM patches collide with `en_savemsg`".
+- **SCREEN and EXIT after the doorbell build.** The doorbell sits in `case 8` of
+  `option_800C5150` beside the branches those two take; KEY CONFIG's
+  interception was confirmed, the neighbours were not re-shot afterwards. One
+  visit each.
 - **The save side of the memory-card messages.** Only LOAD has been shot. The
   save flow (a Mei Ling call) would exercise the "no empty block", "failed" and
   "now checking" captions, and slot 1's kept Japanese line after a success.
@@ -2446,13 +2478,57 @@ own 14 bytes over those offsets and corrupt the ported English mid-string. The
 port has only ever been tested with `DisableRAM = true`, which is why this has
 not been seen.
 
-Fix when it matters: make `savemsg.py` **pin** those six strings at their retail
-addresses (place them first, at the same offsets) so the collection's writes
-land on the strings they were written for, or accept that `en_savemsg` requires
-`DisableRAM = true`. Note the collection's replacements are its own wording
-(the STORAGE rename family), not USA's, so pinning means the ported English is
-overwritten by the collection's text on those six slots — the honest options are
-pin-and-lose-six or require the flag. Not yet decided.
+**Re-examined 2026-09-03 with achievements live (`DisableRAM = false` since
+17:00), and the picture is sharper — and wider — than the paragraph above.**
+
+`en_items` collides too, and far more heavily. Mapped with Ketchup's own rule
+(`ram = 0x10000 + (img - ram_base) / 0x930 * 0x800 + (img - ram_base) % 0x930`),
+`en_items` mirrors into `0x80010EAE..0x80011B02`, and the collection's two large
+RAM patches — `0x1101c` +2895 and `0x1108c` +2838 — cover
+`0x8001101C..0x80011BA2`: essentially the whole item-text pool. Yet English item
+text has been read for days with `DisableRAM = false` and never looked wrong.
+
+The reason is `Ketchup::Update`, and it also decides what can be concluded about
+`savemsg`. Every 30 frames Ketchup checks **the first byte of each RAM run** and,
+if any differs, rewrites every run and logs `Applied … (pass N)`. Every
+`en_items` run inside the collection's range *starts* inside it, so a collection
+write there would flip a first byte and force a pass 2. Across every saved log
+with `DisableRAM = false` — including the 08-29 sessions spent reading item
+text — the highest pass is **1**. So the collection's two big writes never
+landed after Ketchup's first pass. Items are proven intact.
+
+**`savemsg` is not.** The six 14-byte writes fall **mid-run**: the pool's runs
+start at `0x80011F19`, `0x80011F27`, `0x80011F29`, `0x80011F2B`, `0x80012078`,
+`0x80012098`, `0x800120B4`, and none of `0x11F34`, `0x11F6C`, `0x11F90`,
+`0x11FC4`, `0x11FC8`, `0x12020` is one of them. Ketchup's check cannot see those,
+so the pass-1 evidence says nothing about the pool. The `STORAGE 1 / 2` rename
+*does* show on the memory-card screens with the flag off, so that patch family
+is being applied at some point; whether the six pool members land before or
+after Ketchup's pass, and whether they stick, is unknown.
+
+**The test that settles it:** enter LOAD DATA with `DisableRAM = false` and
+watch the `Now checking Memory Card.` caption (load slot 5 — one of the six).
+`No save file.` proves nothing; it is slot 4 and untouched. Garbled →
+live.
+
+**Two honest fixes, and a decision between them:**
+
+1. Make Ketchup's check complete — every byte, still every 30 frames (3,510
+   bytes; trivial). Then the port's bytes are re-asserted whichever way the
+   race goes, and the six messages read as USA wrote them (`Memory Card …`).
+   Verbatim USA text, which is the port's rule. **Caveat:** if the collection
+   *re-applies* its patches (say, each time the memory-card screen opens), a
+   complete check would fight it and the text would flicker between the two
+   for up to 30 frames, then — after Ketchup's back-off at eight applies — for
+   up to 480. Measure whether it re-applies before choosing this.
+2. Let the collection's wording win for that family, the way the ○-button line
+   was let go: exclude the six addresses from the port, or filter nothing and
+   pin them. But the collection's replacement is *Japanese* storage wording,
+   so on an English pool it would read as mixed garbage — this option only
+   works together with adopting the collection's own English (its USA
+   rename strings), which has not been looked at.
+
+`DisableRAM = true` is no longer an option worth listing: it kills achievements.
 
 The collection also patches, outside the pool: the memory-card UI strings
 (`MEMORY CARD 1/2`, `SELECT MEMORY CARD`, `PRESS * TO SELECT MEMORY CARD`,

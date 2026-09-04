@@ -600,6 +600,20 @@ SQInteger SQHook<Q>::SQNative_entryCdRomPatch(HSQUIRRELVM<Q> v)
         return 1;
     }
 
+    // Watches first: a watch is a report, and must see the patch whether or
+    // not a filter below then drops it.
+    for (auto &watch : PatchWatches)
+    {
+        if (offset < watch.start || offset >= watch.end) continue;
+        std::string hex;
+        for (size_t i = 0; i < buffer.size() && i < 256; i++) {
+            hex += fmt::format("{:02x}", buffer[i]);
+        }
+        spdlog::info("[SQ] [Patch] WATCH {}: CD-ROM patch {} at offset 0x{:x},"
+            " {} bytes{}: {}", watch.label, file.empty() ? "<data>" : file, offset,
+            buffer.size(), buffer.size() > 256 ? " (first 256)" : "", hex);
+    }
+
     for (auto &filter : FileBlacklist)
     {
         if (file.empty()) break;
@@ -623,17 +637,6 @@ SQInteger SQHook<Q>::SQNative_entryCdRomPatch(HSQUIRRELVM<Q> v)
             " inside blacklisted range 0x{:x}..0x{:x}.",
             file.empty() ? "<data>" : file, offset, range.first, range.second);
         return 1;
-    }
-    for (auto &watch : PatchWatches)
-    {
-        if (offset < watch.start || offset >= watch.end) continue;
-        std::string hex;
-        for (size_t i = 0; i < buffer.size() && i < 256; i++) {
-            hex += fmt::format("{:02x}", buffer[i]);
-        }
-        spdlog::info("[SQ] [Patch] WATCH {}: CD-ROM patch {} at offset 0x{:x},"
-            " {} bytes{}: {}", watch.label, file.empty() ? "<data>" : file, offset,
-            buffer.size(), buffer.size() > 256 ? " (first 256)" : "", hex);
     }
 
     return 0;
