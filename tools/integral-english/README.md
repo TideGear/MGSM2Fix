@@ -1109,12 +1109,33 @@ would have worked at runtime but left nothing to verify. `static inline const
 unsigned char MGS1_BrightnessTextData[426]` emits real bytes, and the check
 above only exists because of that.
 
-**What has not been seen is the screen.** The test is the same measurement as
-for Integral: first line 1.86-1.88 line-heights below the green line, and no row
-inside the canvas darker than the strip beside it. The log should also carry
-`built-in patch sc_text rows 46-69 blanked -> MGS1_US USA disk 0`, a
-`CD-ROM write 0x165a4790 with 426 bytes`, and four filtered patches. The range
-filter on disk 0 and everything about disk 2 are derived rather than observed.
+**Verified on screen 2026-09-03, and the two games now agree exactly.** Paired
+collection shots at 3840x2160 with every collection patch active and
+achievements live (`bPatchesDisableRAM: false`, `bPatchesDisableCDROM: false` in
+that session's log): `Integral Mod/MC/20260903202117_1.jpg` and
+`MGS1 USA/MC/20260903201944_1.jpg`. Anchored on the green line and scaled by the
+text's own 108 px line pitch, **both** now read
+
+    green line y=906, four lines at rows 1107 / 1215 / 1323 / 1449
+    first line 1.86 line-heights below the green line  (SwanStation USA: 1.88)
+    no row inside the canvas darker than the strip beside it
+
+The collection's USA was 2.86 before this. Better than matching numbers, the two
+shots are *identical pixels* over the whole screen below the header — different
+files, different hashes, and a straight image difference gives **max 0** across
+every band from y=433 to y=1800: the ramp above the green line, the green line,
+the gap, all four lines of text, and below them. Only the header area differs at
+all (max 45, mean 0.034 over 119,040 sampled pixels), which is the option
+screen's own chrome and JPEG noise, not this texture.
+
+So Integral-via-`SC_KEEP_LINES` and USA-via-`BrightnessText` land on exactly the
+same pixels, from two completely different mechanisms — a rebuilt DAR entry on a
+relocated stage in one, and 426 bytes spliced into the collection's own archive
+entry in the other.
+
+Still derived rather than observed: the range filter's own contribution on disk 0
+(the filename filter would have caught those four anyway) and everything about
+disk 2, which has never been booted here.
 
 ## WITHDRAWN: the brightness grey ramp is not actually different
 
