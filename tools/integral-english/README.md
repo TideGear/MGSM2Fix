@@ -1312,10 +1312,36 @@ standing and is itself unattributed.
 
 ## Not tested
 
-- **Disc 2 in game.** Never launched. Its `preope` stage is byte-identical to
-  disc 1's and its option stage produced an identical PPF record set, so the
-  same builds are used and both discs' PPFs are generated together — but no one
-  has watched it run.
+- **Disc 2 in game.** Never launched — and neither has any *other* title's
+  disc 2, which is why no disc-2 patch candidate has ever appeared in a log.
+  But it is now measured rather than assumed (2026-09-03), and everything the
+  port touches is identical across the two discs:
+
+  | what the port patches | disc 1 vs disc 2 |
+  |---|---|
+  | the executable (`en_savemsg`, `en_items`) | **byte-identical**, all 641,024 bytes, same hash. USA's two are identical too. |
+  | `option` (75 sectors) | byte-identical |
+  | `preope` (87 sectors) | byte-identical |
+  | `brf` (138 sectors) | byte-identical |
+  | `camera` (38 sectors) | byte-identical |
+  | `demosel`, `change` | byte-identical |
+  | `title` (204 sectors) | **6 bytes differ**, and they are three per-disc LBAs (`0x00016CCB`/`0x00013DE0`, `0x0001721D`/`0x00014369`) in tag 6 — stream addresses, not text. `unlock_title.py` reads each disc's own source, so this is handled. |
+
+  Both discs' STAGE.DIR are the same size with the same 95 entries at the same
+  sectors. So a single build is correct for both wherever the source is
+  identical, which is everywhere except `title`.
+
+  Disc 2's *geometry* is verified against the real image, not just assumed:
+  `emit()` asserts DUMMY3M is blank at the target slot and that the option entry
+  still reads 27136, both read from disc 2's own image; and the readback checks
+  reconstruct disc 2's 78 DUMMY3M sectors from its own PPF records and find
+  `sc_text` correct and the doorbell stub at the right overlay offset. What
+  remains untested is only that it *runs*.
+
+  Nothing in scope is disc-2-specific. Integral is an (En,Ja) release, so the
+  game's own dialogue and codec text are already English by the language
+  setting; this port is menus and UI only, and every menu stage lives on both
+  discs identically.
 - **The save side of the memory-card messages.** Only LOAD has been shot. The
   save flow (a Mei Ling call) would exercise the "no empty block", "failed" and
   "now checking" captions, and slot 1's kept Japanese line after a success.
