@@ -1,167 +1,574 @@
-From 26a838bf83f2349c0edc68a454beec321aa20ad7 Mon Sep 17 00:00:00 2001
-From: TideGear <tidegear@gmail.com>
-Date: Sat, 29 Aug 2026 23:28:29 -0700
-Subject: [PATCH 1/2] Integral: English Previous Operations and option screen
-
-preope: Metal Gear's recap comes from the GCL chain as usual (12 pages).
-Metal Gear 2's 149 lines cannot - both recaps' text together overflows the
-chain's size ceiling, which sits between 9,567 and 10,304 bytes - so they live
-in the script chunk past the end of the script as NUL terminated strings, found
-by pointer from field_394[0].string (the payload of the chain's first record).
-They cannot go in the overlay either: it loads at a fixed address and must not
-grow past retail's 13 sectors.
-
-preope_reserved() is padding, never called. The main executable on the disc is
-never rebuilt, so it calls NewPreviousOperation at a hardcoded 0x800C4DA4; the
-edits above shift the code ahead of it and this puts the offset back. Verify
-after any change to preope.c with:
-
-    grep -m1 "  NewPreviousOperation" obj/asm_preope_lhs.map
-
-opt.c: the ported help lines need more than the 21 characters a 64-word column
-holds, so the columns are re-laid as {768, 896, 960} with column 3 starting one
-band lower, and font_set_kcb takes an explicit character width per entry. Both
-draw sites now read the column table instead of deriving x from the loop
-counter, which is what made a widened entry sample the wrong VRAM. f924 is
-grown to 12: it is indexed by f920, whose cursor states reach 11, so eight
-entries ran off the end into kcb[0]. Entry 27 (a colon USA does not show) is
-parked off-screen rather than blanked - blanking its chain record leaves EXIT's
-geometry uninitialised and the cursor writes through it.
----
- source/onoda/option/opt.c      | 56 +++++++++++++++++++++++++++-------
- source/onoda/preope/pre_met1.c |  2 +-
- source/onoda/preope/pre_met2.c |  2 +-
- source/onoda/preope/preope.c   | 35 ++++++++++++++++-----
- 4 files changed, 74 insertions(+), 21 deletions(-)
-
 diff --git a/source/onoda/option/opt.c b/source/onoda/option/opt.c
-index 23a51af..f8cceb9 100644
+index 23a51af..a4b86c5 100644
 --- a/source/onoda/option/opt.c
 +++ b/source/onoda/option/opt.c
-@@ -42,7 +42,10 @@ typedef struct _Work
+@@ -38,10 +38,14 @@ typedef struct _Work
+     DG_PRIM *field_30;
+     POLY_FT4 field_34[27];
+     POLY_FT4 field_46C[9];
+-    POLY_FT4 field_5D4[4];
++    POLY_FT4 field_5D4[5];
      POLY_FT4 field_674[17];
      int      f91C;
      int      f920;
--    int      f924[8];
-+    /* Indexed as f924[f920].  The cursor states run to 11 (EXIT steps to 10),
-+       so eight entries ran off the end into kcb[0] and corrupted a font
-+       control block's pointers - the wild write behind the EXIT freeze. */
-+    int      f924[12];
++    /* Indexed as f924[f920], and the cursor states run to 11, so retail's
++       eight entries are read and written off the end into kcb[0].  Retail
++       tolerates that; leave it at eight.  Growing it to 12 shifts kcb[] and
++       everything after by 16 bytes, and that is what freezes the EXIT row. */
+     int      f924[8];
      KCB      kcb[31];
      char     pad1[0x14];
-     DR_TPAGE tpage[3];
-@@ -88,7 +91,10 @@ static Unknown2 dword_800C3218[] =
+@@ -57,13 +61,18 @@ typedef struct _Work
+     int      f2A00[27];
+     int      f2A6C[9];
+     int      f2A90[27];
+-    int      f2AFC[4];
++    int      f2AFC[5];
+     int      f2B0C[17];
+     int      f2B50;
+     int      f2B54;
+     int      f2B58;
+     char     pad2[0x4];
+     int      f2B60;
++    /* USA draws the SCREEN brightness paragraph as the sc_text texture on a
++       fifth quad.  These are appended at the very END of Work on purpose: no
++       existing field's offset moves, so this cannot repeat the class of
++       breakage that growing f924 caused on the EXIT row.  The fifth pack comes
++       from GM_MakePrim below, which is a heap allocation, not this struct. */
+ } Work;
+ 
+ typedef struct _Unknown2
+@@ -80,19 +89,26 @@ static Unknown2 dword_800C3218[] =
+     {0, 76, 190, 0},
+     {0, 100, 190, 0},
+     {0, 42, 190, 0},
+-    {0, 94, 190, 0},
+-    {0, 88, 190, 0},
++    /* USA centres all four help lines at (160, 200) - screen centre - rather
++       than the per-string x retail hand-set for the Japanese widths.  num 1
++       subtracts half of max_width and half of max_height. */
++    {1, 160, 200, 0},   /* screen brightness setup */
++    {1, 160, 200, 0},   /* key configuration setup */
+     {0, 94, 190, 0},
+     {0, 158, 188, 0},
+     {0, 172, 190, 0},
      {0, 172, 190, 0},
      {0, 172, 190, 0},
      {0, 172, 190, 0},
 -    {0, 122, 190, 0},
-+    /* entry 12, the vibration help line.  The retail x was hand-set for the
-+       Japanese string's width; the English one is wider, so centre it instead
-+       (num 1 subtracts half of max_width, and half of max_height from y). */
-+    {1, 170, 200, 0},
-     {0, 36, 110, 0},
-     {0, 36, 125, 0},
-     {0, 36, 140, 0},
-@@ -103,7 +109,9 @@ static Unknown2 dword_800C3218[] =
-     {0, 36, 175, 0},
+-    {0, 36, 110, 0},
+-    {0, 36, 125, 0},
+-    {0, 36, 140, 0},
+-    {0, 36, 155, 0},
++    {1, 160, 200, 0},   /* use directional buttons to test */
++    /* The brightness paragraph, on USA's 12-row pitch.  Measured on screen:
++       measured against USA's own screen, the ink lands 1 px right of this x
++       and 16 rows below this y, so these are USA's ink positions (x 43, first
++       row y 134) less those offsets. */
++    {0, 42, 118, 0},   /* brightness line 1 */
++    {0, 42, 130, 0},   /* brightness line 2 */
++    {0, 42, 142, 0},   /* brightness line 3 */
++    {0, 42, 154, 0},   /* brightness line 4 */
      {0, 88, 190, 0},
-     {0, 122, 190, 0},
+     {0, 172, 190, 0},
+     {0, 172, 190, 0},
+@@ -100,10 +116,13 @@ static Unknown2 dword_800C3218[] =
+     {0, 42, 190, 0},
+     {0, 170, 190, 0},
+     {0, 170, 190, 0},
+-    {0, 36, 175, 0},
++    {0, 42, 166, 0},   /* brightness line 5 */
+     {0, 88, 190, 0},
+-    {0, 122, 190, 0},
 -    {0, 110, 188, 0},
-+    /* entry 27: the colon before the help line.  USA shows none.  Parked below
-+       the visible area rather than blanked, so the entry stays live. */
-+    {0, 110, 300, 0},
++    {1, 160, 200, 0},   /* use directional buttons to test, other button type */
++    /* entry 27 was a colon USA never shows.  Reused for the second line of
++       USA's "Press the O button to return to the option / screen." - see the
++       case 5 / case 7 move below. */
++    {0, 42, 178, 0},   /* brightness line 6 */
      {0, 76, 190, 0},
      {0, 172, 190, 0},
      {0, 172, 190, 0},
-@@ -114,6 +122,27 @@ signed char byte_800C3394[] = {-1, 0, 1, 0, 0, 1, 0, -1};
+@@ -114,6 +133,8 @@ signed char byte_800C3394[] = {-1, 0, 1, 0, 0, 1, 0, -1};
  
  #define EXEC_LEVEL GV_ACTOR_MANAGER
  
-+/* VRAM x of the three font columns.  The draw code used to derive this from
-+   its own loop counter as 768 + i * 64, so a texture could only ever live in
-+   one of three fixed places - moving one without moving the other made the
-+   sprite sample the wrong column.  Both sides now read the same table.
-+   Column 3 sits at 960 so that entry 12, the 31-character vibration-test
-+   help line, can have a 128-wide texture at 832 without overwriting it. */
-+static const short option_column_x[3] = { 768, 896, 960 };
-+/* Entries whose ported English text needs more than the 21 characters a
-+   64-word column holds.  font_get_buffer_size derives the VRAM width back
-+   from the character count, so widening is done by character count alone. */
-+#define OPTION_HELP_INDEX 12
-+static int option_char_width(int index)
-+{
-+    switch (index)
-+    {
-+    case 4:  case 5:  return 24;   /* screen brightness / key configuration setup */
-+    default:          return -1;   /* -1 keeps the width derived from rect.w */
-+    }
-+}
 +
 +
  static void option_800C339C(Work *work, int index)
  {
      RECT rect;
-@@ -124,21 +153,26 @@ static void option_800C339C(Work *work, int index)
-     if (index == 12)
+@@ -373,7 +394,7 @@ static void option_800C3C74(Work *work)
+     poly_src = work->field_5D4;
+     poly_dst = work->field_2C->packs[GV_Clock];
+ 
+-    for (i = 0; i < 4; poly_dst++, poly_src++, i++)
++    for (i = 0; i < 5; poly_dst++, poly_src++, i++)
      {
-         work->f29F4 = 256;
--        work->f29F0 = 832;
-+        work->f29F0 = option_column_x[1];
-         work->f29FC = 276;
-         work->f29F8 = work->f29F0;
-     }
-     else if (index == 24)
-     {
--        work->f29F4 = 256;
--        work->f29F0 = 896;
--        work->f29FC = 276;
-+        /* one band down: entry 12's wide texture occupies this column's x
-+           range for the first band only */
-+        work->f29F4 = 277;
-+        work->f29F0 = option_column_x[2];
-+        work->f29FC = 297;
-         work->f29F8 = work->f29F0;
-     }
+         *poly_dst = *poly_src;
  
-     rect.x = work->f29F0;
-     rect.y = work->f29F4;
--    rect.w = 64;
-+    /* 64 words is 256 pixels, which font_set_kcb turns into 21 characters -
-+       three short of the English help line.  128 gives it 42.  Only entry 12
-+       gets it; the strip it grows into is free now that column 3 moved. */
-+    rect.w = (index == OPTION_HELP_INDEX) ? 128 : 64;
-     rect.h = 21;
+@@ -500,7 +521,6 @@ static void option_800C4130(Work *work, u_long *ot)
  
-     work->fEC4[index].f0 = work->f29F0;
-@@ -151,7 +185,7 @@ static void option_800C339C(Work *work, int index)
-     work->fEC4[index].f6 = work->f29FC;
-     work->f29FC += 21;
+     case 5:
+         option_800C3B3C(work, 3, 0x6739);
+-        option_800C3B3C(work, 27, 0x6739);
  
--    font_set_kcb(kcb, -1, -1, 0, 6, 2, 0);
-+    font_set_kcb(kcb, option_char_width(index), -1, 0, 6, 2, 0);
- 
-     font_set_buffer(kcb, GV_AllocMemory(GV_NORMAL_MEMORY, font_get_buffer_size(kcb)));
- 
-@@ -245,7 +279,7 @@ static void option_800C3664(Work *work, u_long *ot)
-         if (found != 0)
+         if (work->f924[work->f920] == 0)
          {
-             tpage = &work->tpage[i];
--            setDrawTPage(tpage, 1, 0, getTPage(0, 0, 768 + i * 64, 256));
-+            setDrawTPage(tpage, 1, 0, getTPage(0, 0, option_column_x[i], 256));
-             addPrim(ot, tpage);
-         }
+@@ -517,11 +537,7 @@ static void option_800C4130(Work *work, u_long *ot)
+         break;
+ 
+     case 7:
+-        option_800C3B3C(work, 13, 0x6739);
+-        option_800C3B3C(work, 14, 0x6739);
+-        option_800C3B3C(work, 15, 0x6739);
+-        option_800C3B3C(work, 16, 0x6739);
+-        option_800C3B3C(work, 24, 0x6739);
++        /* nothing: the brightness paragraph is the sc_text quad now */
+         break;
+ 
+     case 8:
+@@ -772,41 +788,38 @@ static void option_800C4780(Work *work)
+         setRGB0(&poly[11], 70, 100, 90);
+         setRGB0(&poly[12], 70, 100, 90);
+ 
+-        poly[13].x0 = 74;
+-        poly[13].y0 = -18;
+-        poly[13].x1 = 138;
+-        poly[13].y1 = -18;
+-        poly[13].x2 = 74;
+-        poly[13].y2 = -11;
+-        poly[13].x3 = 138;
+-        poly[13].y3 = -11;
+-
+-        poly[14].x0 = -136;
+-        poly[14].y0 = -18;
+-        poly[14].x1 = -92;
+-        poly[14].y1 = -18;
+-        poly[14].x2 = -136;
+-        poly[14].y2 = -11;
+-        poly[14].x3 = -92;
+-        poly[14].y3 = -11;
+-
+-        poly[15].x0 = -136;
+-        poly[15].y0 = 2;
+-        poly[15].x1 = -84;
+-        poly[15].y1 = 2;
+-        poly[15].x2 = -136;
+-        poly[15].y2 = 9;
+-        poly[15].x3 = -84;
+-        poly[15].y3 = 9;
+-
+-        poly[16].x0 = 78;
+-        poly[16].y0 = -39;
+-        poly[16].x1 = 138;
+-        poly[16].y1 = -39;
+-        poly[16].x2 = 78;
+-        poly[16].y2 = -32;
+-        poly[16].x3 = 138;
+-        poly[16].y3 = -32;
++        poly[13].x0 = 88;
++        poly[13].y0 = -20;
++        poly[13].x1 = 120;
++        poly[13].y1 = -20;
++        poly[13].x2 = 88;
++        poly[13].y2 = -12;
++        poly[13].x3 = 120;
++        poly[13].y3 = -12;
++        poly[14].x0 = -121;
++        poly[14].y0 = -17;
++        poly[14].x1 = -77;
++        poly[14].y1 = -17;
++        poly[14].x2 = -121;
++        poly[14].y2 = -10;
++        poly[14].x3 = -77;
++        poly[14].y3 = -10;
++        poly[15].x0 = -120;
++        poly[15].y0 = 0;
++        poly[15].x1 = -92;
++        poly[15].y1 = 0;
++        poly[15].x2 = -120;
++        poly[15].y2 = 8;
++        poly[15].x3 = -92;
++        poly[15].y3 = 8;
++        poly[16].x0 = 60;
++        poly[16].y0 = -41;
++        poly[16].x1 = 148;
++        poly[16].y1 = -41;
++        poly[16].x2 = 60;
++        poly[16].y2 = -31;
++        poly[16].x3 = 148;
++        poly[16].y3 = -31;
      }
-@@ -288,7 +322,7 @@ static void option_800C3664(Work *work, u_long *ot)
-     if (found != 0)
+     else if (f29E8 == 1)
      {
-         tpage2 = &work->tpage[i];
--        setDrawTPage(tpage2, 1, 0, getTPage(0, 0, 768 + i * 64, 256));
-+        setDrawTPage(tpage2, 1, 0, getTPage(0, 0, option_column_x[i], 256));
-         addPrim(ot, tpage2);
+@@ -814,41 +827,38 @@ static void option_800C4780(Work *work)
+         setRGB0(&poly[11], 100, 160, 135);
+         setRGB0(&poly[12], 70, 100, 90);
+ 
+-        poly[13].x0 = -135;
+-        poly[13].y0 = 2;
+-        poly[13].x1 = -71;
+-        poly[13].y1 = 2;
+-        poly[13].x2 = -135;
+-        poly[13].y2 = 9;
+-        poly[13].x3 = -71;
+-        poly[13].y3 = 9;
+-
+-        poly[14].x0 = -136;
+-        poly[14].y0 = -18;
+-        poly[14].x1 = -92;
+-        poly[14].y1 = -18;
+-        poly[14].x2 = -136;
+-        poly[14].y2 = -11;
+-        poly[14].x3 = -92;
+-        poly[14].y3 = -11;
+-
+-        poly[15].x0 = 86;
+-        poly[15].y0 = -18;
+-        poly[15].x1 = 138;
+-        poly[15].y1 = -18;
+-        poly[15].x2 = 86;
+-        poly[15].y2 = -11;
+-        poly[15].x3 = 138;
+-        poly[15].y3 = -11;
+-
+-        poly[16].x0 = 78;
+-        poly[16].y0 = -39;
+-        poly[16].x1 = 138;
+-        poly[16].y1 = -39;
+-        poly[16].x2 = 78;
+-        poly[16].y2 = -32;
+-        poly[16].x3 = 138;
+-        poly[16].y3 = -32;
++        poly[13].x0 = -120;
++        poly[13].y0 = 0;
++        poly[13].x1 = -88;
++        poly[13].y1 = 0;
++        poly[13].x2 = -120;
++        poly[13].y2 = 8;
++        poly[13].x3 = -88;
++        poly[13].y3 = 8;
++        poly[14].x0 = -121;
++        poly[14].y0 = -17;
++        poly[14].x1 = -77;
++        poly[14].y1 = -17;
++        poly[14].x2 = -121;
++        poly[14].y2 = -10;
++        poly[14].x3 = -77;
++        poly[14].y3 = -10;
++        poly[15].x0 = 92;
++        poly[15].y0 = -20;
++        poly[15].x1 = 120;
++        poly[15].y1 = -20;
++        poly[15].x2 = 92;
++        poly[15].y2 = -12;
++        poly[15].x3 = 120;
++        poly[15].y3 = -12;
++        poly[16].x0 = 60;
++        poly[16].y0 = -41;
++        poly[16].x1 = 148;
++        poly[16].y1 = -41;
++        poly[16].x2 = 60;
++        poly[16].y2 = -31;
++        poly[16].x3 = 148;
++        poly[16].y3 = -31;
+     }
+     else if (f29E8 == 2)
+     {
+@@ -856,41 +866,38 @@ static void option_800C4780(Work *work)
+         setRGB0(&poly[11], 70, 100, 90);
+         setRGB0(&poly[12], 100, 160, 135);
+ 
+-        poly[13].x0 = -135;
+-        poly[13].y0 = -18;
+-        poly[13].x1 = -71;
+-        poly[13].y1 = -18;
+-        poly[13].x2 = -135;
+-        poly[13].y2 = -11;
+-        poly[13].x3 = -71;
+-        poly[13].y3 = -11;
+-
+-        poly[14].x0 = 94;
+-        poly[14].y0 = -18;
+-        poly[14].x1 = 138;
+-        poly[14].y1 = -18;
+-        poly[14].x2 = 94;
+-        poly[14].y2 = -11;
+-        poly[14].x3 = 138;
+-        poly[14].y3 = -11;
+-
+-        poly[15].x0 = -136;
+-        poly[15].y0 = f29E8;
+-        poly[15].x1 = -84;
+-        poly[15].y1 = f29E8;
+-        poly[15].x2 = -136;
+-        poly[15].y2 = 9;
+-        poly[15].x3 = -84;
+-        poly[15].y3 = 9;
+-
+-        poly[16].x0 = 78;
+-        poly[16].y0 = -39;
+-        poly[16].x1 = 138;
+-        poly[16].y1 = -39;
+-        poly[16].x2 = 78;
+-        poly[16].y2 = -32;
+-        poly[16].x3 = 138;
+-        poly[16].y3 = -32;
++        poly[13].x0 = -121;
++        poly[13].y0 = -20;
++        poly[13].x1 = -89;
++        poly[13].y1 = -20;
++        poly[13].x2 = -121;
++        poly[13].y2 = -12;
++        poly[13].x3 = -89;
++        poly[13].y3 = -12;
++        poly[14].x0 = 80;
++        poly[14].y0 = -17;
++        poly[14].x1 = 124;
++        poly[14].y1 = -17;
++        poly[14].x2 = 80;
++        poly[14].y2 = -10;
++        poly[14].x3 = 124;
++        poly[14].y3 = -10;
++        poly[15].x0 = -120;
++        poly[15].y0 = 0;
++        poly[15].x1 = -92;
++        poly[15].y1 = 0;
++        poly[15].x2 = -120;
++        poly[15].y2 = 8;
++        poly[15].x3 = -92;
++        poly[15].y3 = 8;
++        poly[16].x0 = 60;
++        poly[16].y0 = -41;
++        poly[16].x1 = 148;
++        poly[16].y1 = -41;
++        poly[16].x2 = 60;
++        poly[16].y2 = -31;
++        poly[16].x3 = 148;
++        poly[16].y3 = -31;
      }
  }
+ 
+@@ -1135,6 +1142,34 @@ static void option_800C4B68(Work *work)
+     }
+ }
+ 
++/* The Master Collection intercepts KEY CONFIG. It replaces the six instructions
++   that begin `case 8`'s third branch below (retail 0x800C550C, the first KEY
++   CONFIG cursor call) with
++
++       lui   v1, 0x8020        ; 0x80200000 - the emulator's doorbell, the one
++       lui   v0, 0x0000        ; address MGSM2Fix's Ketchup deliberately never
++       addiu v0, v0, 1         ; blocks, even with DisableRAM on
++       sw    v0, 0(v1)
++       j     0x800C5684        ; option_800C5150's epilogue, 20 bytes before
++       nop                     ; the next function
++
++   so selecting KEY CONFIG rings the doorbell and returns WITHOUT transitioning
++   to state 9. Its own Control Settings panel then draws over the OPTION menu -
++   which is why its screen still shows the OPTION rows behind it.
++
++   That patch is `disc1_16F8E024_patch.bin`, keyed to a byte offset inside
++   retail's overlay. This overlay is recompiled and 172 bytes shorter, and the
++   English port relocates the whole option stage into DUMMY3M besides, so the
++   patch lands on bytes the game never reads and the interception was lost.
++   Hence reproducing it here rather than inheriting it: ours works wherever the
++   stage ends up living.
++
++   Set to 0 for a raw PSX disc, where there is no collection to intercept
++   anything, 0x80200000 is past the end of a retail console's 2 MB, and the
++   ported KEY CONFIG screen is the entire point of porting its text. */
++#define OPTION_MC_CONTROL_SETTINGS 1
++#define OPTION_MC_DOORBELL         0x80200000
++
+ static void option_800C5150(Work *work, int param_2)
+ {
+     POLY_FT4 *poly;
+@@ -1238,6 +1273,7 @@ static void option_800C5150(Work *work, int param_2)
+             work->f2AFC[1] = 768;
+             work->f2AFC[2] = 256;
+             work->f2AFC[3] = 256;
++            work->f2AFC[4] = 512;
+         }
+         break;
+ 
+@@ -1254,7 +1290,13 @@ static void option_800C5150(Work *work, int param_2)
+         }
+         else
+         {
+-            option_800C449C(work, -149, -70, 88, 12, 255, 1);
++#if OPTION_MC_CONTROL_SETTINGS
++            /* Ring the doorbell and return, exactly as their patch does - no
++               transition to state 9. See the note above this function. */
++            *(volatile unsigned int *)OPTION_MC_DOORBELL = 1;
++            return;
++#endif
++            option_800C449C(work, -148, -70, 88, 13, 255, 1);
+ 
+             work->f920 = 9;
+             work->f29E4 = 0;
+@@ -1284,7 +1326,7 @@ static void option_800C5150(Work *work, int param_2)
+         break;
+ 
+     case 7:
+-        for (i = 0; i < 4; i++)
++        for (i = 0; i < 5; i++)
+         {
+             work->f2AFC[i] = 0;
+         }
+@@ -1328,7 +1370,7 @@ static void option_800C5698(Work *work)
+         if (press & PAD_DOWN)
+         {
+             work->f29E4 = 1;
+-            option_800C449C(work, -149, 38, 88, 12, 255, 1);
++            option_800C449C(work, -148, 38, 112, 13, 255, 1);
+             GM_SeSet2(0, 63, SE_MENU_CURSOR);
+         }
+         else if (press & (PAD_LEFT | PAD_RIGHT))
+@@ -1380,7 +1422,7 @@ static void option_800C5698(Work *work)
+         if (press & PAD_UP)
+         {
+             work->f29E4 = 0;
+-            option_800C449C(work, -149, -70, 88, 12, 255, 1);
++            option_800C449C(work, -148, -70, 88, 13, 255, 1);
+             GM_SeSet2(0, 63, SE_MENU_CURSOR);
+         }
+         else if (press & PAD_DOWN)
+@@ -1418,7 +1460,7 @@ static void option_800C5698(Work *work)
+         if (press & PAD_UP)
+         {
+             work->f29E4 = 1;
+-            option_800C449C(work, -149, 38, 88, 12, 255, 1);
++            option_800C449C(work, -148, 38, 112, 13, 255, 1);
+             GM_SeSet2(0, 63, SE_MENU_CURSOR);
+         }
+         else if (!(press & PAD_CIRCLE))
+@@ -2378,7 +2420,7 @@ static int GetResources(Work *work, int map)
+ 
+     work->field_24 = GM_MakePrim(DG_PRIM_SORTONLY | DG_PRIM_POLY_FT4, 27, NULL, NULL);
+     work->field_28 = GM_MakePrim(DG_PRIM_SORTONLY | DG_PRIM_POLY_FT4, 9, NULL, NULL);
+-    work->field_2C = GM_MakePrim(DG_PRIM_SORTONLY | DG_PRIM_POLY_FT4, 4, NULL, NULL);
++    work->field_2C = GM_MakePrim(DG_PRIM_SORTONLY | DG_PRIM_POLY_FT4, 5, NULL, NULL);
+     work->field_30 = GM_MakePrim(DG_PRIM_SORTONLY | DG_PRIM_POLY_FT4, 17, NULL, NULL);
+ 
+     po = work->field_34;
+@@ -2547,6 +2589,22 @@ static int GetResources(Work *work, int map)
+     work->f2AFC[i] = 0;
+     i++;
+ 
++    /* USA's own call, copied exactly, drawing USA's whole 232x70 texture.
++       An earlier build used (-121, 14, 111, 60) with the texture cropped to 46
++       rows, because the Master Collection's USA shows only lines 1-4 and shows
++       them 12 rows lower than this constant puts them.  Both of those are the
++       collection's doing, not USA's: it ships four CD-ROM patches that replace
++       `sc_text` in USA's option stage with a 4-line version on the same 232x70
++       canvas, the four lines centred in it - which drops the O-button sentence
++       (that button's name is platform-specific) and moves the block down 12
++       rows.  With the collection's patches disabled, its USA draws all six
++       lines at exactly SwanStation's position, so USA's constant is right and
++       the measurement had been fitted to replaced artwork. */
++    Init_Res(work, GV_StrCode("sc_text"), po, -121, 2, 111, 72, 0, 0);
++    po++;
++    work->f2AFC[i] = 0;
++    i++;
++
+     po = work->field_674;
+     i = 0;
+ 
+@@ -2566,25 +2624,33 @@ static int GetResources(Work *work, int map)
+     work->f2B0C[i] = 0;
+     i++;
+ 
+-    Init_Res(work, GV_StrCode("key_button"), po, -149, -70, -61, -58, 1, 0);
++    /* KEY CONFIG labels: USA's own quads, read out of USA's option overlay
++       (base 0x800C5968, each label's string referenced from exactly one
++       lui/addiu site, arguments taken at the following Init_Res call).
++       Four quads change because USA's art is a different size; the other four
++       - key_syukan, key_action, key_buki, key_hohuku - already carry USA's
++       constants, and for three of those USA's own art is SMALLER than the quad,
++       so USA stretches it. Keeping the quad reproduces that stretch exactly,
++       which is what matching USA means here. */
++    Init_Res(work, GV_StrCode("key_button"), po, -148, -70, -60, -57, 1, 0);
+     setRGB0(po, 100, 160, 135);
+     po++;
+     work->f2B0C[i] = 0;
+     i++;
+ 
+-    Init_Res(work, GV_StrCode("key_sykan"), po, -149, 38, -61, 50, 1, 0);
++    Init_Res(work, GV_StrCode("key_sykan"), po, -148, 38, -36, 51, 1, 0);
+     setRGB0(po, 100, 160, 135);
+     po++;
+     work->f2B0C[i] = 0;
+     i++;
+ 
+-    Init_Res(work, GV_StrCode("key_reverse"), po, 29, 41, 93, 47, 1, 0);
++    Init_Res(work, GV_StrCode("key_reverse"), po, 40, 42, 84, 48, 1, 0);
+     setRGB0(po, 70, 100, 90);
+     po++;
+     work->f2B0C[i] = 0;
+     i++;
+ 
+-    Init_Res(work, GV_StrCode("key_normal"), po, -35, 41, 17, 47, 1, 0);
++    Init_Res(work, GV_StrCode("key_normal"), po, -18, 39, 22, 49, 1, 0);
+     setRGB0(po, 100, 160, 135);
+     po++;
+     work->f2B0C[i] = 0;
+@@ -2624,25 +2690,48 @@ static int GetResources(Work *work, int map)
+     work->f2AFC[i] = 0;
+     i++;
+ 
+-    Init_Res(work, GV_StrCode("key_action"), po, 74, -18, 138, -11, 0, 0);
++    /* These four quads are OVERWRITTEN every frame by the per-button-type
++       function above, which is where the real rectangles live - so these values
++       only matter for the first frame, and they are USA's type-A ones to keep
++       the source honest. Init_Res takes the screen rect from the quad and the
++       UVs from the texture, so a rectangle that does not match its art scales
++       the art; every one of USA's is exactly its art's size. */
++    /* abe = 1 on these four, as USA does. USA passes a saved register that is
++       always non-zero here, so every KEY CONFIG label is drawn semi-transparent,
++       and USA's own art relies on it: its palettes have no (0,0,0) entry - index
++       0 is a visible grey - so with abe = 0 the label's background renders as an
++       opaque box (LoadPalette in libdg/loader.c maps only pure black to 0x0000).
++       Integral's own art did have a transparent index 0 and did not need it.
++       USA's textures also carry PCXINFO flag 0x18, i.e. blend rate 1
++       ((flag & 0x30) >> 4 -> DG_SetTexture's abr), which comes along with the
++       art. */
++    Init_Res(work, GV_StrCode("key_action"), po, 88, -20, 120, -12, 1, 0);
+     setRGB0(po, 100, 160, 135);
+     po++;
+     work->f2AFC[i] = 0;
+     i++;
+ 
+-    Init_Res(work, GV_StrCode("key_buki"), po, -136, -18, -92, -11, 0, 0);
++    Init_Res(work, GV_StrCode("key_buki"), po, -121, -17, -77, -10, 1, 0);
+     setRGB0(po, 100, 160, 135);
+     po++;
+     work->f2AFC[i] = 0;
+     i++;
+ 
+-    Init_Res(work, GV_StrCode("key_hohuku"), po, -136, 2, -84, 9, 0, 0);
++    Init_Res(work, GV_StrCode("key_hohuku"), po, -120, 0, -92, 8, 1, 0);
+     setRGB0(po, 100, 160, 135);
+     po++;
+     work->f2AFC[i] = 0;
+     i++;
+ 
+-    Init_Res(work, GV_StrCode("key_syukan"), po, 78, -39, 138, -32, 0, 0);
++    /* key_syukan is USA's art at USA's size, but shifted +11 px right of USA's
++       own x. Integral's background art puts the connector curve coming off the
++       triangle button 11 px further right than USA's does - USA moved its curve
++       to clear the label, Integral did not - so USA's absolute x would leave the
++       label sitting on the curve. Measured from paired screenshots: the rule
++       beneath the label starts at screen x 2343 in USA and 2442 here, 99 px at
++       8.92 px per game px. Moving the text instead of porting the art is by the
++       user's rule of 2026-09-03, and was asked for in this case. */
++    Init_Res(work, GV_StrCode("key_syukan"), po, 60, -41, 148, -31, 1, 0);
+     setRGB0(po, 100, 160, 135);
+     po->b0 = 135;
+     po++;
 diff --git a/source/onoda/preope/pre_met1.c b/source/onoda/preope/pre_met1.c
-index 60aea1e..30b87b2 100644
+index 60aea1e..96d906e 100644
 --- a/source/onoda/preope/pre_met1.c
 +++ b/source/onoda/preope/pre_met1.c
 @@ -16,7 +16,7 @@
@@ -169,12 +576,42 @@ index 60aea1e..30b87b2 100644
  
  #define EXEC_LEVEL  GV_ACTOR_USER
 -#define PAGE_COUNT  9
-+#define PAGE_COUNT  12
++#define PAGE_COUNT  13
  
  typedef struct PreMet1Prims
  {
+@@ -92,15 +92,21 @@ typedef struct PreMet1Unk
+     int   fore_color;
+ } PreMet1Unk;
+ 
++/* USA's recap layout, measured line by line against its own screenshots:
++   origin x 8, pitch 22 rows.  Retail Integral had x 16 / pitch 19, and that
++   8 px of extra left margin is what ran the longest lines off the 320 px
++   screen edge.  With these values every line lands on USA's to the pixel at
++   both ends - the glyph widths are identical between the two builds.  Slot 8
++   is the blank that pads USA's 7 lines a page out to this engine's 8. */
+ static PreMet1Unk premet1_800C3250[8] = {
+-    {0x0010, 0x0023, 0x00000000},
+-    {0x0010, 0x0036, 0x00000000},
+-    {0x0010, 0x0049, 0x00000000},
+-    {0x0010, 0x005C, 0x00000000},
+-    {0x0010, 0x006F, 0x00000000},
+-    {0x0010, 0x0082, 0x00000000},
+-    {0x0010, 0x0095, 0x00000000},
+-    {0x0010, 0x00A8, 0x00000000},
++    {0x0008, 0x0023, 0x00000000},
++    {0x0008, 0x0039, 0x00000000},
++    {0x0008, 0x004F, 0x00000000},
++    {0x0008, 0x0065, 0x00000000},
++    {0x0008, 0x007B, 0x00000000},
++    {0x0008, 0x0091, 0x00000000},
++    {0x0008, 0x00A7, 0x00000000},
++    {0x0008, 0x00BD, 0x00000000},
+ };
+ 
+ static signed char premet1_800C3290[8] = {-1, 0, 1, 0, 0, 1, 0, -1};
 diff --git a/source/onoda/preope/pre_met2.c b/source/onoda/preope/pre_met2.c
-index 29e3ca4..f9993e0 100644
+index 29e3ca4..145ef96 100644
 --- a/source/onoda/preope/pre_met2.c
 +++ b/source/onoda/preope/pre_met2.c
 @@ -16,7 +16,7 @@
@@ -186,40 +623,66 @@ index 29e3ca4..f9993e0 100644
  
  typedef struct PreMet2Prims
  {
+@@ -93,14 +93,14 @@ typedef struct PreMet2Unk
+ } PreMet2Unk;
+ 
+ static PreMet2Unk premet2_800C3250[8] = {
+-    {0x0010, 0x0023, 0x00000000},
+-    {0x0010, 0x0036, 0x00000000},
+-    {0x0010, 0x0049, 0x00000000},
+-    {0x0010, 0x005C, 0x00000000},
+-    {0x0010, 0x006F, 0x00000000},
+-    {0x0010, 0x0082, 0x00000000},
+-    {0x0010, 0x0095, 0x00000000},
+-    {0x0010, 0x00A8, 0x00000000},
++    {0x0008, 0x0023, 0x00000000},
++    {0x0008, 0x0039, 0x00000000},
++    {0x0008, 0x004F, 0x00000000},
++    {0x0008, 0x0065, 0x00000000},
++    {0x0008, 0x007B, 0x00000000},
++    {0x0008, 0x0091, 0x00000000},
++    {0x0008, 0x00A7, 0x00000000},
++    {0x0008, 0x00BD, 0x00000000},
+ };
+ 
+ static signed char premet2_800C3290[8] = {-1, 0, 1, 0, 0, 1, 0, -1};
 diff --git a/source/onoda/preope/preope.c b/source/onoda/preope/preope.c
-index 003bda4..45db8ea 100644
+index 003bda4..2659285 100644
 --- a/source/onoda/preope/preope.c
 +++ b/source/onoda/preope/preope.c
 @@ -16,6 +16,8 @@
  #define EXEC_LEVEL GV_ACTOR_MANAGER
  
  // FIXME: it's the same struct as in change.c (in change overlay)
-+#define MG2_RECAP_OFFSET 22029
++#define MG2_RECAP_OFFSET 22042
 +
  typedef struct _Unknown
  {
      SPRT  text_sprt[2];
-@@ -46,8 +48,8 @@ typedef struct _Work
+@@ -46,8 +48,11 @@ typedef struct _Work
      char     pad378[0x14];
      DR_TPAGE field_38C;
      Unknown  field_394[4];
 -    Unknown  field_714[72];
 -    Unknown  field_4614[112];
-+    Unknown  field_714[12 * 8];
++    /* 13 pages, USA's pagination.  The engine draws 8 slots a page and USA
++       lays out 7, so every page carries USA's 7 lines then one blank, which
++       keeps USA's page breaks exactly without touching any draw loop. */
++    Unknown  field_714[13 * 8];
 +    Unknown  field_4614[19 * 8];
      int      field_A814;
      int      field_A818;
      int      clut_x;
-@@ -820,7 +822,7 @@ static int GetResources(Work *work, int map)
+@@ -820,7 +825,7 @@ static int GetResources(Work *work, int map)
      }
  
      index = 0;
 -    for (j = 0; j < 9; j++)
-+    for (j = 0; j < 12; j++)
++    for (j = 0; j < 13; j++)
      {
          for (i = 0; i < 8; i++)
          {
-@@ -829,13 +831,21 @@ static int GetResources(Work *work, int map)
+@@ -829,13 +834,21 @@ static int GetResources(Work *work, int map)
          }
      }
  
@@ -240,13 +703,13 @@ index 003bda4..45db8ea 100644
 -            index++;
 +            work->field_4614[index].string = (char *)p;
 +
-+            while (*p++ != ' ')
++            while (*p++ != '\0')
 +            {
 +            }
          }
      }
  
-@@ -854,6 +864,15 @@ static int GetResources(Work *work, int map)
+@@ -854,6 +867,15 @@ static int GetResources(Work *work, int map)
  
  /*---------------------------------------------------------------------------*/
  
@@ -262,40 +725,3 @@ index 003bda4..45db8ea 100644
  void *NewPreviousOperation(int name, int where, int argc, char **argv)
  {
      Work *work;
--- 
-2.50.1.windows.1
-
-
-From b8ea28b488d890a298d85822cdf3aee5d8a78ae7 Mon Sep 17 00:00:00 2001
-From: TideGear <tidegear@gmail.com>
-Date: Sun, 30 Aug 2026 02:28:19 -0700
-Subject: [PATCH 2/2] preope: write the string terminator as an escape, not a
- raw NUL
-
-The MG2 recap walk compared against a literal 0x00 byte embedded in the
-source between two quotes, which is not a valid C character constant and
-made the whole file binary to grep and diff. psyq compiled it to the same
-comparison against zero - obj/preope.bin is byte identical before and
-after, and NewPreviousOperation stays at 800C4DA4 - but any tool that
-re-saved the file would have silently dropped the byte and changed the
-loop's meaning.
----
- source/onoda/preope/preope.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/source/onoda/preope/preope.c b/source/onoda/preope/preope.c
-index 45db8ea..bab17bd 100644
---- a/source/onoda/preope/preope.c
-+++ b/source/onoda/preope/preope.c
-@@ -843,7 +843,7 @@ static int GetResources(Work *work, int map)
-         {
-             work->field_4614[index].string = (char *)p;
- 
--            while (*p++ != ' ')
-+            while (*p++ != '\0')
-             {
-             }
-         }
--- 
-2.50.1.windows.1
-

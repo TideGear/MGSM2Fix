@@ -375,9 +375,11 @@ that is otherwise English.
 them.** With `DisableRAM`/`DisableCDROM` both `false` - every collection patch
 active - **MGS1 (USA)'s KEY CONFIG is intercepted**: the collection draws its own
 "Control Settings" panel (First Person View Mode, Controller Response Speed,
-Controller Settings, Keyboard Settings) over the game's screen. **Integral's is
-not.** Why, is not known — and two attempts to attribute it were wrong, so the
-record of what has been *ruled out* is the useful part.
+Controller Settings, Keyboard Settings) over the game's screen. Integral's was
+not — **because this port broke it. Found and fixed 2026-09-03; see "The
+collection's KEY CONFIG interception" below for the mechanism.** Three
+attributions were wrong before the right one, so the record of what was ruled
+out is kept as well.
 
 **It is not a CD-ROM patch.** MGSM2Fix's `Ketchup` title table gives the ids:
 **99** is `INTEGRAL`, **980** is `MGS1_JP`, **981** is `MGS1_US`, 982-986 the
@@ -492,6 +494,148 @@ colours do not).
 
 Note `key_normal` and `key_reverse` are already Latin in Integral, but in a
 bolder all-caps face; porting them changes the style to USA's lowercase.
+
+## The collection's KEY CONFIG interception, and how the port broke it
+
+Settled 2026-09-03, after the user relayed a claim from the MGSM2Fix Discord
+that Integral's KEY CONFIG *should* be intercepted and was not because
+`DisableRAM`/`DisableCDROM` were set. The flags were not set — that session's
+log records both `false` — but the claim was right that it should be
+intercepted, and the cause was ours.
+
+### What it actually is: a doorbell at `0x80200000`
+
+The collection patches the option stage's overlay at retail `0x800C550C`,
+replacing six instructions with:
+
+    lui   v1, 0x8020        ; 0x80200000
+    lui   v0, 0x0000
+    addiu v0, v0, 1         ; = 1
+    sw    v0, 0(v1)         ; ring
+    j     0x800C5684        ; option_800C5150's epilogue, 20 bytes before the
+    nop                     ;   next function
+
+`0x80200000` is the emulator's doorbell. MGSM2Fix already knew about it without
+knowing what it was for: `Ketchup::Update` carries
+`if (bPatchesDisableRAM && address != 0x200000)`, i.e. that one address is
+deliberately never blocked. The collection's native side watches it and puts up
+its Control Settings panel.
+
+`0x800C550C` is the first KEY CONFIG cursor call, inside `case 8`'s third branch
+of `option_800C5150` — the branch that transitions to state 9. So selecting KEY
+CONFIG rings the doorbell and **returns without entering the screen at all**,
+which is why the panel appears over the OPTION menu with its rows still visible
+behind it.
+
+### Why the port broke it, and how the cause was found
+
+Two bisection steps, no theorising:
+
+1. **Move our option PPF aside and boot.** Intercepted. So it is ours.
+2. **Relocate the retail stage, byte for byte, and boot.** *Not* intercepted.
+   So it is not our rebuilt contents — it is the relocation.
+
+Which then explained itself. The port parks the option stage in DUMMY3M and
+repoints its `STAGE.DIR` entry; the collection still writes its patch to the
+retail sectors; the game no longer reads them. The patch is orphaned. This is
+the same class of bug as `menu.ppf`'s chain records, which
+[the sc_text notes](#the-sc_text-texture-port) already describe — a relocated
+stage stops receiving everything aimed at where it used to be.
+
+The patch that does it is `disc1_16F8E024_patch.bin`, and it is the **only**
+collection patch anywhere inside Integral disc 1's option stage. Found by
+mapping every offset-named candidate the log records onto each stage's image
+span:
+
+| stage | sectors | relocated by the port? | collection patches inside |
+|---|---|---|---|
+| `option` | 27136..27210 | **yes** | **1** — `disc1_16F8E024_patch.bin`, stage offset 152460 |
+| `preope` | 27249..27335 | yes | 0 |
+| `brf` | 1..138 | yes | 0 |
+| `camera` | 27211..27248 | no | 0 |
+| `title` | 35391..35594 | no | 1 (`disc1_1822B55D_patch_PS5.bin`, and `title` is not relocated) |
+
+So this was one instance, not a class. **Re-run that audit whenever a new stage
+is relocated** — it is a few lines of arithmetic against the log's candidate
+list, and the failure mode is silent.
+
+### Seeing it at all needed a new tool
+
+`disc1_16F8E024_patch.bin` is entered **with a filename and zero bytes of inline
+data** — the content comes from the file, so MGSM2Fix's hook cannot read it, and
+no amount of staring at patch names would have revealed what it does.
+
+`SQHook::SetPatchWatch(start, end, label)` reports any CD-ROM patch landing in a
+disc-image range — offset, length and leading bytes — and then lets it through.
+Registered for both discs' option stages in `mgs1.h`. It was that watch which
+caught the *second*, previously invisible patch in the same stage: 24 inline
+bytes at `0x16f665ac`, which is overlay `+8964` = `0x800C550C`, the stub above.
+The lesson generalises: **the collection's file-backed patches are opaque to the
+hook, so watch the region, not the name.**
+
+The watch also fired at `0x128f3e64` — the exact disc 2 address predicted by
+putting stage offset 152460 through disc 2's STAGE.DIR LBA — so the same patch
+targets both disc images.
+
+### The fix: reproduce the stub, do not inherit it
+
+`opt.c` now carries it directly, behind `OPTION_MC_CONTROL_SETTINGS`:
+
+    else
+    {
+    #if OPTION_MC_CONTROL_SETTINGS
+        *(volatile unsigned int *)OPTION_MC_DOORBELL = 1;
+        return;
+    #endif
+        option_800C449C(work, -148, -70, 88, 13, 255, 1);
+        work->f920 = 9;
+        ...
+
+Reproduced rather than inherited because their patch is keyed to a byte offset
+inside retail's overlay, and ours is recompiled *and* relocated — so ours works
+wherever the stage ends up living. It builds to the same shape at our own
+addresses (the compiler picks different registers, which the emulator does not
+care about):
+
+    0x800C5434  3C028020  lui v0, 0x8020
+    0x800C5438  AC430000  sw  v1, 0(v0)
+    0x800C543C  08031548  j   0x800C5520     ; our epilogue
+    0x800C5440  00000000  nop
+
+Overlay came out **25,530 bytes, 312 under retail's 25,842 ceiling** — smaller
+than before, because the early return elides the whole state-9 setup block.
+
+**Set the flag to 0 for a raw PSX disc.** There is no collection to intercept
+anything, `0x80200000` is past the end of a retail console's 2 MB, and the
+ported KEY CONFIG screen is the entire reason its text was ported.
+
+### What this means for the KEY CONFIG text port
+
+In the collection, Integral's KEY CONFIG screen is now unreachable — as USA's
+always was — so the eight ported label textures are **not visible there**. They
+are still built, still verified, and are exactly what a raw PSX disc patch
+needs. The user's call, 2026-09-03: *"that was the point of porting the text. I
+want the intercept still in mc."*
+
+## PPF3's description field is 50 bytes, and `ljust` does not truncate
+
+Cost a 306 MB log and a crash on 2026-09-03. A hand-written PPF used a 60-byte
+description in the 50-byte header field; `ljust(50, b'\x00')` pads but never
+truncates, so every record offset was parsed 10 bytes late. Ketchup then wrote
+255-byte blocks at addresses like `0xfa4aa0aa4aa0afe`, in a loop, at roughly a
+gigabyte of log per minute.
+
+Two guards now:
+
+- Every tool that builds a PPF asserts its description length — `optsctext.py`,
+  `preope_ppf.py`, `reloc_ppf.py`. They were all padding without truncating; the
+  strings happened to be short enough.
+- **`ppfcheck.py`** parses a PPF exactly as Ketchup does and rejects what it
+  would choke on: bad magic, records running past EOF, zero-length records,
+  trailing bytes, and offsets past any plausible disc image.
+  `py ppfcheck.py --deployed` checks everything under the mods folder. Run it on
+  anything before it goes near the game — it caught the broken file instantly,
+  and all 18 deployed PPFs pass.
 
 ## Memory-card messages (`en_savemsg`)
 
