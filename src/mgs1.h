@@ -256,10 +256,13 @@ private:
     // The same entry as a disc-image range, per disk: `option` is STAGE.DIR
     // sector 27023 on both of MGS1 (USA)'s disks, and the entry's payload is
     // 5852 bytes at file offset 55499300, so the span follows from each disk's
-    // STAGE.DIR LBA (132344 and 100801). Of the 107 CD-ROM patches the
+    // STAGE.DIR LBA (132344 and 100801). Tight enough to be safe, checked two
+    // ways against every patch candidate in the log archive: of the 107 the
     // collection offers this title, exactly four fall anywhere inside the
-    // 81-sector option stage, and they are the four above - so a range this
-    // tight cannot catch anything else.
+    // 81-sector option stage and they are the four above; and across titles
+    // 99 (Integral) and 980 (the Japanese MGS1), whose disc images do span
+    // these offsets, nothing falls inside either window. Registered without
+    // knowing the title, because Load() runs before there is one.
     const std::vector<std::pair<uint64_t, uint64_t>> MGS1_RangeBlacklist_BrightnessText = {
         { 0x165A34CCull, 0x165A4F38ull },   // disk 0
         { 0x11EE2B7Cull, 0x11EE45E8ull },   // disk 1
