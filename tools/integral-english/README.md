@@ -824,6 +824,29 @@ single word with no space, text in the GCL scripts rather than the overlays
 (which is where the ported menus live, and those are handled), and anything on
 disc 2 or the VR disc.
 
+## What stays Japanese, and why (consolidated 2026-09-03)
+
+The rule is [no unauthorised translation](#scope-what-this-port-changes-and-what-it-deliberately-keeps):
+port USA's English, never invent it. Everything below therefore stays Japanese
+until the user authorises translation, and each entry is here because **USA has
+no counterpart to port**, not because it was missed. `jpsweep.py` swept disc 1
+and found nothing else portable.
+
+| still Japanese | why | where |
+|---|---|---|
+| 1P MODE's twenty-one explanation pages | an Integral-only mode; USA has no 1P MODE, so there is no English to port | "1P MODE" under Unlocks |
+| KEY CONFIG's per-row help lines (`ボタン設定：タイプA`, `主観モード時の操作：通常操作`, `オプション画面に戻ります。`) | USA's KEY CONFIG has no such lines | "The KEY CONFIG screen" |
+| the option screen's other Japanese help lines, and record 7's colon (`字幕設定：オン`) | Integral-only rows; record 7 was wrongly blanked once and restored | "The sc_text texture port" |
+| `savemsg` indices 1 and 9 (`セーブ中です`, `セーブが完了しました`) | USA draws nothing at those indices, so there is no text to port. Integral therefore flashes Japanese during and after a save | "Memory-card messages" |
+| six `camsave` slots (`0x60C`, `0x62C`, `0x63C`, `0x65C`, `0x668`, `0x66C`) | USA's strings at those slots are **empty** | "The PHOTO ALBUM's own memory-card messages" |
+| the save-slot title (full-width `ＭＧＳ．［ＮＭ］…`) | not in either caption table; the collection's own storage UI displays it. Separate question, never investigated | "Memory-card messages" |
+| record 3, the vibration-test row's label (`振動テスト`) | **kept blank, not Japanese** — the user's decision 2026-09-02: Integral's line is the row name plus a sentence USA's own line already covers | the scope table |
+| the whole VR disc | not started; USA's `SLUS-00957` does exist, so this one **is** portable | below |
+
+Two of these are worth revisiting only with authorisation: the 1P MODE pages
+(the largest body of untranslated text in the game) and the KEY CONFIG help
+lines. The rest are cases where USA itself shows nothing.
+
 ## Not ported at all: the VR disc (SLPM-86249)
 
 Integral's third disc — VR training — is untouched. `mods/INTEGRAL/VR-DISK/` is
@@ -1011,12 +1034,63 @@ operand — the double-NUL trick fixes the odd/even case but not the fact that
 execution resumes inside the text at all.
 
 The fix is the method already proven on `preope`: instead of padding, shorten
-the STRING value's length byte and shrink every enclosing container
-(`gclparse.py`'s `containers_over` returns exactly the sized nodes — the
-OPTION's `len`, the COMMAND's BE16 size, each enclosing ARG, and the script's
-BE32 length). Then there is no padding and no early NUL, so nothing resumes
-inside the text, and the centring is correct because the string really is
-shorter. Not attempted yet.
+the STRING value's length byte and shrink every enclosing container. Then there
+is no padding and no early NUL, so nothing resumes inside the text, and the
+centring is correct because the string really is shorter. Not attempted yet.
+
+**The containers, measured (2026-09-03).** `gclparse.py`'s `containers_over`
+returns exactly the four sized nodes over the first message at `0x11B5`, with
+the offset of each size field:
+
+| node | span | size field | note |
+|---|---|---|---|
+| `SCRIPT` | `0x10DE..0x1430` | `0x10DA`, BE32 | length 850 |
+| `ARG` | `0x10DE..0x1430` | `0x10DF`, BE16 | |
+| `COMMAND` | `0x1138..0x1406` | `0x1139`, BE16 | **id `0x9906`** |
+| `OPTION` | `0x11AD..0x1205` | `0x11AF`, u8 | option letter `'v'` |
+
+**Careful: the messages do not all live in that one OPTION.** Records run from
+`0x11B5` to about `0x1290`, while the `'v'` OPTION ends at `0x1205` — so only
+the first few are inside it and the rest sit in later blocks. Run
+`containers_over` **per edited record** rather than assuming one container set.
+
+They are `07 <len> <payload>` records, the same shape as the option chain's, and
+the payload is the game's own font encoding, not Shift-JIS: `0x80xx` is a Latin
+glyph, so `80 44 80 49 80 53 80 43 20 80 31` reads `DISC 1`.
+
+### How to test it
+
+**The crash test is easy, and it is the test that matters.** `GCL:WRONG CODE`
+fires while the interpreter walks the script, which happens **on entry to the
+title stage** — the first screen you see. So: rebuild, deploy, boot. Title
+screen with no `GCL:WRONG CODE` run in the log means the container arithmetic is
+right. No special conditions, no disc swapping, no save state.
+
+**There is a static test too, and it catches the same class of bug first.**
+`gclparse.py` is self-checking by construction: every container carries its own
+size, so a parse that lands exactly on each declared end proves the sizes are
+consistent, and a wrong edit desynchronises the walk and fails loudly. Re-parse
+the rebuilt chunk before deploying — that is precisely the failure that shipped
+last time.
+
+**Seeing the text on screen is the hard part, and may be impossible here.**
+Nothing in `stage/title.c` references these strings; they are arguments to
+command `0x9906`, and the real disc checking lives in `change.c` (`THIS IS
+DISC 2!!`, `THIS IS NOT DISC 2!!!`), whose copy already ships working as
+`en_menu2`. The collection swaps to disc 2 by itself, so the game may never
+reach a "wrong disc" path at the title screen at all — the same situation as
+KEY CONFIG, where the port's value turned out to be the raw disc patch rather
+than anything visible in the collection. Ways to force it, cheapest first:
+
+- Load a disc-2 save with disc 1 mounted, and see whether the game asks or the
+  collection just swaps.
+- Write the disc number the title stage checks, using MGSM2Fix's RAM hooks
+  (`SQOnRamWrite`/`SQOnRamRead`), once that variable is identified — `change.c`
+  shows how the game identifies a disc.
+
+**Do the cheap reachability check before building the fix.** If the text is
+unreachable in the collection, `en_menu3` is disc-patch completeness, not a
+visible bug, and should be scheduled as such.
 
 ## The collection shows only four of USA's six brightness lines (found 2026-09-03)
 
@@ -1345,6 +1419,13 @@ standing and is itself unattributed.
 - **The save side of the memory-card messages.** Only LOAD has been shot. The
   save flow (a Mei Ling call) would exercise the "no empty block", "failed" and
   "now checking" captions, and slot 1's kept Japanese line after a success.
+- **Whether `en_menu3`'s text is reachable in the collection at all.** The
+  collection swaps discs by itself, so the title stage may never reach a "wrong
+  disc" prompt. Cheap to check, and it decides whether `en_menu3` is a visible
+  bug or disc-patch completeness. See "How to test it" under
+  "Why `en_menu3` crashes".
+- **The other ~22 PHOTO ALBUM strings.** `en_camsave` ships 23; only
+  `No save file.` has been seen on screen.
 - **`[Patches] PreserveConfiguration` catching a real stale write.** Three clean
   runs; the race it guards is intermittent and has not been caught in the act.
   See `UPSTREAM.md`.
