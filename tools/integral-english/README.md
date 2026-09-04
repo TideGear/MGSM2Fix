@@ -60,6 +60,8 @@ case — ask before doing it.**
 |---|---|
 | `key_syukan` — KEY CONFIG's "first person view" (the △ button's label) — sits **+11 game px right** of USA's x | Integral's background art puts the connector curve coming off the △ button 11 px further right than USA's, because USA moved its curve left to clear the longer English label and Integral never had to. At USA's absolute x the label sat **on** Integral's curve. Measured on paired shots: the rule beneath the label starts at screen x 2343 in USA, 2442 here (99 px ÷ 8.92 px per game px = 11.1). After the shift the label is +18 screen px from its rule in **both** games — the gap is now identical, which is the point. **Asked and approved by the user, 2026-09-03**, and the case that produced the amendment above. Detail: "How the KEY CONFIG port was built". |
 
+| the brightness paragraph's fifth and sixth lines — "Press the ○ button to return to the option screen." — are **blanked in the collection build** | The collection drops them from its own USA, because ○ is not the back button on every platform. Integral has no `sc_text` for those patches to replace, so our six-line Integral contradicted the collection's own USA two menus away. `SC_KEEP_LINES = 4` blanks the same two lines for the collection build; `= 6` is USA's own text and is what a raw PSX disc patch gets, where ○ really is the back button. **The user's call, stated 2026-09-03**: "in MC i prefer the circle message suppressed". Detail: "The collection shows only four of USA's six brightness lines". |
+
 The other three KEY CONFIG labels were checked the same way and need no shift:
 each already sits USA's distance from its own rule. Only the rules' far ends run
 longer in Integral, which is art, and stays.
@@ -377,6 +379,23 @@ Controller Settings, Keyboard Settings) over the game's screen. **Integral's is
 not**, and the patch listing says why: `test_keyconfig_disc1.bin` sits under
 title **980**'s patch directory, USA loads titles 980/981, and Integral (title
 **099**) has no keyconfig patch at all.
+
+**It never did — checked against every log generation, 2026-09-03.** The user
+remembered Integral intercepting it before this port began, so the question was
+whether our rebuilt option overlay had broken it. It had not. Across all fifty
+saved `MGSM2Fix.log*` generations, back to 2026-08-29 and so before any of this
+work, the collection offers Integral **98** patch candidates and not one of them
+is a keyconfig patch; the only match anywhere is title 980's. The overlay rebuild
+could not have broken a patch the collection never asks for.
+
+Why the collection ships it for one title only is not documented, but the
+filename says a good deal: `test_keyconfig_disc1.bin` is named `test_`, exists
+under exactly **one** title, and covers exactly **one disc**. Titles 981 (107
+candidates) and 099 (98) have no equivalent, and there is no
+`test_keyconfig_disc2.bin` anywhere. It reads as a prototype that shipped for
+USA disc 1 and was never rolled out. **Falsifiable prediction: USA disc 2's KEY
+CONFIG should not be intercepted either.** Untested — worth a look next time
+disc 2 is booted, since it would settle "prototype" against "deliberate".
 
 So porting this screen is invisible to a stock USA player and fully visible to a
 stock Integral player - which is the version this port targets, so the work
@@ -910,6 +929,55 @@ to a collection screenshot is fitted to whatever the collection patched, and
 changing the patch flags changes the target. Before deriving any constant from a
 shot, check the session's `bPatchesDisable*` lines, and check whether the asset
 appears in the log's filtered patch list.
+
+### The dark bar over the grey ramp: one re-centring causes both symptoms
+
+The user, looking at the collection's four-line text: *"at the top of the MC's
+text there's a gray bar that looks like it's a chunk of the darkest of the gray
+brightness bar. Like the text was in the right place with the gray bar partially
+behind it, then the whole text including that part of the bar moved down."*
+
+That is exactly it, and USA's own texture proves it. Decoding `sc_text` and
+counting palette indices per row:
+
+    rows 0-1   194 of 232 px are palette index 0 = (8, 8, 8)
+    row  2      85 px of it
+    bg         index 12 = (0, 0, 0), 67% of the canvas
+
+`LoadPalette` turns **only** pure `(0,0,0)` into the transparent CLUT entry, so
+index 12 is see-through and index 0 — `(8,8,8)`, one step off black — is
+**opaque**. USA's art therefore carries a solid near-black bar across rows 0..3.
+Where USA puts it, immediately under the green line, the grey ramp behind it is
+already black and the bar is invisible. The collection re-centres the four
+remaining lines in the same 70-row canvas, which carries the bar down 11 rows
+onto a brighter ramp band — and there it shows. One re-centring, both symptoms:
+the low text and the bar. Nothing in the renderer, nothing to do with
+MGSM2Fix, and nothing to do with this port.
+
+### So the collection build blanks the lines instead of re-centring (2026-09-03)
+
+`SC_KEEP_LINES = 4` (`optsctext.py`) drops the same two lines the collection
+drops, and changes **nothing else**: same 232x70 canvas, same
+`Init_Res(work, "sc_text", po, -121, 2, 111, 72, 0, 0)` quad, line 1 still at
+row 0, bar still hidden at the top. `drop_lines()` finds the six line starts
+from an ink profile (rows `[0, 12, 24, 38, 47, 63]`), takes the blank gap above
+the first dropped line with it (cut at row 46), and blanks x 2..231 to the
+transparent index — preserving the vertical teal rule at x=1, and *restoring*
+the one at x=227 across the six pixels where the dropped line's ink had been
+covering it. Because the canvas and quad are untouched there is no overlay
+change at all, so the 25,842-byte ceiling is not back in play.
+
+Not cropping is the point. A 46-row texture would need the quad shortened to
+match — UVs come from the texture's own size via `SetPacketTexture`, so a
+70-row quad over 46 rows of art stretches it — and every one of those numbers
+is a chance to reintroduce the offset. Blanking touches one thing.
+
+Verified end to end from the **deployed** PPFs (not the build's intent):
+reconstruct the 78 DUMMY3M sectors from the PPF's own 682 records, walk the tag
+table and DAR, decode `sc_text`. Both discs: 232x70 at vram(512,256)
+clut(1008,237), inked lines starting at rows `[0, 12, 24, 38]`, 194 px of index
+0 in each of rows 0 and 1, no ink below. Six-line revert PPFs are in
+`work/backup_sctext6_disc{1,2}.ppf`.
 
 ## WITHDRAWN: the brightness grey ramp is not actually different
 

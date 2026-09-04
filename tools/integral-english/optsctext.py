@@ -5,15 +5,27 @@ pixel-exact instead of re-wrapped font text.
 WHY A TEXTURE. USA never renders this paragraph with the font. It draws one
 232x70 4bpp texture, `sc_text`, on a quad:
     Init_Res(work, GV_StrCode("sc_text"), poly, -121, 2, 111, 72, 0, 0)
-We draw that same texture whole, on USA's own quad constants.
-An earlier build cropped it to 46 rows and moved the quad to (-121,14)-(111,60),
-because the Master Collection's USA shows only lines 1-4, 12 rows lower than
-USA's constant puts them. Both are the COLLECTION's doing: it ships four CD-ROM
-patches replacing `sc_text` in USA's option stage with a 4-line version on the
-same 232x70 canvas, centred - dropping the O-button sentence (platform-specific
-button name) and shifting the block down 12 rows. With the collection's patches
-disabled its USA draws all six lines at SwanStation's position, so USA's own
-constants are correct and the measurement had been fitted to replaced art.
+We draw that same texture on USA's own quad constants, at USA's own size.
+
+SC_KEEP_LINES decides how much of it is inked. The Master Collection's USA
+shows only lines 1-4: it ships four CD-ROM patches replacing `sc_text` with a
+4-line version on the same 232x70 canvas, dropping the O-button sentence
+because that button's name is not the same on every platform. Integral has no
+`sc_text` for those patches to replace, so in the collection our six-line
+Integral disagreed with its own USA. SC_KEEP_LINES = 4 makes the collection
+build agree by blanking the same two lines; 6 is USA's own text, for a raw disc
+patch where O really is the back button.
+
+What the collection also does, and what we do not, is re-centre the four
+remaining lines in the 70-row canvas. That alone is why its text sits 11 rows
+low under a dark bar: USA's art carries an opaque (8,8,8) bar across rows 0..3,
+invisible just below the green line where the ramp is already black, and
+obvious once it moves down over a brighter band. Blanking instead of
+re-centring keeps line 1 at row 0 and the bar where USA hides it. An earlier
+build here cropped to 46 rows and moved the quad to (-121,14)-(111,60), fitting
+the collection's replacement art rather than USA's own - with the collection's
+patches disabled its USA draws all six lines at SwanStation's position, so
+USA's constants were right all along.
 Integral has no such texture and no code naming it, so it renders the paragraph
 as KCB font text from chain records 13-16/24/27. That path cannot reproduce
 USA's line breaks: `rect.w = kcb->max_width` is a single byte and one 4bpp tpage
@@ -117,7 +129,8 @@ CHAIN_OFF, CHAIN_TAG = 0x1B8, 6
 # where the two textures go
 SCT_VRAM, SCT_CLUT = (512, 256), (1008, 237)
 PAD_VRAM           = (512, 326)
-SC_ROWS            = 70          # USA's whole texture: all six lines (see the docstring)
+SC_ROWS            = 70          # USA's whole canvas height - never cropped (see the docstring)
+SC_KEEP_LINES      = 4           # 4 = the collection build; 6 = USA's own text, for a raw disc
 
 # KEY CONFIG: swap in USA's eight label textures. Four of the quads change too
 # (see opt.c); the other four already carry USA's constants, and for three of
@@ -140,6 +153,45 @@ KEY_LABELS = {                    # id: (name, vram, clut)
 # Nothing needs padding: opt.c now carries USA's own rectangles, and every one
 # of those is exactly its art's size.
 KEY_PAD_TO = {}
+
+
+def drop_lines(w, h, rows, keep, bg=12, teal=1, rule=227):
+    """Blank the text lines past `keep`, leaving canvas, quad and frame alone.
+
+    The collection drops USA's fifth and sixth lines - "Press the O button to
+    return to the option screen." - because O is not the back button on every
+    platform, which is a fair call. What it then gets wrong is re-centring the
+    four that remain in the same 232x70 canvas: USA's art carries an opaque
+    (8,8,8) bar across rows 0..3, invisible where USA puts it (just under the
+    green line, where the grey ramp is already black) but plainly visible once
+    the whole block moves down 11 rows. That is the dark bar over the ramp, and
+    the text sitting low, both out of the one re-centring.
+
+    So drop the same two lines and leave everything else exactly as USA has it:
+    same canvas, same quad, bar back in rows 0..3, line 1 starting at row 0.
+    The two vertical teal rules at x=1 and x=227 run the canvas's full height.
+    x=1 is never touched by glyphs and is copied through; at x=227 the dropped
+    line's ink was overwriting the rule, so the rule is restored there.
+    """
+    prof = [sum(1 for x in range(2, rule) if rows[y][x] not in (bg, 0, 11, 5))
+            for y in range(h)]
+    starts = [y for y in range(h) if prof[y] and (y == 0 or not prof[y - 1])]
+    assert len(starts) == 6, 'expected USA six lines, measured %d: %s' % (len(starts), starts)
+    if keep >= len(starts):
+        return h, starts, [list(r) for r in rows], 0
+    cut = starts[keep]
+    while cut and not prof[cut - 1]:
+        cut -= 1                          # take the blank gap above it too
+    out = [list(r) for r in rows]
+    restored = 0
+    for y in range(cut, h):
+        for x in range(2, w):
+            if x == rule:
+                restored += rows[y][x] != teal
+                out[y][x] = teal
+            else:
+                out[y][x] = bg
+    return cut, starts, out, restored
 
 
 def pad(x, a=2048): return (x + a - 1) // a * a
@@ -311,17 +363,21 @@ def build_stage():
     assert len(src) == 1, 'sc_text not found in USA option DAR'
     ext, blob = src[0][1], src[0][2]
     assert len(blob) % 4 == 0, 'sc_text payload %d not 4-aligned' % len(blob)
-    # SC_ROWS is USA's full height: all six lines. (It was 46 while the port was
-    # matching the collection's replacement texture.) Re-encode anyway, and prove
-    # the round-trip, so a future crop cannot ship unverified.
+    # The canvas is never cropped and the quad never moves: USA's height is
+    # USA's height. SC_KEEP_LINES only blanks lines - see drop_lines().
     import pcx4
     w, h, pal, rows = pcx4.decode(blob)
-    assert (w, h) == (232, 70), (w, h)
-    blob = pcx4.encode(blob, w, SC_ROWS, pal, rows[:SC_ROWS])
+    assert (w, h) == (232, SC_ROWS), (w, h)
+    cut, starts, kept, restored = drop_lines(w, h, rows, SC_KEEP_LINES)
+    assert kept[:cut] == [list(r) for r in rows[:cut]], 'drop_lines touched a kept row'
+    assert restored <= 6, 'restored %d px of the x=227 rule, expected the dropped line only' % restored
+    blob = pcx4.encode(blob, w, h, pal, kept)
     blob += bytes((-len(blob)) % 4)
     cw, ch, cpal, crows = pcx4.decode(blob)
-    assert (cw, ch) == (232, SC_ROWS) and crows == rows[:SC_ROWS] and cpal == pal, 'crop does not round-trip'
-    print('  sc_text  cropped 232x70 -> 232x%d (%d bytes), decode round-trips' % (SC_ROWS, len(blob)))
+    assert (cw, ch) == (w, h) and crows == kept and cpal == pal, 'blanking does not round-trip'
+    print('  sc_text  232x%d kept whole; lines start at rows %s, keeping %d - blanked %d..%d'
+          ' (%d px of the x=227 rule restored), %d bytes, decode round-trips'
+          % (h, starts, SC_KEEP_LINES, cut, h - 1, restored, len(blob)))
     newblob, old = set_pcxinfo(blob, SCT_VRAM[0], SCT_VRAM[1], SCT_CLUT[0], SCT_CLUT[1])
     print('  sc_text  USA vram(%d,%d) clut(%d,%d) %d colours flag 0x%X'
           % (old[0], old[1], old[2], old[3], old[4], old[5]))
@@ -447,6 +503,12 @@ def verify(stage, newsect):
     import pcx4
     sw, sh, _pal, _rows = pcx4.decode(got[SC_TEXT][1])
     assert (sw, sh) == (232, SC_ROWS), 'sc_text in the built DAR is %dx%d' % (sw, sh)
+    # independent of the build: count inked lines, and prove USA's (8,8,8) bar
+    # is still in rows 0..1 - had the block been re-centred, it would not be.
+    sprof = [sum(1 for x in range(2, 227) if _rows[y][x] not in (12, 0, 11, 5)) for y in range(sh)]
+    slines = sum(1 for y in range(sh) if sprof[y] and (y == 0 or not sprof[y - 1]))
+    assert slines == SC_KEEP_LINES, 'built sc_text has %d inked lines, want %d' % (slines, SC_KEEP_LINES)
+    assert min(_rows[0].count(0), _rows[1].count(0)) > 150, 'the (8,8,8) bar is not in rows 0..1'
     k = struct.unpack_from('<7H', got[KEY_PAD][1], 74)
     assert (k[2], k[3]) == PAD_VRAM, k
     assert pay[0] == open(OVL, 'rb').read(), 'overlay payload mismatch'
