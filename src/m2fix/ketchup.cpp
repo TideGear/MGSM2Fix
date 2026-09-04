@@ -69,9 +69,17 @@ void Ketchup<Q>::Update()
 	unsigned int interval = RamCheckInterval * (RamApplies < 8 ? 1 : 16);
 	if (RamTick++ % interval != 0) return;
 
-	// Cheap check: one byte per run. Anything wrong and we rewrite the lot.
-	// GetRamValue is masked because the value arrives widened, and comparing
-	// the raw result against a byte does not reliably hold.
+	// Cheap check: one byte per run, the first. Anything wrong and we rewrite
+	// the lot. GetRamValue is masked because the value arrives widened, and
+	// comparing the raw result against a byte does not reliably hold.
+	//
+	// Known blind spot: a foreign write that lands INSIDE a run without
+	// touching its first byte is not seen, so it stands until something else
+	// disturbs the run. The collection's own RAM patches can do exactly that -
+	// six of its memory-card rewrites fall mid-run in the Integral port's
+	// caption pool. Checking every byte would close it, but a foreign writer
+	// that re-applies would then fight this loop and flicker; measure that
+	// before changing it.
 	bool intact = true;
 	for (auto &patch : RamPatches) {
 		if ((SQEmuTask<Q>::GetRamValue(CHAR_BIT, patch.address) & 0xFF) != patch.data.front()) {
@@ -213,7 +221,7 @@ bool Ketchup<Q>::ProcessBuiltins(HSQUIRRELVM<Q> v, Ketchup_TitleInfo &title, Ket
 		spdlog::info("[SQ] [Ketchup] built-in patch {} -> {} {} disk {}.",
 			patch.name, title.name, version.name, disk.id);
 		ApplyBlock(v, title, version, disk, patch.offset,
-			const_cast<unsigned char *>(patch.data.data()), patch.data.size());
+			patch.data.data(), patch.data.size());
 	}
 
 	return true;
