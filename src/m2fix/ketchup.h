@@ -80,4 +80,13 @@ private:
 	static inline unsigned int RamTick = 0;
 	static inline unsigned int RamApplies = 0;
 	constexpr static unsigned int RamCheckInterval = 30;
+
+	// Read-only integrity report: every byte of every run, on a slow cadence,
+	// logging any run that differs from what was written. Never rewrites - the
+	// cheap first-byte check above owns that - so it cannot fight a foreign
+	// writer; it only makes one visible. See Audit() and the comment in Update().
+	static void Audit();
+	constexpr static unsigned int RamAuditInterval = 300;
+	static inline unsigned int RamAuditReports = 0;
+	static inline std::set<unsigned int> RamAuditSeen = {};
 };
