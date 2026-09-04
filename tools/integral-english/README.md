@@ -369,15 +369,18 @@ Was "not ported yet" until 2026-09-03. **The screen IS visible in the collection
 after all — before this it was the one screen still fully Japanese in a build
 that is otherwise English.
 
-**Corrected 2026-09-03 (second time on this point):** it was first thought the
-collection intercepted this screen, then that `DisableRAM`/`DisableCDROM` `true`
-was what revealed it, and a CD-ROM patch named `test_keyconfig_disc1` was named
-as the mechanism. **All of that is wrong for Integral.** With both flags back to
-`false` - every collection patch active - Integral's KEY CONFIG still renders
-normally, and the patch listing shows why: `test_keyconfig_disc1.bin` lives under
-title **980**'s patch directory, and Integral (title **099**) has no keyconfig
-patch of any kind. Whatever the earlier "normally intercepted" impression was, it
-was not this patch and not Integral. Unverified for the other versions. It also matters for a
+**Settled 2026-09-03: interception is per version, and Integral is not one of
+them.** With `DisableRAM`/`DisableCDROM` both `false` - every collection patch
+active - **MGS1 (USA)'s KEY CONFIG is intercepted**: the collection draws its own
+"Control Settings" panel (First Person View Mode, Controller Response Speed,
+Controller Settings, Keyboard Settings) over the game's screen. **Integral's is
+not**, and the patch listing says why: `test_keyconfig_disc1.bin` sits under
+title **980**'s patch directory, USA loads titles 980/981, and Integral (title
+**099**) has no keyconfig patch at all.
+
+So porting this screen is invisible to a stock USA player and fully visible to a
+stock Integral player - which is the version this port targets, so the work
+counts. It is also what a raw PSX disc patch would need for either game. It also matters for a
 future patch aimed at raw PSX disc images. Reference shots of both games,
 unintercepted, are in `reference/keyconfig_*.{usa,int}.jpg`, and every label's
 art from both discs is rendered side by side in `keyconfig-textures.png`.
