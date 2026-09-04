@@ -93,6 +93,10 @@ OUT      = 'work/option_sctext_stage.bin'
 JP       = 'D:/Steam/SteamApps/common/MGS1/windata/dlc/dlc_japan.bin'
 MODS     = 'D:/Steam/SteamApps/common/MGS1/mods/INTEGRAL/INTEGRAL'
 DESC     = b'MGS Integral: option screen text'
+# PPF3's description field is exactly 50 bytes and `ljust` only pads, never
+# truncates: a longer string shifts every record offset and the loader then
+# writes at garbage addresses until it dies. Cost 306 MB of log to find once.
+assert len(DESC) <= 50, 'PPF3 description is 50 bytes'
 
 HDR      = 24            # mode 2 form 1
 SLOT     = 384           # DUMMY3M sector index: past preope 0..89 and brf 128..266

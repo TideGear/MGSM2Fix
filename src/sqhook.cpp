@@ -258,6 +258,12 @@ void SQHook<Q>::SetPatchRangeBlacklist(uint64_t start, uint64_t end)
 }
 
 template <Squirk Q>
+void SQHook<Q>::SetPatchWatch(uint64_t start, uint64_t end, std::string label)
+{
+    PatchWatches.push_back({ start, end, label });
+}
+
+template <Squirk Q>
 void SQHook<Q>::SetPatchFileBlacklist(std::string file)
 {
     FileBlacklist.push_back(file);
@@ -617,6 +623,17 @@ SQInteger SQHook<Q>::SQNative_entryCdRomPatch(HSQUIRRELVM<Q> v)
             " inside blacklisted range 0x{:x}..0x{:x}.",
             file.empty() ? "<data>" : file, offset, range.first, range.second);
         return 1;
+    }
+    for (auto &watch : PatchWatches)
+    {
+        if (offset < watch.start || offset >= watch.end) continue;
+        std::string hex;
+        for (size_t i = 0; i < buffer.size() && i < 256; i++) {
+            hex += fmt::format("{:02x}", buffer[i]);
+        }
+        spdlog::info("[SQ] [Patch] WATCH {}: CD-ROM patch {} at offset 0x{:x},"
+            " {} bytes{}: {}", watch.label, file.empty() ? "<data>" : file, offset,
+            buffer.size(), buffer.size() > 256 ? " (first 256)" : "", hex);
     }
 
     return 0;

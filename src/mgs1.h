@@ -77,6 +77,22 @@ public:
             MGS1_KetchupPatches = MGS1_BrightnessTextPatches();
         }
 
+        // Report what the collection writes into Integral's `option` stage. It
+        // patches the stage's GCL script at one place - disc 1's is
+        // disc1_16F8E024_patch.bin, stage offset 152460, i.e. tag 6 (the script
+        // chunk) + 908 - and that patch is what redirects KEY CONFIG to the
+        // collection's own Control Settings panel. The English port relocates
+        // the stage, so the patch lands on sectors the game no longer reads and
+        // the interception is lost. Watching it means a change on their side is
+        // visible in the log rather than silent.
+        //     span = the retail `option` stage, sectors 27136..27210, through
+        //     (lba + fo / 2048) * 2352 + 24 + fo % 2048, with STAGE.DIR at LBA
+        //     136654 on disc 1 and 105178 on disc 2.
+        SQHook<Squirk::Standard>::SetPatchWatch(0x16F634B8ull, 0x16F8E5C8ull,
+            "Integral disc 1 option stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x128C92F8ull, 0x128F4408ull,
+            "Integral disc 2 option stage");
+
         if (M2Config::bPatchesDisableFont) {
             for (auto & MGS1_TextureWhitelist_Font : MGS1_TextureWhitelist_Fonts) {
                 SQHook<Squirk::Standard>::SetTextureWhitelist(MGS1_TextureWhitelist_Font);

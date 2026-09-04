@@ -13,6 +13,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from iso import Disc
 
 stage_name, stage_path, slot, disc_p, out_p = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], sys.argv[5]
+
+desc = ('MGS Integral: English %s' % stage_name).encode('latin1')
+# PPF3's description field is exactly 50 bytes, and `ljust` only pads - it never
+# truncates. A longer string shifts every record offset, and the loader then
+# writes at garbage addresses until the game dies. Cost 306 MB of log to find.
+assert len(desc) <= 50, 'PPF3 description field is 50 bytes'
 stage = open(stage_path, 'rb').read()
 disc = Disc(disc_p)
 files = {n.upper(): (l, s) for n, l, s, d in disc.walk() if not d}
@@ -50,7 +56,7 @@ print('   entry at file offset %d: sector %d -> %d' % (ent, old, offset))
 writes.append((img(sd_lba + ent // 2048, ent % 2048 + 8), struct.pack('<I', offset)))
 
 out = bytearray(b'PPF30' + bytes([2])
-                + ('MGS Integral: English %s' % stage_name).encode('latin1').ljust(50, b'\x00') + bytes(4))
+                + desc.ljust(50, b'\x00') + bytes(4))
 n = 0
 for off, data in writes:
     for k in range(0, len(data), 255):
