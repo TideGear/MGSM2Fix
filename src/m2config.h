@@ -13,7 +13,7 @@ public:
         bPatchesEnableMosaic = true;
         bPatchesRestoreGhosts = true;
         bPatchesRestoreMedicine = true;
-        bPatchesRestoreBrightnessText = true;
+        bPatchesRestoreBrightnessText = false;
         bPatchesPreserveConfiguration = true;
     }
 
