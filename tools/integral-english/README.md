@@ -944,15 +944,27 @@ counting palette indices per row:
     row  2      85 px of it
     bg         index 12 = (0, 0, 0), 67% of the canvas
 
-`LoadPalette` turns **only** pure `(0,0,0)` into the transparent CLUT entry, so
-index 12 is see-through and index 0 — `(8,8,8)`, one step off black — is
-**opaque**. USA's art therefore carries a solid near-black bar across rows 0..3.
-Where USA puts it, immediately under the green line, the grey ramp behind it is
-already black and the bar is invisible. The collection re-centres the four
-remaining lines in the same 70-row canvas, which carries the bar down 11 rows
-onto a brighter ramp band — and there it shows. One re-centring, both symptoms:
-the low text and the bar. Nothing in the renderer, nothing to do with
-MGSM2Fix, and nothing to do with this port.
+**The whole canvas is opaque** — `Init_Res`'s `abe` argument is `0`, and the
+rendered pixels agree: below the paragraph, inside the canvas's x span, both
+games read luminance 0.00 where the strip beside it reads 1.13. So the 232x70
+canvas is a solid black backdrop for the text, spanning game rows 122..191, and
+index 12 `(0,0,0)` is **not** see-through here. (An earlier note in this file
+claimed it was; that is corrected, and it matters for any quad drawn with
+`abe = 0`.)
+
+Which makes the `(8,8,8)` rows a **seam filler**, and a precise one. The ramp's
+own bands, measured left of the canvas: value ~8.9 down to game row 125.3, then
+~1.1 below. USA's canvas rows 0..3 land on game rows 122..125 — exactly the
+ramp's `8` band — and are painted one step off black so the backdrop's top edge
+disappears into it. Below row 126 the ramp is already ~0, so plain black hides
+there by itself. The art is fitted to `y0 = 2` to the row.
+
+The collection re-centres the four remaining lines in that canvas and the seam
+filler travels down with them, leaving pure black over the ramp's `8` band.
+Measured on its USA: rows 122.3..125.3 read 0.00 inside the canvas against 8.89
+beside it — a four-row notch, which is the bar the user spotted, and the text
+one full line pitch lower. One re-centring, both symptoms. Nothing in the
+renderer, nothing to do with MGSM2Fix, nothing to do with this port.
 
 ### So the collection build blanks the lines instead of re-centring (2026-09-03)
 
@@ -978,6 +990,24 @@ table and DAR, decode `sc_text`. Both discs: 232x70 at vram(512,256)
 clut(1008,237), inked lines starting at rows `[0, 12, 24, 38]`, 194 px of index
 0 in each of rows 0 and 1, no ink below. Six-line revert PPFs are in
 `work/backup_sctext6_disc{1,2}.ppf`.
+
+**Measured in game 2026-09-03, paired collection shots at 3840x2160** (ours:
+`Integral Mod …/MC/20260903174615_1.jpg`, theirs: `MGS1 USA/MC/20260903174739_1.jpg`),
+anchored on the green line and scaled by the text's own 108 px line pitch:
+
+| | first line below the green line | notch over the ramp's `8` band |
+|---|---|---|
+| SwanStation USA (README reference) | 1.88 line-heights | none |
+| **ours, Integral** | **1.86** | **none** — no row inside the canvas reads darker than the strip beside it |
+| the collection, USA | 2.86 | rows 122.3..125.3 read 0.00 vs 8.89 |
+
+Our text is exactly 108 px = one line pitch = 12 game rows higher than the
+collection's, landing 0.02 line-heights from SwanStation — inside the noise of a
+JPEG measurement. Horizontally all four lines are pixel-identical to the
+collection's: lines 1-3 agree on both edges to the pixel, and line 4's 9 px
+right-edge disagreement is a threshold artefact (columns 1138..1144 sit at
+115-122 luminance in both shots, either side of the 120 cutoff; both go dark at
+1146). Same glyphs, same x, one line pitch higher, no notch.
 
 ## WITHDRAWN: the brightness grey ramp is not actually different
 
