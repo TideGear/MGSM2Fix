@@ -161,14 +161,20 @@ def drop_lines(w, h, rows, keep, bg=12, teal=1, rule=227):
     The collection drops USA's fifth and sixth lines - "Press the O button to
     return to the option screen." - because O is not the back button on every
     platform, which is a fair call. What it then gets wrong is re-centring the
-    four that remain in the same 232x70 canvas: USA's art carries an opaque
-    (8,8,8) bar across rows 0..3, invisible where USA puts it (just under the
-    green line, where the grey ramp is already black) but plainly visible once
-    the whole block moves down 11 rows. That is the dark bar over the ramp, and
-    the text sitting low, both out of the one re-centring.
+    four that remain in the same 232x70 canvas.
+
+    The canvas is OPAQUE - Init_Res's abe is 0, and the rendered pixels agree -
+    so it is a solid black backdrop over game rows 122..191, and its rows 0..3
+    of palette index 0, (8,8,8), are a seam filler: they land on exactly the
+    rows where the grey ramp's own value is 8, hiding the backdrop's top edge.
+    Re-centring carries that filler down with the text and leaves pure black
+    over the ramp's 8 band, which is the dark notch above the collection's
+    text. Measured on its USA: 0.00 inside the canvas against 8.89 beside it,
+    four rows, with the text one full line pitch lower. One re-centring, both
+    symptoms.
 
     So drop the same two lines and leave everything else exactly as USA has it:
-    same canvas, same quad, bar back in rows 0..3, line 1 starting at row 0.
+    same canvas, same quad, filler back in rows 0..3, line 1 starting at row 0.
     The two vertical teal rules at x=1 and x=227 run the canvas's full height.
     x=1 is never touched by glyphs and is copied through; at x=227 the dropped
     line's ink was overwriting the rule, so the rule is restored there.
