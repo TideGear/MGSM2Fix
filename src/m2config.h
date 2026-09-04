@@ -4,6 +4,15 @@
 
 #include "m2fixbase.h"
 
+// What to do about the collection's replacement for MGS1's Option -> SCREEN
+// help texture. See [Patches] BrightnessText in the ini.
+enum class M2BrightnessText
+{
+    Collection,   // leave it alone
+    Fixed,        // its four lines, at the position the game draws them
+    Original,     // the game's own six lines, at that same position
+};
+
 class M2Config : public M2FixBase
 {
 public:
@@ -13,7 +22,7 @@ public:
         bPatchesEnableMosaic = true;
         bPatchesRestoreGhosts = true;
         bPatchesRestoreMedicine = true;
-        bPatchesRestoreBrightnessText = false;
+        eBrightnessText = M2BrightnessText::Fixed;
         bPatchesPreserveConfiguration = true;
     }
 
@@ -69,7 +78,10 @@ public:
     static inline bool bPatchesEnableMosaic;
     static inline bool bPatchesRestoreGhosts;
     static inline bool bPatchesRestoreMedicine;
-    static inline bool bPatchesRestoreBrightnessText;
+    // Given a value here, not just in the constructor: an enum's zero is
+    // Collection, so a read before the singleton is first constructed would
+    // otherwise see the wrong default.
+    static inline M2BrightnessText eBrightnessText = M2BrightnessText::Fixed;
     static inline bool bPatchesPreserveConfiguration;
     static inline bool bShouldCheckForUpdates;
     static inline bool bConsoleUpdateNotifications;

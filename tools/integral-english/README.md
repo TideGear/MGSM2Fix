@@ -376,26 +376,44 @@ them.** With `DisableRAM`/`DisableCDROM` both `false` - every collection patch
 active - **MGS1 (USA)'s KEY CONFIG is intercepted**: the collection draws its own
 "Control Settings" panel (First Person View Mode, Controller Response Speed,
 Controller Settings, Keyboard Settings) over the game's screen. **Integral's is
-not**, and the patch listing says why: `test_keyconfig_disc1.bin` sits under
-title **980**'s patch directory, USA loads titles 980/981, and Integral (title
-**099**) has no keyconfig patch at all.
+not.** Why, is not known — and two attempts to attribute it were wrong, so the
+record of what has been *ruled out* is the useful part.
 
-**It never did — checked against every log generation, 2026-09-03.** The user
-remembered Integral intercepting it before this port began, so the question was
-whether our rebuilt option overlay had broken it. It had not. Across all fifty
-saved `MGSM2Fix.log*` generations, back to 2026-08-29 and so before any of this
-work, the collection offers Integral **98** patch candidates and not one of them
-is a keyconfig patch; the only match anywhere is title 980's. The overlay rebuild
-could not have broken a patch the collection never asks for.
+**It is not a CD-ROM patch.** MGSM2Fix's `Ketchup` title table gives the ids:
+**99** is `INTEGRAL`, **980** is `MGS1_JP`, **981** is `MGS1_US`, 982-986 the
+European localisations. The collection prints its whole per-title patch
+candidate list on every boot (`conv_checked_path()`), and across every saved
+`MGSM2Fix.log*` generation:
 
-Why the collection ships it for one title only is not documented, but the
-filename says a good deal: `test_keyconfig_disc1.bin` is named `test_`, exists
-under exactly **one** title, and covers exactly **one disc**. Titles 981 (107
-candidates) and 099 (98) have no equivalent, and there is no
-`test_keyconfig_disc2.bin` anywhere. It reads as a prototype that shipped for
-USA disc 1 and was never rolled out. **Falsifiable prediction: USA disc 2's KEY
-CONFIG should not be intercepted either.** Untested — worth a look next time
-disc 2 is booted, since it would settle "prototype" against "deliberate".
+| title | candidates | keyconfig patch |
+|---|---|---|
+| 99 `INTEGRAL` | 94-98 | none |
+| 980 `MGS1_JP` | 78-84 | `test_keyconfig_disc1.bin` |
+| 981 `MGS1_US` | 97-107 | none |
+
+So the one keyconfig patch in the whole set belongs to the **Japanese** MGS1,
+not USA. USA has none, and its KEY CONFIG is intercepted anyway. Stronger still:
+map every USA candidate's name (the collection names each patch after its own
+disc-image offset) onto the option stage's image span — sectors 27023..27103,
+`0x16577868..0x165A6098` on disc 1 — and **exactly four of the 107 fall inside
+it**, the four `sc_text` pieces below. Nothing patches USA's option *overlay* at
+all, so no patch is redirecting that menu.
+
+**It never was Integral, either.** The user remembered Integral intercepting it
+before this port began, which would have meant our rebuilt option overlay broke
+it. It did not: the logs go back to 2026-08-29, before any of this work, and
+Integral is offered no keyconfig patch in any of them. The overlay rebuild
+cannot have broken a patch the collection never asks for.
+
+**Two withdrawn attributions, and the lesson.** First: "`test_keyconfig_disc1`
+is why USA intercepts it" — wrong, that patch is not in USA's list. Second:
+"it sits under title 980's directory, and USA loads 980/981" — also wrong, 980
+is the Japanese MGS1 and USA is 981 alone. Both came from grepping patch names
+across *all* logs at once and reading a title id as a version I had guessed at.
+**Attribute a patch to a title by the title's own id, and get the id from
+`MGS1_Ketchup` in `src/mgs1.h`, not from the order things appear in a log.**
+What remains true is only what was measured: USA's KEY CONFIG is intercepted,
+Integral's is not, and no CD-ROM patch explains it.
 
 So porting this screen is invisible to a stock USA player and fully visible to a
 stock Integral player - which is the version this port targets, so the work
@@ -1008,6 +1026,95 @@ collection's: lines 1-3 agree on both edges to the pixel, and line 4's 9 px
 right-edge disagreement is a threshold artefact (columns 1138..1144 sit at
 115-122 luminance in both shots, either side of the 120 cutoff; both go dark at
 1146). Same glyphs, same x, one line pitch higher, no notch.
+
+### Fixing it for USA too, in MGSM2Fix rather than on the disc (2026-09-03)
+
+Integral's copy of this texture is ours, so `SC_KEEP_LINES` settles it there.
+USA's is the collection's, and the user asked for that fixed too — as an
+MGSM2Fix feature, since it is a collection bug with no connection to this port.
+It is, and `UPSTREAM.md` carries the row.
+
+**Why MGSM2Fix can do it at all.** `Ketchup::ApplyBlock` already wraps
+`SQEmuTask::EntryCdRomPatch`, i.e. "write these bytes at this disc-image
+offset" — exactly a PPF record. So no new mechanism was needed, only a table the
+fix carries itself: `Ketchup_DiskPatch` (title, version, disk, offset, bytes),
+returned by a new `M2Game::SQKetchupPatches()` and applied by
+`Ketchup::ProcessBuiltins()` at the top of `ProcessDisk`, before the early
+return that skips a missing mods folder.
+
+**Why not a PPF in `mods/MGS1_US`.** A built-in leaves the reference game
+byte-stock whenever the setting is off, so pixel comparisons against USA need no
+file shuffling. A PPF would have to be moved aside each time.
+
+**426 bytes.** Do not re-encode the texture: `pcx4.encode` makes different
+run-length choices than whatever produced USA's art (5818 bytes against 5852 for
+the *same pixels*), so a whole-payload diff is 5288 bytes across 335 runs. But
+this PCX is four bit planes, run-length encoded **one row at a time**, so rows
+are independent in the byte stream. Keep USA's own bytes for rows 0..45 and
+replace only rows 46..69: **426 bytes at payload offset `0x1064`**, against the
+1653 bytes they replace. The payload's declared size never changes — the new
+encoding is shorter, and the decoder stops after 70 rows without reading the
+1230 bytes left over.
+
+**The offsets, and how they were checked.** `option` is STAGE.DIR sector 27023
+on both USA disks, the `sc_text` payload is 5852 bytes at file offset 55499300,
+and row 46 is at 55503496. Through
+`(lba + fo / 2048) * 2352 + 24 + fo % 2048`, with STAGE.DIR at LBA 132344 and
+100801:
+
+    disk 0   payload 0x165A34CC..0x165A4F38   row 46 at 0x165A4790
+    disk 1   payload 0x11EE2B7C..0x11EE45E8   row 46 at 0x11EE3E40
+
+Three independent confirmations of disk 0. The bytes at
+`alldata.bin + 0xF12F8000 + 0x165A4790` equal the bytes STAGE.DIR holds at file
+offset 55503496. The write lands inside one sector, so it needs no splitting.
+And the collection's own first patch for this entry is named `disc1_165A34CC` —
+which is exactly `0x165A4790` minus 4196 payload bytes minus two 304-byte sector
+strides, i.e. the collection names each piece after its image offset in the very
+same space, and its piece 1 begins at the payload's first byte. Its four pieces
+therefore cover payload `[0, 1500)`, `[1500, 3548)`, `[3548, 5596)`,
+`[5596, 5852)`, and our 426 bytes sit inside piece 3 — so piece 3 would overwrite
+them, and all four have to be filtered whichever mode is chosen.
+
+**Filtered two ways, on purpose.** The four filenames are what was observed on
+disk 0 and are verified in game. `SQHook::SetPatchRangeBlacklist` adds a
+half-open disc-image range, matched against the offset the patch is entered
+with, which covers the same archive entry on **either** disk without having to
+know what the collection called each piece there — the disk 2 names have never
+appeared in a log, because USA disc 2 has never been booted here. The range is
+tight enough to be safe: of the 107 patches the collection offers title 981,
+exactly four fall anywhere inside the 81-sector option stage, and they are those
+four pieces.
+
+**Why not just move the quad.** `SetPacketTexture` takes the UVs from the
+texture's own size, so the quad cannot crop — and shifting it up 11 rows to meet
+the collection's re-centred text would drag the opaque canvas's top edge onto
+the ramp's brighter 16 band, a worse notch than the one being fixed.
+
+**Verified statically end to end, on both disks, against the shipped binary.**
+`scratchpad/verify_shipped.py` trusts nothing the build tools claim: it pulls
+the 426 bytes out of the deployed `MGSM2Fix64.asi` (they sit at file offset
+`0x259BA0`, exactly once), reads the two offsets out of the shipped table,
+checks each against the image offset recomputed from that disk's STAGE.DIR,
+confirms the collection's own `alldata.bin` still holds the expected pre-patch
+bytes there, then applies the binary's bytes at the binary's offset over the
+game's own payload and decodes the result: 232x70, four inked lines starting at
+rows `[0, 12, 24, 38]`, 194 px of the `(8,8,8)` filler in each of rows 0 and 1,
+rows 0..45 byte-identical to the game's own, no ink below.
+
+One caveat worth keeping: the data has to be a plain `.rdata` array, not a
+`std::vector` initializer_list. As an initializer_list the optimiser synthesised
+it — the 426 bytes appeared nowhere in the object file *or* the binary — which
+would have worked at runtime but left nothing to verify. `static inline const
+unsigned char MGS1_BrightnessTextData[426]` emits real bytes, and the check
+above only exists because of that.
+
+**What has not been seen is the screen.** The test is the same measurement as
+for Integral: first line 1.86-1.88 line-heights below the green line, and no row
+inside the canvas darker than the strip beside it. The log should also carry
+`built-in patch sc_text rows 46-69 blanked -> MGS1_US USA disk 0`, a
+`CD-ROM write 0x165a4790 with 426 bytes`, and four filtered patches. The range
+filter on disk 0 and everything about disk 2 are derived rather than observed.
 
 ## WITHDRAWN: the brightness grey ramp is not actually different
 

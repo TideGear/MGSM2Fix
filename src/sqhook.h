@@ -57,6 +57,7 @@ public:
     static void SetLoadScriptHook(const char *name, SQFUNCTION<Q> func);
     static void SetNativeCallHook(const char *name, SQFUNCTION<Q> func);
     static void SetPatchFileBlacklist(std::string file);
+    static void SetPatchRangeBlacklist(uint64_t start, uint64_t end);
     static void SetPatchDataBlacklist(std::vector<unsigned char> data);
     static void SetTextureWhitelist(unsigned int data);
 
@@ -137,6 +138,11 @@ private:
 private:
     static inline HSQREMOTEDBG<Q> DBG = nullptr;
     static inline std::vector<std::string> FileBlacklist = {};
+    // Half-open disc-image ranges. Filters by where a patch writes rather than
+    // what its file is called, which is what you want for an asset whose patch
+    // names differ per disk - the collection names each piece after its own
+    // image offset, so one range covers every piece of one archive entry.
+    static inline std::vector<std::pair<uint64_t, uint64_t>> RangeBlacklist = {};
     static inline std::vector<std::vector<unsigned char>> DataBlacklist = {};
     static inline std::vector<unsigned int> TextureWhitelist = {};
     static inline unsigned int ThreadCount           = 0;
