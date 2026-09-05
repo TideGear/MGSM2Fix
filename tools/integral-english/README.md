@@ -1450,10 +1450,11 @@ standing and is itself unattributed.
   `differs from what was written` line naming a pool address means the writes
   stick, silence means they do not. See "The collection's RAM patches collide
   with `en_savemsg`".
-- **EXIT after the doorbell build.** SCREEN is confirmed (2026-09-04: the
-  game's own brightness screen, four lines, correctly placed, while KEY CONFIG
-  hands off to the collection's panel — the intended pair). EXIT sits in the
-  same `case 8` and was not mentioned; one visit.
+- ~~SCREEN and EXIT after the doorbell build~~ **Done 2026-09-04.** All three
+  branches of `case 8` behave: up → SCREEN shows the game's own brightness
+  screen, four lines, correctly placed; down → EXIT highlights and confirms out
+  of the menu; confirm → KEY CONFIG hands off to the collection's panel. The
+  doorbell fires only where it should.
 - **The save side of the memory-card messages.** Only LOAD has been shot. The
   save flow (a Mei Ling call) would exercise the "no empty block", "failed" and
   "now checking" captions, and slot 1's kept Japanese line after a success.
