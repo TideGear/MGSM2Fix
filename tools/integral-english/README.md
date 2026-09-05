@@ -870,113 +870,90 @@ single word with no space, text in the GCL scripts rather than the overlays
 (which is where the ported menus live, and those are handled), and anything on
 disc 2 or the VR disc.
 
-## Not yet ported: the MISSION LOG (`abst` stage) — found 2026-09-04
+## TO DO: port the MISSION LOG (`abst` stage) — found and scoped 2026-09-04, not started
 
-Loading a save shows `READ MISSION LOG? YES / NO` and then a full page of
-story-so-far text, which in Integral is **entirely Japanese** (with furigana);
-USA has it in English. It was missed for a specific reason: `jpsweep.py` finds
-text by **pointer words in the overlay**, and the mission log's lines are GCL
-script strings — `ab_ch.c:673` reads them with `GCL_GetString(GCL_NextStr())`
-from the command's string list — which nothing in the overlay points at. So the
-sweep's "disc 1 swept clean" (below) is **withdrawn**: it covered only
-overlay-pointed strings, and every chain/script text — the option chain,
-preope, this — is outside its reach. The sweep needs a second pass that walks
-each stage's script chunk.
+**Status: unported, in scope, awaiting the go-ahead.** Loading a save shows
+`READ MISSION LOG? YES / NO` and then a page of story-so-far text; in Integral
+it is entirely Japanese (with furigana), USA has the same text in English, so by
+the port's rule it is portable. It is the largest text port left on the main
+discs — 122 text pages, ~1,000 records, a different per-screen layout and a
+stage relocation — so it was scoped fully and deliberately **not** started
+unasked. `abstscan.py` prints every number below; `abstscan.py page N` dumps a
+block from both games.
 
-What is known so far, for the port:
-
-- USA `abst`: 76 sectors, script tag `c?` 79,116 bytes; `Alaska` ×2,
-  `Shadow Moses`, `DARPA` ×16 present as ASCII in the stage, ~56 KB of ASCII
-  runs. Integral `abst`: 80 sectors, `c?` 90,796 bytes, **zero** Shift-JIS and
-  no ASCII text — its Japanese is game-encoded (`0x80xx`-style), like the
-  title's disc messages.
-- `ab_ch.c` draws **eight lines** per page (`KCB kcb[8]`, pitch 21 px, all
-  centred at x 160 via `D_800C3750`) into a KCB of **`rect.w = 64`** words — the
-  same font path and the same `u8 max_width` / 256-texel limits that forced the
-  option help lines to be widened. USA's lines are long; USA's `abst` overlay is
-  50,811 bytes against Integral's 47,071, so its `ab_ch.c` may size the KCB
-  differently. Check USA's constant before assuming the lines fit.
-- The variant (which page of text) is chosen by the script per save point;
-  `DARPA` ×16 in USA suggests on the order of 16+ variants. The port is
-  therefore preope-shaped: many strings inside script containers, English
-  shorter than Japanese, so the STRING length bytes and every enclosing
-  container shrink (`gclparse.containers_over`, per record).
-- The `READ MISSION LOG?` box is a shared texture; the Japanese caption under
-  it (`作戦記録を参照しますか？`) is an Integral help line whose USA counterpart
-  is still to be checked.
-
-**Scoped 2026-09-04, from the GCL decoder and both overlays' disassembly:**
+**Which actor — corrected the same evening.** The mission log is
+**`onoda/abst/abst.c`** (`NewAbstract`). `ab_ch.c` (`NewAbstractChange`), which
+the first scoping pass measured, is the *disc-change abstract* — see the next
+section. Everything below is `abst.c` and its USA counterpart.
 
 | | Integral | USA |
 |---|---|---|
-| lines per page | **8** (`for (i < 8)`, `KCB kcb[8]`) | **14** (`slti a1, 14` straight after the two GCL string calls) |
-| KCB rect | 64 × 21 | **128 × 20** |
-| font / CLUT origin | `font_x 832, font_y 256, clut 832/276`, `font_y += 21` | `704 / 256, clut y 275`, stepping 20 with a **column wrap when `font_y + 20 >= 512`** |
-| `0x9906` commands (pages) | 126 | 125 |
-| string runs | 94 × 9 records + 29 × 8 | 99 × 15 (+ 8 × 16, 1 × 17): an empty first record, then up to 14 lines, trailing empties |
-| text | game-encoded Japanese, 993 records | plain ASCII, 1,246 records, longest **54 chars** (`infiltration of the nuclear weapons disposal facility.`) |
+| stage | `abst`, STAGE.DIR sector 139, **80 sectors**, identical on both discs | sector 146, 76 sectors |
+| overlay | `sb` 47,071 bytes, base `0x800C3208` | `sb` 50,811, base `0x800C5968` |
+| script chunk `c?` | 90,796 bytes | 79,116 bytes |
+| `0x9906` blocks | 126 in all: **122 text pages** — 91 with `i` count **8** and 31 with count **7** — plus the 31-string location list, the disc-change block and two others | 125: **122 text pages** — 108 with count **14** and 14 with count **7** (a few carry 15–16 records) — plus the same others. **122 = 122**, so pairing pages by order is plausible; confirm against the shared `l`/`r`/`e` ids |
+| a page's `i` option | `INT count`, then `count + 1` STRING records: record 0 the header, then the lines | same, with USA's count |
+| lines per screen | up to **11** (+ header): `KCB kcb[12]`, `D_800C3238` = `{88, 180}` header then 11 × `{x 16, y 35 + 19k}` | **7** per screen, two screens per page: the 14-entry table at overlay `+0x34` = `{color, x 8, y 35 + 22k}` for k 0..6, twice |
+| KCB rect / origin | **128 × 21**, `font 704/256`, `clut 704/276`, `+= 21` | **128 × 20**, `704/256`, `clut_y 275`, `+= 20`, **wrap when `font_y + 20 >= 512` → 256/704/704/275** (init fn `0x800C6DB0..0x800C6F44`; needed because 15 × 20 from 256 passes 512) |
+| string loop bound | `for (i < field_2C4 + 1)`, `field_2C4` = the `i` count (default 12) | `slti a1, 14` at `0x800C8230` |
+| text | game-encoded Japanese; longest record 99 bytes | plain ASCII; longest line **54 chars** |
+| DUMMY3M for relocation | free from slot **462** (preope 0..89, brf 128..266, option 384..461); `DU_SECTORS` 13,500 | — |
+| collection patch inside the stage | **one**: `disc1_132F2716_patch_PS5.bin` at stage sector +51 (the script chunk). Watches registered for both discs' `abst` spans; whether a `_PS5` patch is applied on Windows decides whether relocating orphans anything | — |
 
-So the page counts match almost one for one, but USA fits up to 14 shorter
-lines where Integral fits 8 denser ones, and the KCB geometry is USA's own. The
-port is therefore: `ab_ch.c` grows to 14 slots with USA's rect, origin, step and
-wrap; every page's string list is replaced with USA's 15-record list, shrinking
-or growing the STRING lengths and every enclosing container; and since the
-script chunk changes size the stage is relocated into DUMMY3M like `option` and
-`preope` — so the collection-patch audit for `abst` comes first.
+**Page grammar** (both games): `60 <BE16 size> 99 06 <ofs=7>` · `STRID` `STRID`
+· `OPTION l` (left image id) · `r` (right image) · `e` (end proc) · (`d`, some)
+· **`OPTION i`**: `INT count` then the `07 <len> <bytes>` records.
 
-**The sweep's second pass, and what it found.** A census of GCL STRING runs in
-every stage's script chunks, both games, needs two guards or it lies: a run must
-be at least two records (a lone `0x07` is bytecode far more often than a
-string), and "Japanese" must mean even length, every lead byte in `0x80..0xdf`,
-and mostly non-Latin — otherwise `roll`, `s10a`, `s04a` and dozens more report
-hundreds of "Japanese" records that are binary present identically in both
-games, and `rank`'s location names (`Dock`, `Heliport`, game-encoded English in
-both) count as Japanese. With the guards, seven stages carry Japanese: five are
-the retail forms of things already ported (`preope`, `option`, `title`,
-`demosel`, `change`), and two are new — **`abst`** (this section) and
-**`rank`**: 36 Japanese records, sentences with `FOXDIE` and digits in them,
-against 10 English records in USA's `rank` that are only location names. USA's
-counterpart for those sentences is not in its `rank` script, so it is either
-elsewhere or Integral-only; the results screen has never been reached here.
+**The `i` length byte — settled.** It reads 49 (USA) / 234 (Integral) against a
+~560-byte payload: the low byte of a length that overflowed u8. It is **never
+used**: `abst.c` reaches the text with `GCL_GetOption('i')`, which positions
+`next_str_ptr` at the payload, reads the count with `GCL_StrToInt`, then walks
+`count + 1` records with `GCL_GetString(GCL_NextStr())`; every `GetOption` scan
+(`l`, `r`, `e`, `i`) stops at its own letter and `i` is last, so nothing ever
+skips past it by that byte. **Leave it exactly as the game wrote it.** A plain
+value-list walk *does* break right after `i` (`WRONG CODE`, confirmed by
+simulating `parse.c`) — which is why `gclparse` cannot parse these blocks and
+the sweep missed them.
 
-### The open question that gates the abst port, and `rank`
+**Method, when started** (the `preope` method): per page, replace the `count`
+INT and the `07`-record run with USA's, resizing each record's own length byte
+and the COMMAND's BE16 size (the blocks are top-level in the chunk — confirm
+with `gclparse.containers_over` that nothing else encloses them); grow `abst.c`
+to USA's model — `kcb[15]`, rect 128×20, the wrap, the two-screens-of-7 paging
+and its 14-entry position table (USA's paging logic has to be read from its
+overlay; Integral's `abst.c` has no second screen); relocate the stage into
+DUMMY3M and composite the deployed PPFs as `optsctext.py` does; verify with
+`abstscan.py`, `ppfcheck.py` and a readback like `verify_integral_option.py`;
+test by loading the save (the user has one).
 
-**The `0x9906` page block's grammar is not fully cracked, and it must be before
-a byte is changed.** Each page is `COMMAND 0x9906` holding two `STRID`s and the
-options `e`/`l`/`r`/`d`/`i`; the whole mission-log text is the payload of the
-**`i`** option — but its u8 length byte reads **49** (USA) / **234** (Integral)
-while the real payload is ~560 bytes, so the length byte is not the container
-size, and walking the block as a plain GCL value list breaks with `WRONG CODE`
-right after `i` (confirmed by simulating `parse.c` over it). The game does not
-break, so `ab_ch.c` reaches the eight strings some other way: `GetResources`
-calls `GCL_GetOption('a')` then `('e')`, then loops `GCL_GetString(GCL_NextStr())`
-**8 times**, and `GCL_NextStr` just returns `next_str_ptr` and walks `07`
-records. So the eight lines are consumed as a raw run of `07` records from
-wherever `next_str_ptr` lands after the `e` option — the `i` length byte is
-never used as a bound. **Until it is understood exactly how `next_str_ptr` is
-positioned onto the first `07` record, the safe edit is: keep every option and
-`STRID` byte-for-byte, and only rewrite the `07`-record run in place, adjusting
-each record's own length byte and the COMMAND's BE16 size and the script's outer
-containers — never the `i` option's length byte.** That is the preope method,
-but the container to resize is the COMMAND (BE16 at block+1), not an OPTION.
+**Still open before the first edit:** USA's two-screen paging code (which
+function flips from lines 0–6 to 7–13, and on what input); pairing Integral's
+pages with USA's when the counts differ — pair by the shared `l`/`r` image ids
+and `e` proc ids, not by order; the USA counterpart of the `READ MISSION LOG?`
+Japanese caption; and the `_PS5` patch. A USA screenshot of the mission log
+would confirm the 7-line screen in one look.
 
-Also unresolved: `ab_ch.c` reads a fixed **8** strings and `D_800C3750` has 8
-rows, but the blocks carry 9 (94 of them) or 8 (29) records in Integral and 15
-in USA — so USA fits far more lines by drawing 14 and Integral draws 8, and the
-extra records in each block are consumed elsewhere (the trailing empties, or
-`ab_demo`). The exact page→lines mapping needs the running screen to confirm.
+## TO DO: the disc-change abstract (`ab_ch.c`) — a fourth copy of the disc-swap messages
 
-### `rank` is Integral-only text, NOT portable without translation
+Found while scoping the mission log. `NewAbstractChange` in `ab_ch.c` reads
+options `a` (disc number) and `e`, then eight strings from inside `e`'s payload,
+draws them in eight 64×21 KCBs (`font 832/256`, `clut 832/276`, `+= 21`),
+centred at x 160 via `D_800C3750[8]` `{num 1, x 160, y 190/210, 0x6739}`. The
+one block that feeds it in each game (`OPT a(5) OPT e(244)`, at Integral chunk
+`+0xB0A5`, USA `+0xC6D1`) holds — Japanese in Integral, English in USA:
 
-The results/ranking stage. Integral's `rank` script carries **36 game-encoded
-Japanese sentence records** (they mention `FOXDIE`, a rank number, `：` colons);
-USA's `rank` carries the **same location-name strings** both games share
-(`Dock`, `Heliport`, …) and **none** of those 36 sentences. So USA has no
-counterpart to port — the sentences are Integral-only ranking commentary, which
-falls under the no-translation rule and **stays Japanese**. (If USA shows
-equivalent commentary drawn from elsewhere — the executable, a shared stage —
-that is unconfirmed; the rank screen has never been reached here.) Added to the
-consolidated list below.
+    Insert DISC 1. / after inserting DISC 1. / Insert DISC 2. /
+    after inserting DISC 2. / Press the Start Button / Now Checking... /
+    <9001> / The correct DISC has not been insert.
+
+That is the same family `en_menu2` ported in `demosel`/`change` and `en_menu3`
+targets in `title` — the **fourth** copy, in `abst`. Same reachability question
+as `en_menu3`: the collection swaps discs itself, so this screen may be
+unreachable in it. Portable; USA's strings are shorter, so the records and the
+COMMAND size shrink. Here the `e` option's own length byte *is* consulted —
+`GetOption('a')` scans first and, `a` being present, stops before `e`; but keep
+`e`'s length byte consistent with its payload regardless, since it is the
+container the strings live in.
 
 ## What stays Japanese, and why (consolidated 2026-09-03)
 
