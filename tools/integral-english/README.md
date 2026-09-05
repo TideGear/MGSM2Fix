@@ -1096,7 +1096,11 @@ cursor-frame and counter immediates and the pad masks; the collage images
 (BRF.DAT, 160 px at VRAM x 128 and 256, CLUTs (768,245/246)) are clear of the
 KCB columns; `ppfcheck --deployed` clean on all 20 files.
 
-**Not verified:** anything on screen. First things to look at when a save is
+**Not verified:** anything on screen. An unattended smoke test is not possible:
+a `StageSelect = abst` launch on 2026-09-05 00:39 sat in the collection's own
+launcher ("Ver.3.0.0" is the last log line), which waits for a game to be
+chosen before Ketchup or any stage loads; the process was stopped by PID and
+the ini restored. First things to look at when a save is
 loaded: the caption under READ MISSION LOG? still Japanese (by rule); page
 `1/2` with ► highlighted and seven English lines at USA's rows (ink tops at
 game y 52, 74, 96, 118, 140, 162, 184; x from 8); RIGHT moves the frame to
