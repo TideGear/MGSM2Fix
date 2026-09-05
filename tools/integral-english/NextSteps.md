@@ -228,7 +228,7 @@ on this branch.
 | `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
 | `pcx4.py` | encode/decode the 4-plane RLE PCX the texture loader expects (how `sc_text` and the KEY CONFIG art were read and written) |
 
-Rescued from the session scratchpad on 2026-09-04 (they existed nowhere durable): the four scripts above and `map_pristine.map` (the pristine executable's symbol map, now at `D:\mgsbuild\integral-english-work\`).
+Rescued from the session scratchpad on 2026-09-04 (they existed nowhere durable): `bridge.py`, `gcldump.py`, `gclprocs.py` and `map_pristine.map` (`pcx4.py` was already in the repo) (the pristine executable's symbol map, now at `D:\mgsbuild\integral-english-work\`).
 
 The scripts that shaped tonight's documentation live only in the session
 scratchpad and are disposable; everything they established is in the README.
