@@ -155,12 +155,15 @@ def main():
             assert got[i] == exp, (t, i, got[i], exp)
     assert len(chk) == len(ino) and all(chk[k] == ino[k] for k in range(len(ino)) if not (fofs(lo) <= k < fofs(hi) or fofs(IN_SAVE_TAB) <= k < fofs(IN_LOAD_TAB) + 4*N)), 'bytes changed outside the pool and tables'
 
-    # emit: only the runs that differ, addressed at each disc's executable sectors
-    diffs = [k for k in range(len(ino)) if chk[k] != ino[k]]
-    runs = []
-    for k in diffs:
-        if runs and k == runs[-1][1]: runs[-1][1] = k + 1
-        else: runs.append([k, k + 1])
+    # emit every byte of the pool and of both tables, changed or not, addressed
+    # at each disc's executable sectors. Until 2026-09-05 only differing runs
+    # were emitted; the collection's own RAM patches rewrite six 14-byte spans
+    # inside this pool before Ketchup's pass, and Ketchup writes only the bytes a
+    # PPF names, so a byte the English shared with retail could keep the
+    # collection's value (that is exactly how the SOCOM description broke, see
+    # items.py). Owning the whole pool also puts every byte under Ketchup::Audit.
+    runs = [[fofs(lo), fofs(hi)], [fofs(IN_SAVE_TAB), fofs(IN_LOAD_TAB) + 4*N]]
+    assert not any(chk[k] != ino[k] for k in range(len(ino)) if not any(a <= k < b for a, b in runs)), 'bytes changed outside the pool and tables'
     os.makedirs(WORK, exist_ok=True)
     open(WORK + '/int1_savemsg.exe', 'wb').write(chk)
     # A run may cross a 2048-byte payload boundary; the image has 304 bytes of

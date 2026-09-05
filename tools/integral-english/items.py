@@ -19,9 +19,25 @@ IN_ITEM_TAB, IN_WEAP_TAB = 0x8009E3E4, 0x8009E5CC
 IN_OUTLIER               = 0x08EC4C
 IN_OUTLIER_LUI           = 0x02BEB0          # lui  reg,hi16
 IN_OUTLIER_ADDIU         = 0x02BEB4          # addiu reg,reg,lo16
-N_ITEM, N_WEAP           = 26, 10
+N_ITEM, N_WEAP           = 26, 10            # the item table's last two entries are the frozen Ration/Ketchup pair
 ARENA_A = (0x0016AC, 0x001E74)               # item description pool
 ARENA_B = (0x001EE8, 0x002304)               # weapon description pool
+
+# Code in menu/item.c and menu/weapon.c that edits the descriptions in place,
+# with byte offsets laid out for the Japanese strings (found 2026-09-05 from the
+# user's screenshots and Ketchup's audit lines):
+#  - menu_item_printDescription: itemDescription[46] = GM_CardFlag + '0' - the
+#    card level digit. USA's string has its '1' at 45 and USA's own exe stores
+#    at 45 (sb $v0, 0x2d($a1) at 0x8003D9E8); Integral's stores at 46 and
+#    overwrote the space: "level 17security".
+#  - menu_weapon_printDescription: bytes 0x70..0x72 of the SOCOM description
+#    become "d0 03 00" or "90 b6 91" for the suppressor line. USA's 83-byte
+#    string ends long before 0x70 and USA's identical code writes into padding;
+#    in the repacked pool those bytes were the Mine Detector text ("Cannot be
+#    used in" -> "Cannot be<90b6><91..>"). Made the no-ops they are in USA.
+IN_CARD_LEVEL_SB  = 0x8003B690                # sb $v0, 0x2e($a0) -> 0x2d
+IN_SOCOM_SB       = (0x8003E070, 0x8003E07C, 0x8003E088, 0x8003E094, 0x8003E0A0, 0x8003E0B0)
+IN_SOCOM_SB_WORDS = (0xA0620070, 0xA0620071, 0xA0400072, 0xA0620070, 0xA0620071, 0xA0620072)
 
 # Ketchup disk descriptors: image offset of RAM 0x80010000 for each disc
 INTEGRAL_BASE = {0: 0x131D2238, 1: 0x0EB38078}
@@ -110,22 +126,46 @@ def main():
     struct.pack_into('<I', new, IN_OUTLIER_LUI,   (lui   & 0xFFFF0000) | hi16)
     struct.pack_into('<I', new, IN_OUTLIER_ADDIU, (addiu & 0xFFFF0000) | lo16)
 
+    # the ID Card's level digit goes where USA's string has it
+    w = struct.unpack_from('<I', new, fofs(IN_CARD_LEVEL_SB))[0]
+    assert w == 0xA082002E, 'card level store is not the expected sb: %08X' % w
+    assert us_items[17][45:47] == b'1 ', us_items[17]
+    struct.pack_into('<I', new, fofs(IN_CARD_LEVEL_SB), 0xA082002D)
+
+    # the SOCOM suppressor rewrite becomes the no-op it is in USA
+    for a, expect in zip(IN_SOCOM_SB, IN_SOCOM_SB_WORDS):
+        w = struct.unpack_from('<I', new, fofs(a))[0]
+        assert w == expect, 'SOCOM store at %08X is not the expected sb: %08X' % (a, w)
+        struct.pack_into('<I', new, fofs(a), 0)          # nop
+    assert len(us_weaps[0]) < 0x70, 'USA SOCOM description reaches the suppressor offsets'
+
     open(os.path.join(WORK, 'int1_en.exe'), 'wb').write(new)
     print('arena A slack: %d bytes   arena B slack: %d bytes' % (slack_a, slack_b))
     print('HARD/EXTREME message relocated to %08X' % out_ram)
 
-    # ---- diff -> byte runs
-    runs, i = [], 0
-    while i < len(ino):
-        if new[i] != ino[i]:
-            j = i
-            while j < len(ino) and new[j] != ino[j]:
-                j += 1
-            runs.append((i, bytes(new[i:j])))
-            i = j
-        else:
-            i += 1
-    print('%d changed runs, %d changed bytes' % (len(runs), sum(len(r[1]) for r in runs)))
+    # ---- every byte of the regions the port owns, changed or not.
+    # The collection's own RAM patches rewrite this pool (two ~2.8 KB blocks at
+    # 0x8001101C and 0x8001108C) before Ketchup's pass, and Ketchup only writes
+    # the bytes a PPF names: a byte the English happened to share with retail
+    # kept the collection's value. That was the SOCOM line break (0x800119DC,
+    # retail 0x80 of "80 23", ours 0x80 of "80 7c") drawn as a katakana glyph
+    # on 2026-09-05. Owning whole regions also lets Ketchup::Audit see them.
+    regions = [ARENA_A, ARENA_B,
+               (fofs(IN_ITEM_TAB), fofs(IN_ITEM_TAB) + 4 * N_ITEM),
+               (fofs(IN_WEAP_TAB), fofs(IN_WEAP_TAB) + 4 * N_WEAP),
+               (IN_OUTLIER_LUI, IN_OUTLIER_LUI + 4), (IN_OUTLIER_ADDIU, IN_OUTLIER_ADDIU + 4),
+               (fofs(IN_CARD_LEVEL_SB), fofs(IN_CARD_LEVEL_SB) + 4)]
+    regions += [(fofs(a), fofs(a) + 4) for a in IN_SOCOM_SB]
+    regions.sort()
+    for (a, b), (c, d) in zip(regions, regions[1:]):
+        assert b <= c, 'owned regions overlap'
+    owned = bytearray(len(ino))
+    for a, b in regions:
+        owned[a:b] = b'\x01' * (b - a)
+    assert not any(new[k] != ino[k] and not owned[k] for k in range(len(ino))), 'bytes changed outside the owned regions'
+    runs = [(a, bytes(new[a:b])) for a, b in regions]
+    print('%d owned regions, %d bytes (%d differ from retail)'
+          % (len(runs), sum(len(r[1]) for r in runs), sum(1 for k in range(len(ino)) if owned[k] and new[k] != ino[k])))
 
     # ---- split runs at 2048-byte data-page boundaries, map to image offsets
     for disc, base in INTEGRAL_BASE.items():

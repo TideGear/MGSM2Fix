@@ -14,7 +14,7 @@ record; `NextSteps.md` is the map.
 
 | Patch | Contents |
 |---|---|
-| `en_items` | item descriptions |
+| `en_items` | item and weapon descriptions, the frozen Ration/Ketchup pair, the HARD/EXTREME Mine Detector message; two code fixes (card level digit offset, SOCOM suppressor rewrite) |
 | `en_menu`, `en_menu2` | menu strings |
 | `en_option` | `screen brightness setup`, `key configuration setup`, `use directional buttons to test`; the brightness paragraph as USA's `sc_text` texture (four lines in the collection build); the eight KEY CONFIG label textures |
 | `en_preope` | Previous Operations with USA's exact pagination: Metal Gear (13 pages, 7 lines each, last page 6), Metal Gear 2 (19 pages) — `preope_usa.py` |
@@ -294,7 +294,8 @@ that spills into a sector's 304-byte tail is silently lost while the log still
 says "loaded" — `en_savemsg` lost 142 of 442 bytes that way on 2026-09-02.
 Split runs at payload boundaries and replay Ketchup's rule as an assert
 (`savemsg.py` does). Check: the log's "Applied N bytes of RAM patches" must
-equal `en_items`' 3,068 plus yours. Image offset of an executable file offset
+equal `en_items`' 3,224 plus `en_savemsg`'s 531 (3,755 since 2026-09-05; it
+was 3,068 + 442 while only differing runs were emitted). Image offset of an executable file offset
 `fo`: `base + ((fo - 0x800) // 2048) * 2352 + (fo - 0x800) % 2048`, where
 `base` is Ketchup's `ram_base` — Integral disc 1 **`0x131D2238`**, disc 2
 **`0x0EB38078`**. The inverse (image → RAM) is
@@ -976,6 +977,60 @@ Blind spots, stated so the result is not over-read: strings reached by
 single word with no space, text in the GCL scripts rather than the overlays
 (which is where the ported menus live, and those are handled), and anything on
 disc 2 or the VR disc.
+
+## Three item-text faults and what they taught (2026-09-05)
+
+The user's first shots after the MISSION LOG deployment showed two glitches in
+text that had been "verified" for a week: `《Socom Pistol》ドSemi-autom / atic
+pistol.` and `opens all level 17security doors.` Ketchup's audit lines in the
+same log caught two of the three mechanisms in the act; the third was found by
+reading the bytes. All three are fixed in `items.py` and the second lesson is
+applied to `savemsg.py` too.
+
+1. **The card level digit.** `menu_item_printDescription` (menu/item.c) does
+   `itemDescription[46] = GM_CardFlag + '0'` — byte 46 is where the Japanese
+   string keeps its digit. USA's string has the `1` at byte 45 and USA's exe
+   stores at 45 (`sb $v0, 0x2d($a1)` at 0x8003D9E8). Integral's store hit the
+   space: audit line `run 0x1102a differs at +76: wrote " securit" have
+   "7securit"`. Fix: the Integral instruction at 0x8003B690 now stores at 45
+   (`A082002E` → `A082002D`), in the `en_items` PPF.
+2. **The SOCOM suppressor rewrite.** `menu_weapon_printDescription`
+   (menu/weapon.c) writes bytes 0x70..0x72 of the SOCOM description every time
+   the weapon window shows it: `d0 03 00` without the suppressor, `90 b6 91`
+   with it (the Japanese text's optional last line). USA's 83-byte string ends
+   long before 0x70 and USA's identical code writes into padding. In the
+   repacked pool the target was the relocated Mine Detector message: audit line
+   `run 0x119dd differs at +95: wrote " used in" have "<90b6><91>ed in"`. Fix:
+   the six `sb` instructions are NOPs (0x8003E070..0x8003E0B0), the no-op they
+   are in USA.
+3. **A byte the English shared with retail kept the collection's value.** The
+   stray glyph came from the line break after the title: `d0 15 80 7c`. Byte
+   0x800119DC (`80`) equals retail (`80` of the grenade text's `80 23`), so no
+   PPF record named it and Ketchup never wrote it; the collection's own RAM
+   patch (one of the two ~2.8 KB blocks at 0x8001101C / 0x8001108C, applied
+   before Ketchup's pass) had put something else there, and the engine read a
+   two-byte katakana code instead of `|`. The 1-byte record for `15` at
+   0x800119DB and the run starting at 0x800119DD were written and audited
+   fine — the audit sees only what a PPF names, which is why "items proven
+   intact" (below) was blind to this. Fix: `items.py` and `savemsg.py` now
+   emit **every byte of the regions they own** (both arenas, both tables, the
+   frozen-item pair inside the item table, the code words), changed or not:
+   3,224 + 531 bytes, so `Applied … bytes of RAM patches` now reads **3,755**,
+   Ketchup owns the whole pool after the collection's pass, and the audit
+   covers all of it. The collection's block itself was not found as plain
+   bytes in `alldata.bin` or the DLC containers (searched 2026-09-05), so what
+   it wrote there is inferred from the glyph, not read.
+
+Corrections this forces on older notes: "items proven intact" (the RAM-patch
+collision section) held only for bytes a record named; the earlier fear about a
+complete Ketchup check fighting the collection does not arise here because the
+collection writes first (pass 1 only, every session); and the frozen Ration /
+Ketchup descriptions were never lost — Integral's item table has 26 entries
+whose last two are that pair, USA's likewise, so `N_ITEM = 26` ports them.
+
+Both fixes are static until seen: check the SOCOM, the ID Card (`level 7
+security` with a level-7 card), a Mine Detector on HARD/EXTREME after viewing
+the SOCOM, and any weapon whose description you look at.
 
 ## The MISSION LOG port (`abst` stage, `en_abst`, built 2026-09-05)
 
@@ -2862,6 +2917,16 @@ MEMORY CARD 1 / 2 — so a shot taken with the flags on differs from one taken
 before in those strings. Not a port difference.
 
 ### The collection's RAM patches collide with `en_savemsg` (found 2026-09-03)
+
+**Superseded 2026-09-05 — read "Three item-text faults" first.** The
+"items proven intact" conclusion below held only for bytes a PPF record named:
+a byte the English shared with retail was never written by Ketchup and kept
+whatever the collection's block put there (the SOCOM line break). Since
+2026-09-05 `en_items` and `en_savemsg` own every byte of their pools and
+tables, so neither the first-byte blind spot nor the mid-run one applies to
+them any more; the byte counts quoted below (3,068 / 442 / 3,510) are the
+old differing-run figures. The analysis is kept as the record of how the
+collision was measured.
 
 Read the filtered list out of the log
 (`filtering RAM patch offset 0x… with size 0x…`) and six of the collection's
