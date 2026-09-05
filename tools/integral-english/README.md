@@ -905,6 +905,40 @@ What is known so far, for the port:
   it (`作戦記録を参照しますか？`) is an Integral help line whose USA counterpart
   is still to be checked.
 
+**Scoped 2026-09-04, from the GCL decoder and both overlays' disassembly:**
+
+| | Integral | USA |
+|---|---|---|
+| lines per page | **8** (`for (i < 8)`, `KCB kcb[8]`) | **14** (`slti a1, 14` straight after the two GCL string calls) |
+| KCB rect | 64 × 21 | **128 × 20** |
+| font / CLUT origin | `font_x 832, font_y 256, clut 832/276`, `font_y += 21` | `704 / 256, clut y 275`, stepping 20 with a **column wrap when `font_y + 20 >= 512`** |
+| `0x9906` commands (pages) | 126 | 125 |
+| string runs | 94 × 9 records + 29 × 8 | 99 × 15 (+ 8 × 16, 1 × 17): an empty first record, then up to 14 lines, trailing empties |
+| text | game-encoded Japanese, 993 records | plain ASCII, 1,246 records, longest **54 chars** (`infiltration of the nuclear weapons disposal facility.`) |
+
+So the page counts match almost one for one, but USA fits up to 14 shorter
+lines where Integral fits 8 denser ones, and the KCB geometry is USA's own. The
+port is therefore: `ab_ch.c` grows to 14 slots with USA's rect, origin, step and
+wrap; every page's string list is replaced with USA's 15-record list, shrinking
+or growing the STRING lengths and every enclosing container; and since the
+script chunk changes size the stage is relocated into DUMMY3M like `option` and
+`preope` — so the collection-patch audit for `abst` comes first.
+
+**The sweep's second pass, and what it found.** A census of GCL STRING runs in
+every stage's script chunks, both games, needs two guards or it lies: a run must
+be at least two records (a lone `0x07` is bytecode far more often than a
+string), and "Japanese" must mean even length, every lead byte in `0x80..0xdf`,
+and mostly non-Latin — otherwise `roll`, `s10a`, `s04a` and dozens more report
+hundreds of "Japanese" records that are binary present identically in both
+games, and `rank`'s location names (`Dock`, `Heliport`, game-encoded English in
+both) count as Japanese. With the guards, seven stages carry Japanese: five are
+the retail forms of things already ported (`preope`, `option`, `title`,
+`demosel`, `change`), and two are new — **`abst`** (this section) and
+**`rank`**: 36 Japanese records, sentences with `FOXDIE` and digits in them,
+against 10 English records in USA's `rank` that are only location names. USA's
+counterpart for those sentences is not in its `rank` script, so it is either
+elsewhere or Integral-only; the results screen has never been reached here.
+
 ## What stays Japanese, and why (consolidated 2026-09-03)
 
 The rule is [no unauthorised translation](#scope-what-this-port-changes-and-what-it-deliberately-keeps):
