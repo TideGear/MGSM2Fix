@@ -939,6 +939,45 @@ against 10 English records in USA's `rank` that are only location names. USA's
 counterpart for those sentences is not in its `rank` script, so it is either
 elsewhere or Integral-only; the results screen has never been reached here.
 
+### The open question that gates the abst port, and `rank`
+
+**The `0x9906` page block's grammar is not fully cracked, and it must be before
+a byte is changed.** Each page is `COMMAND 0x9906` holding two `STRID`s and the
+options `e`/`l`/`r`/`d`/`i`; the whole mission-log text is the payload of the
+**`i`** option — but its u8 length byte reads **49** (USA) / **234** (Integral)
+while the real payload is ~560 bytes, so the length byte is not the container
+size, and walking the block as a plain GCL value list breaks with `WRONG CODE`
+right after `i` (confirmed by simulating `parse.c` over it). The game does not
+break, so `ab_ch.c` reaches the eight strings some other way: `GetResources`
+calls `GCL_GetOption('a')` then `('e')`, then loops `GCL_GetString(GCL_NextStr())`
+**8 times**, and `GCL_NextStr` just returns `next_str_ptr` and walks `07`
+records. So the eight lines are consumed as a raw run of `07` records from
+wherever `next_str_ptr` lands after the `e` option — the `i` length byte is
+never used as a bound. **Until it is understood exactly how `next_str_ptr` is
+positioned onto the first `07` record, the safe edit is: keep every option and
+`STRID` byte-for-byte, and only rewrite the `07`-record run in place, adjusting
+each record's own length byte and the COMMAND's BE16 size and the script's outer
+containers — never the `i` option's length byte.** That is the preope method,
+but the container to resize is the COMMAND (BE16 at block+1), not an OPTION.
+
+Also unresolved: `ab_ch.c` reads a fixed **8** strings and `D_800C3750` has 8
+rows, but the blocks carry 9 (94 of them) or 8 (29) records in Integral and 15
+in USA — so USA fits far more lines by drawing 14 and Integral draws 8, and the
+extra records in each block are consumed elsewhere (the trailing empties, or
+`ab_demo`). The exact page→lines mapping needs the running screen to confirm.
+
+### `rank` is Integral-only text, NOT portable without translation
+
+The results/ranking stage. Integral's `rank` script carries **36 game-encoded
+Japanese sentence records** (they mention `FOXDIE`, a rank number, `：` colons);
+USA's `rank` carries the **same location-name strings** both games share
+(`Dock`, `Heliport`, …) and **none** of those 36 sentences. So USA has no
+counterpart to port — the sentences are Integral-only ranking commentary, which
+falls under the no-translation rule and **stays Japanese**. (If USA shows
+equivalent commentary drawn from elsewhere — the executable, a shared stage —
+that is unconfirmed; the rank screen has never been reached here.) Added to the
+consolidated list below.
+
 ## What stays Japanese, and why (consolidated 2026-09-03)
 
 The rule is [no unauthorised translation](#scope-what-this-port-changes-and-what-it-deliberately-keeps):
@@ -956,6 +995,7 @@ and found nothing else portable.
 | six `camsave` slots (`0x60C`, `0x62C`, `0x63C`, `0x65C`, `0x668`, `0x66C`) | USA's strings at those slots are **empty** | "The PHOTO ALBUM's own memory-card messages" |
 | the save-slot title (full-width `ＭＧＳ．［ＮＭ］…`) | not in either caption table; the collection's own storage UI displays it. Separate question, never investigated | "Memory-card messages" |
 | record 3, the vibration-test row's label (`振動テスト`) | **kept blank, not Japanese** — the user's decision 2026-09-02: Integral's line is the row name plus a sentence USA's own line already covers | the scope table |
+| `rank`'s 36 ranking-commentary sentences | Integral-only; USA's `rank` has the shared location names and none of these sentences, so there is nothing to port unless a USA counterpart turns up elsewhere | "`rank` is Integral-only text" |
 | the whole VR disc | not started; USA's `SLUS-00957` does exist, so this one **is** portable | below |
 
 Two of these are worth revisiting only with authorisation: the 1P MODE pages
