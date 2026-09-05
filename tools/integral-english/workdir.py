@@ -32,6 +32,8 @@ def _root():
 
 ROOT = _root()
 WORK = os.path.join(ROOT, 'work').replace('\\', '/')
+GAME = os.environ.get('INTEGRAL_ENGLISH_GAME', 'D:/Steam/SteamApps/common/MGS1')
+DECOMP = os.environ.get('INTEGRAL_ENGLISH_DECOMP', 'D:/mgsbuild/d')
 
 if __name__ == '__main__':
     print('ROOT =', ROOT)

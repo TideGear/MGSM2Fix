@@ -1,10 +1,10 @@
 """Sweep disc 1 for UI text still Japanese that USA has in English.
 
-Uses the method that found the photo album's messages: overlays load at a fixed
-address per game, so a word equal to base+offset is a pointer, and the pointer
-word's OFFSET is the same index in both games. A slot where Integral's target
-reads as Japanese text and USA's reads as an English sentence is a port
-candidate - and because the slot matches, the pairing is exact.
+This historical scanner compares pointer slots at equal overlay offsets.
+That established the camera caption pairing only after independent inspection;
+equal offsets alone do not prove homologous tables in other overlays.
+It scans disc 1 only and misses GCL, instruction references and relocated data.
+Use audit_text.py for a broader candidate inventory, with explicit limitations.
 
 Guards, both learned the hard way: a target must look like text, not code (a
 MIPS prologue reads as high bytes), and must terminate.

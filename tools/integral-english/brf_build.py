@@ -29,7 +29,7 @@ from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BAS
                        RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX, ANIM_X)
 
 si, ti, Fi, pi = stage(WORK + '/int1_stage.dir')
-su, tu, Fu, pu = stage(WORK + '/us1_stage.dir')
+su, tu, Fu, pu = stage(WORK + '/usa1_stage.dir')
 ni = [k for k, t in enumerate(ti) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 nu = [k for k, t in enumerate(tu) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])

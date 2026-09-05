@@ -117,15 +117,15 @@ detail; this is the index.
 3. **A freeze leaves no trace in `MGSM2Fix.log`.** The last lines are always
    the periodic `check_write_mgs_savedata`, identical to a clean exit, so the
    log cannot tell you a freeze happened or where.
-4. Symptoms mislead about *locality*: an overlay 32 bytes too large froze only
-   the EXIT row, which looks exactly like a bug in the EXIT row.
+4. Symptoms mislead about *locality*: the failing option build froze only
+   the EXIT row; overlay size and struct layout had both changed.
 
 ### Overlays
 
 - **Keep an overlay at or under retail's byte count** — but as insurance, not
   because it is the mechanism. The `+108` / `+32` / `+0` bisection that produced
   this rule was **confounded**: the commit that reached +0 also reverted
-  `f924[12]` to `[8]`, and that is the real freeze. Overlays load into the BSS
+  `f924[12]` to `[8]`, changing the retail aliasing described below. Overlays load into the BSS
   tail at `StageCharacterEntries` with ~118 KB of headroom (the largest stage
   overlay on the disc is 143,856 bytes against option's 25,842), so +32 bytes
   cannot plausibly overflow it. The padded sector slot (26,624) is not a limit
@@ -338,9 +338,10 @@ Find them by scanning for `\x01CD001\x01` (the PVD at sector 16; base = hit −
 DAR and chain byte-identical between EU and USA, `brf` DAR identical, only
 `preope`'s chain differs (re-sourced); the `brf` *overlay* differs in 3,200
 bytes of pointers, and the briefing layout constants were read from the EU copy
-— they measured pixel-perfect against USA shots, but that equality is
-inferred, not verified; re-locate by call count and re-extract if it ever
-matters.
+— they measured pixel-perfect against USA shots. **Rechecked 2026-09-04:**
+USA's base and both sampled functions are eight bytes below the EU addresses;
+all 16 row-call argument tuples and all 53 quad-call argument tuples match.
+`brf_widen.py` and `brf_build.py` now use `usa1_stage.dir` and the USA addresses.
 
 **Reading and poking live RAM through the Squirrel debugger** (memory-only
 until 2026-09-04): enable `[Squirrel Debugger]` in the ini, run `bridge.py`
@@ -400,6 +401,14 @@ prints what it resolved to. Anything a tool writes goes to `WORK` as well.
 
 ## Building
 
+**Current workflow (2026-09-04): [BUILDING.md](BUILDING.md).** `rebuild.py`
+extracts retail inputs, exports the pinned decomp base, applies our source patch,
+compiles the two overlays, and builds all eight shipped patch families into an
+isolated directory. `preope_usa.py` now builds directly from retail and stages
+its PPFs; `--deploy` is explicit. `optsctext.py` uses `optlabel2.py` to rebuild
+its caption chain and no longer needs a pinned font-text PPF or deployed inputs.
+The older experiments below are historical, not prerequisites for this build.
+
 Needs the decompilation at `D:\mgsbuild\d` (branch `integral-english-text`,
 see `decomp-overlay-changes.patch`) and disc images in `discs/`.
 
@@ -407,9 +416,8 @@ see `decomp-overlay-changes.patch`) and disc images in `discs/`.
     py build.py --psyq_path D:/mgsbuild/psyq --variant main_exe
     ninja -f build.ninja ../obj/preope.bin ../obj/option.bin
 
-    py preope_both.py          # the base stage, work/preope_en.bin (re-wrapped, 12/19 pages)
-    py preope_usa.py           # USA's exact pagination on top of it (13/19 pages) - and this
-                               # one DEPLOYS to the mods folder as it runs; there is no --deploy
+    py preope_usa.py           # retail inputs, USA's exact 13/19 pagination;
+                               # stages into WORK; --deploy is explicit
 
 Removed 2026-09-04 as dead: `preope_ppf.py` (it packed the 12-page base stage,
 so running it would have shipped the superseded layout over the live one),
@@ -452,9 +460,11 @@ counter still drawn — which is why they took so long to separate.
 Hence the design: Metal Gear in the chain, Metal Gear 2 in the script chunk past
 the end of the script, located by pointer from `field_394[0].string`.
 
-`MG2_RECAP_OFFSET` in `preope.c` is **hardcoded to 22029**, which assumes the
-chain is exactly +737 bytes over retail (Metal Gear wrapped at 45 characters,
-12 pages). `preope_both.py` asserts it. Change the wrapping and both must move.
+The current `MG2_RECAP_OFFSET` in `preope.c` is **22042**, measured from the
+first chain record at script `+0x1B8` to the appended MG2 text at `+22482`.
+`preope_usa.py` asserts it. The earlier `22029`/12-page value belonged to the
+superseded wrapped-text build; current MG1 uses USA's 13-page pagination.
+Changing the chain layout requires updating both builder and overlay.
 
 ## Things that do not work
 
@@ -816,10 +826,11 @@ Collection's own rename of MEMORY CARD → STORAGE, so Integral shows the
 original wording; USA's reference shot predates that setting. The in-game save
 flow (Mei Ling) has not been shot yet.
 
-Not yet built into a save title: Integral composes the save-slot name in
-full-width Shift-JIS (`ＭＧＳ．［ＮＭ］ time area`, `datasave.c` ~2261) where USA
-uses ASCII; the Master Collection's own storage UI shows those names, so this
-is a separate question.
+The save-slot encoding audit is recorded in [COVERAGE.md](COVERAGE.md).
+USA also stores full-width Shift-JIS, so the old ASCII claim was incorrect.
+Integral's source constructs `ＭＧＳ∫`, difficulty, time,
+and the area name in Shift-JIS. Formatting and Integral's product identifier
+must be distinguished from Japanese text with an English counterpart.
 
 ## The PHOTO ALBUM's own memory-card messages (`en_camsave`, 2026-09-03)
 
@@ -1007,7 +1018,8 @@ with `gclparse.containers_over` that nothing else encloses them); grow `abst.c`
 to USA's model — `kcb[15]`, rect 128×20, the wrap, the two-screens-of-7 paging
 and its 14-entry position table (USA's paging logic has to be read from its
 overlay; Integral's `abst.c` has no second screen); relocate the stage into
-DUMMY3M and composite the deployed PPFs as `optsctext.py` does; verify with
+DUMMY3M and reconstruct all owned caption edits from retail as `optsctext.py`
+does; verify with
 `abstscan.py`, `ppfcheck.py` and a readback like `verify_integral_option.py`;
 test by loading the save (the user has one).
 
@@ -1054,11 +1066,9 @@ states, so nobody has to re-derive them:
 
 **None of the four has been seen in the collection.** The open question is
 whether the collection ever shows the game's own swap prompt at all, or swaps
-silently before `change` draws it. If it swaps silently, all four are
-unreachable in the collection and matter only for a raw disc patch - still
-worth shipping under the port's rule, but untestable here. (This absorbs the
-former "Not tested" item on `en_menu3`'s reachability: it is the same question
-for all four copies.)
+silently before `change` draws it. A silent normal swap does not prove the
+title/wrong-disc, demo-theater or abstract paths unreachable. Those need
+dedicated tests; all four remain relevant to a raw disc patch.
 
 **Disc 2 is set in exactly one place, so the developer menu can never reach
 it.** `onoda/change/change.c` performs a literal CD check and is the sole
@@ -1099,10 +1109,9 @@ as above, and no debug load ever changes the disc.
 ## What stays Japanese, and why (consolidated 2026-09-03)
 
 The rule is [no unauthorised translation](#scope-what-this-port-changes-and-what-it-deliberately-keeps):
-port USA's English, never invent it. Everything below therefore stays Japanese
-until the user authorises translation, and each entry is here because **USA has
-no counterpart to port**, not because it was missed. `jpsweep.py` swept disc 1
-and found nothing else portable.
+port USA's English, never invent it. The table distinguishes Integral-only
+text from unfinished ports. The old disc-1 pointer scan was not exhaustive;
+see [COVERAGE.md](COVERAGE.md) for the expanded inventory and its limits.
 
 | still Japanese | why | where |
 |---|---|---|
@@ -1111,23 +1120,25 @@ and found nothing else portable.
 | the option screen's other Japanese help lines, and record 7's colon (`字幕設定：オン`) | Integral-only rows; record 7 was wrongly blanked once and restored | "The sc_text texture port" |
 | `savemsg` indices 1 and 9 (`セーブ中です`, `セーブが完了しました`) | USA draws nothing at those indices, so there is no text to port. Integral therefore flashes Japanese during and after a save | "Memory-card messages" |
 | six `camsave` slots (`0x60C`, `0x62C`, `0x63C`, `0x65C`, `0x668`, `0x66C`) | USA's strings at those slots are **empty** | "The PHOTO ALBUM's own memory-card messages" |
-| the save-slot title (full-width `ＭＧＳ．［ＮＭ］…`) | not in either caption table; the collection's own storage UI displays it. Separate question, never investigated | "Memory-card messages" |
+| camera GCL caption at script `+0x1B8` | Integral has a nonempty game-encoded caption; the corresponding USA record is empty | [COVERAGE.md](COVERAGE.md) |
+| the save-slot title (full-width Latin) | USA also uses full-width Shift-JIS; Integral has its own product suffix. No ASCII conversion is warranted | [COVERAGE.md](COVERAGE.md#save-slot-title-encoding) |
 | record 3, the vibration-test row's label (`振動テスト`) | **kept blank, not Japanese** — the user's decision 2026-09-02: Integral's line is the row name plus a sentence USA's own line already covers | the scope table |
 | `rank`'s 36 ranking-commentary sentences | Integral-only; USA's `rank` has the shared location names and none of these sentences, so there is nothing to port unless a USA counterpart turns up elsewhere | "`rank` is Integral-only text" |
 | the whole VR disc | not started; USA's `SLUS-00957` does exist, so this one **is** portable | below |
 
 Two of these are worth revisiting only with authorisation: the 1P MODE pages
 (the largest body of untranslated text in the game) and the KEY CONFIG help
-lines. The rest are cases where USA itself shows nothing.
+lines. The VR port remains separate work; the save title is an encoding/branding case.
 
 ## Not ported at all: the VR disc (SLPM-86249)
 
 Integral's third disc — VR training — is untouched. `mods/INTEGRAL/VR-DISK/` is
-empty, so Ketchup applies nothing to it, and no tool here targets it. What is
+empty, so Ketchup applies nothing to it. `audit_text.py` inventories its GCL
+candidates; no patch builder targets it. What is
 known so far, for whoever starts it:
 
 - USA's counterpart is `SLUS-00957` (VR Missions), inside `alldata.bin` at image
-  base `0xD39B7000`; its STAGE.DIR has the same 106-stage layout as Integral's
+  base `0xD39B7000`; its STAGE.DIR has 105 named stage entries, as does Integral's
   VR disc, so stage-by-stage comparison is possible.
 - Its option/text chain is **not** at `+0x1B8` like the main game's `option`
   stage — the offsets in `optscan.py` do not apply unchanged.
@@ -1361,9 +1372,9 @@ than anything visible in the collection. Ways to force it, cheapest first:
   (`SQOnRamWrite`/`SQOnRamRead`), once that variable is identified — `change.c`
   shows how the game identifies a disc.
 
-**Do the cheap reachability check before building the fix.** If the text is
-unreachable in the collection, `en_menu3` is disc-patch completeness, not a
-visible bug, and should be scheduled as such.
+**Use the cheap reachability check to prioritise the fix.** A normal swap does
+not settle the title's wrong-disc path. `en_menu3` remains required for raw-disc
+completeness even if a dedicated test establishes that the collection hides it.
 
 ## The collection shows only four of USA's six brightness lines (found 2026-09-03)
 
@@ -2330,17 +2341,16 @@ the font path's limits. Built by `optsctext.py`.
 sectors of the shipped briefing stage. Worse, a blankness check would have
 *passed*, because PPFs are applied by the loader at runtime and never written
 back, so the image on disk shows all 13,501 DUMMY3M sectors as zero. Occupancy
-has to be composited from the deployed PPFs; `optsctext.py` does that and asserts
-disjointness. Slot 384 leaves brf 256 sectors of growth room.
+must include other patches. `optsctext.py --deploy` checks deployed occupancy;
+`rebuild.py` checks overlapping writes across the complete packaged set. Slot 384 leaves brf 256 sectors of growth room.
 
 **`menu.ppf` writes chain records 4 and 5** ("screen brightness setup", "key
 configuration setup") into the option stage. After relocation those writes land
 on a stage the game no longer reads, so both labels would have silently reverted
-to Japanese. The relocated image is therefore built from a **composite** of
-retail plus the deployed *non-option* PPFs' STAGE.DIR writes plus a **pinned**
-copy of the last font-text option build (`work/fonttext_disc{1,2}_option.ppf`,
-`CHAIN_PPF`), and `verify()` asserts the 8 records in `EXPECT_CHAIN` (3/7 blank,
-4/5/12/26 English, 13/24 English) before emitting.
+to Japanese. The relocated image is now built directly from retail with
+`optlabel2.build` reconstructing every owned caption. Unowned records, including
+record 7's colon, match retail. The old pinned font-text PPF is no longer an
+input; `verify()` checks the final rebuilt chain before emitting.
 
 **Never let the builder consume its own previous output** — this shipped as a
 bug on 2026-09-02. Once the sc_text PPF was deployed, `composite()`'s "every
@@ -2350,8 +2360,8 @@ That silently dropped the font-text PPF's 1,519 bytes of chain edits, so records
 3/7/12/13-16/24/26 reverted to retail Japanese: "use directional buttons to
 test" came back as `振動テスト...` with a garbled glyph (the user caught it). The
 static record check had been run on the *previous* build, not the one deployed.
-Now the input is pinned, any write to the entry pointer is a hard error, and the
-record assert runs on every build.
+The current retail-based builder removes that feedback path entirely, and the
+record assertions run on every build.
 
 **The quad's y: the two engines do not place the same constant in the same
 place.** USA's own call is `(-121, 2, 111, 72)`. Deployed here, that rendered the
@@ -2424,9 +2434,8 @@ font-text option build. Copy those two back over
 brightness screen returns to the re-wrapped font text, which is positionally
 exact but not pixel-exact.
 
-Re-running the builder after deployment needs nothing moved aside: `composite()`
-skips the deployed option PPF by name (it is this script's own output) and
-takes the chain edits from `CHAIN_PPF` instead.
+Re-running the builder after deployment needs nothing moved aside: the caption
+chain is reconstructed from retail by `optlabel2.py`, without any prior PPF.
 
 ### Building and deploying
 
@@ -2508,9 +2517,14 @@ two lines render correctly anyway — `font_get_buffer_size` gives a 252-pixel
 buffer and the proportional font fits 23–24 English characters in far less.
 Harmless, but the comment claims an effect it does not have.
 
-**Verified correct.** `f924[8]` → `[12]` is a genuine fix: `f920` is tested
-against 11 and used to index `f924`, so retail wrote four ints past the end into
-`kcb[0]`. `dword_800C3218` entry 12's `num = 1` really does centre
+**Correction (2026-09-04): retain `f924[8]`.** The earlier claim that growing
+it to `[12]` was a fix is withdrawn. Retail reads/writes beyond the array into
+`kcb[0]`; preserving that relationship is necessary for the working overlay.
+Growing it shifts the subsequent fields and freezes EXIT. The checked-in
+decomp patch retains eight entries. See "Overlays" and "A correction on the
+overlay size limit" for the measured evidence.
+
+**Verified correct.** `dword_800C3218` entry 12's `num = 1` really does centre
 (`rect.x = x - max_width / 2`). Both `opt.c` and `preope.c` are fully decompiled
 with no `INCLUDE_ASM`, so growing their `Work` structs is safe. The
 45-character wrap is consistent with the formula, not just with testing.

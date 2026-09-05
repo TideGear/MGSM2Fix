@@ -33,7 +33,7 @@ usage: camsave.py [--deploy]      (writes work/ always; PPFs to mods with --depl
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-from workdir import WORK
+from workdir import WORK, GAME
 import os, struct, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -46,7 +46,7 @@ TAB = (0x600, 0x740)                 # pointer-word region in the overlay payloa
 POOL = (0x0CB2C, 0x0CD18)            # Integral's Japanese message pool, in the overlay
 STR_MIN = 0x0C000                    # strings live past here; below it is code
 SD_LBA = {1: 136654, 2: 105178}      # STAGE.DIR lba per disc
-MODS = 'D:/Steam/SteamApps/common/MGS1/mods/INTEGRAL/INTEGRAL'
+MODS = os.path.join(GAME, 'mods/INTEGRAL/INTEGRAL')
 NAMES = {1: 'INTEGRAL_disc1_en_camsave.ppf', 2: 'INTEGRAL_disc2_en_camsave.ppf'}
 HDR = 24
 

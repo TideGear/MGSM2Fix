@@ -41,7 +41,7 @@ usage: savemsg.py [--deploy]     (writes work/ always; PPFs to mods with --deplo
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-from workdir import WORK
+from workdir import WORK, GAME
 import os, struct, sys
 
 TADDR, HDR = 0x80010000, 0x800
@@ -55,7 +55,7 @@ US_SAVE_ANCHOR = (6, b'Data saved.')         # save table index 6
 KEEP = {1, 9}                                # USA draws nothing here; Integral's text stays
 INTEGRAL_BASE = {0: 0x131D2238, 1: 0x0EB38078}   # image offset of RAM 0x80010000 per disc (Ketchup)
 SECTOR_DATA, SECTOR_RAW = 0x800, 0x930
-MODS = 'D:/Steam/SteamApps/common/MGS1/mods/INTEGRAL/INTEGRAL'
+MODS = os.path.join(GAME, 'mods/INTEGRAL/INTEGRAL')
 NAMES = {0: 'INTEGRAL_disc1_en_savemsg.ppf', 1: 'INTEGRAL_disc2_en_savemsg.ppf'}
 
 ram = lambda fo: TADDR + fo - HDR

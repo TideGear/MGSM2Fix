@@ -76,7 +76,7 @@ def strcode(s):
     return i
 
 si, ti, Fi, pi = stage(WORK + '/int1_stage.dir')
-su, tu, Fu, pu = stage(WORK + '/us1_stage.dir')
+su, tu, Fu, pu = stage(WORK + '/usa1_stage.dir')
 ni = [k for k, t in enumerate(ti) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 nu = [k for k, t in enumerate(tu) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])
@@ -402,7 +402,7 @@ HILITE = [(0x800C6944, 10,  5, 'bar top / box bottom'),
 
 def xl_patches(int_ovl, usa_ovl):
     from quadscan import scan
-    U = {n: xl for a, n, xl, yt, xr, yb, sa in scan(usa_ovl, 0x800C5970, 0x800CC1D8) if n}
+    U = {n: xl for a, n, xl, yt, xr, yb, sa in scan(usa_ovl, 0x800C5968, 0x800CC1D0) if n}
     out = {}
     for a, n, xl, yt, xr, yb, sa in scan(int_ovl, BASEADDR, 0x800C983C):
         if not n or not n.startswith('br_s') or n == 'br_s00': continue
@@ -473,7 +473,7 @@ S00_NEW = [0x00050940, 0x00051180, 0x00411021, 0x00050880, 0x00411021]
 # where Integral hardcodes 13 - but the call structure is identical, so USA's
 # advances transfer directly.  Both tables are extracted by simulating the
 # registers over each overlay (see rowargs.py), so this follows the discs.
-INT_FN, USA_BASE, USA_FN = 0x800C69B4, 0x800C5970, 0x800C9194
+INT_FN, USA_BASE, USA_FN = 0x800C69B4, 0x800C5968, 0x800C918C
 
 # br_s03..br_s06 take their advance from USA's s6, which is CONDITIONAL - 20 by
 # default (800C96C8) and 17 only on one branch (800C97DC).  Extracting the 17
