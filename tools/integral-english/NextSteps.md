@@ -141,6 +141,10 @@ seven English lines at USA's rows (ink tops game y 52, 74, 96, 118, 140, 162,
 SELECT hides the text; × leaves. README "The MISSION LOG port" has the full
 list and the measuring method. If anything is off, bisect first: move the two
 `en_abst` PPFs out of the mods folders and confirm the log is Japanese again.
+No debug shortcut exists: the collection's launcher needs a game chosen before
+anything loads, so even a `StageSelect = abst` smoke test needs a person at the
+controls (tried 2026-09-05 00:39: the process idled in the launcher and was
+stopped by PID; the ini was restored from `MGSM2Fix.ini.before_abst_smoke`).
 
 ### 5.2 The disc-2 run (needs the user at the controller; nothing to build)
 Load the **Comm Twr A** save (no debug) and play through the actual story disc
@@ -373,7 +377,8 @@ night, from data to deployment:
   `rebuild.py` builds nine families and three overlays. `ppfcheck --deployed`
   clean on 20 files.
 - **Verified statically** (README "The MISSION LOG port" lists it); **not yet
-  on screen** — that is §5.1, the first thing to do.
+  on screen** — that is §5.1, the first thing to do. An unattended smoke test
+  was tried and cannot work: the collection's launcher waits for a game choice.
 - Doc corrections found the same night and folded in: the `_disabled` path,
   the PatchWatch-blind-under-DisableCDROM note, the upstream re-port sizing,
   eight stale README passages (verify_shipped.py, scratchpad tools, the
