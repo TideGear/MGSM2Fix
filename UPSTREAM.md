@@ -20,5 +20,7 @@ on its own. Add an entry whenever a commit touching `src/`, `MGSM2Fix.ini` or
 
 | — (not changed) | **Known weakness, recorded not fixed:** `Ketchup::Update` verifies the RAM half of a patch set by reading **one byte per run — the first**. A foreign write that lands inside a run without touching its first byte stands until something else disturbs the run. The collection's own RAM patches do exactly that to one of the Integral port's exe patches. Checking every byte is cheap (3.5 KB every 30 frames), but a foreign writer that re-applies would then fight the loop and flicker, with Ketchup's own back-off stretching the gap to 480 frames — so it needs a measurement of whether the collection re-applies before it is changed. Comment added at the check | anyone shipping a PPF that patches an executable | open |
 
+| this commit | `[Game] GiveItems`: a test aid — comma-separated MGS1 item ids handed to Snake once per gameplay stage, writing `GM_Items[id]` / `GM_ItemsMax[id]` (linkvarbuf `+0x4A` / `+0x7A`, shorts, off the same `scene_name` relation UnlockBriefing uses) only where the count is still zero. Exists so a tester can reach, say, the PHOTO ALBUM without a full playthrough; the inventory is saved, so it persists in any save made afterwards | anyone testing MGS1 in the collection | built 2026-09-04, first use pending (Camera = 12 for the PHOTO ALBUM test) |
+
 Not for upstream: `tools/integral-english/*`, the PPF outputs under the mods
 folder, and README sections that describe the port itself.
