@@ -33,6 +33,9 @@ THEATER), USA's maximum, and EXTREME.
 
 usage: unlock_title.py [--deploy]
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from optscan import ents
@@ -67,10 +70,10 @@ USA_SITES = [
 
 TARGETS = [
     # name, stage dir, STAGE.DIR lba, overlay base, sites, PPF path (under MODS)
-    ('Integral disc 1', 'work/int1_stage.dir', 136654, 0x800C3208, INT_SITES, 'INTEGRAL/INTEGRAL/0/INTEGRAL_disc1_unlock_title.ppf'),
-    ('Integral disc 2', 'work/int2_stage.dir', 105178, 0x800C3208, INT_SITES, 'INTEGRAL/INTEGRAL/1/INTEGRAL_disc2_unlock_title.ppf'),
-    ('USA disc 1',      'work/usa1_stage.dir', 132344, 0x800C5970, USA_SITES, 'MGS1_US/0/MGS1_disc1_unlock_title.ppf'),
-    ('USA disc 2',      'work/usa2_stage.dir', 100801, 0x800C5970, USA_SITES, 'MGS1_US/1/MGS1_disc2_unlock_title.ppf'),
+    ('Integral disc 1', WORK + '/int1_stage.dir', 136654, 0x800C3208, INT_SITES, 'INTEGRAL/INTEGRAL/0/INTEGRAL_disc1_unlock_title.ppf'),
+    ('Integral disc 2', WORK + '/int2_stage.dir', 105178, 0x800C3208, INT_SITES, 'INTEGRAL/INTEGRAL/1/INTEGRAL_disc2_unlock_title.ppf'),
+    ('USA disc 1',      WORK + '/usa1_stage.dir', 132344, 0x800C5970, USA_SITES, 'MGS1_US/0/MGS1_disc1_unlock_title.ppf'),
+    ('USA disc 2',      WORK + '/usa2_stage.dir', 100801, 0x800C5970, USA_SITES, 'MGS1_US/1/MGS1_disc2_unlock_title.ppf'),
 ]
 
 
@@ -102,7 +105,7 @@ def main():
             recs.append((img, struct.pack('<I', new)))
             print('  %s  %08X: %08X -> %08X  %s' % (name, addr, old, new, note))
         blob = ppf3(recs, 'MGS1: force title-screen unlocks (test aid)')
-        out = 'work/' + os.path.basename(rel); open(out, 'wb').write(blob)
+        out = WORK + '/' + os.path.basename(rel); open(out, 'wb').write(blob)
         print('%s: %d words -> %s' % (name, len(recs), out))
         if deploy:
             p = os.path.join(MODS, rel); os.makedirs(os.path.dirname(p), exist_ok=True)

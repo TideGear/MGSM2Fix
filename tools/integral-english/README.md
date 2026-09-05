@@ -12,7 +12,7 @@ counts and line breaks change.
 | `en_items` | item descriptions |
 | `en_menu`, `en_menu2` | menu strings |
 | `en_option` | `screen brightness setup`, `key configuration setup`, `use directional buttons to test` |
-| `en_preope` | Previous Operations: Metal Gear (12 pages), Metal Gear 2 (19 pages) |
+| `en_preope` | Previous Operations with USA's exact pagination: Metal Gear (13 pages, 7 lines each, last page 6), Metal Gear 2 (19 pages) — `preope_usa.py` |
 | `en_brf` | briefing menu labels (20 PCX textures, quads, USA's row arithmetic and `above`) |
 | `en_savemsg` | memory-card messages (`datasave.c` save/load caption tables in the executable) |
 | `en_camsave` | the PHOTO ALBUM's own copy of those messages, inside the `camera` overlay |
@@ -290,10 +290,18 @@ session-specific and lives under Windows Temp. Three gigabytes of re-extractable
 data plus every backup, one Disk Cleanup away from gone, and unreachable from
 any future session's scratchpad path.
 
-It now lives at **`D:\mgsbuild\integral-english-work\`**: `work\` (run the
-tools from that directory), `unlocks_parked\`, `keyconfig_test\`, and the ini,
+It now lives at **`D:\mgsbuild\integral-english-work\`**: `work\`,
+`unlocks_parked\`, `keyconfig_test\`, and the ini,
 log and `opt.c` snapshots. The scratchpad copy is left in place for this
-session only. Anything a tool writes should go there, not to the scratchpad.
+session only.
+
+**The tools find it themselves (2026-09-04).** Every tool imports `WORK` from
+`workdir.py` instead of opening `'work/…'` relative to the current directory, so
+they run from anywhere. Resolution, first match wins: the
+`INTEGRAL_ENGLISH_WORK` environment variable naming the root that holds
+`work\`; then `D:\mgsbuild\integral-english-work`; then the current
+directory, which keeps the old `cd <root>` convention working. `py workdir.py`
+prints what it resolved to. Anything a tool writes goes to `WORK` as well.
 
 **Verifiers, all of which read the deployed artefacts rather than the build:**
 
@@ -325,8 +333,15 @@ see `decomp-overlay-changes.patch`) and disc images in `discs/`.
     py build.py --psyq_path D:/mgsbuild/psyq --variant main_exe
     ninja -f build.ninja ../obj/preope.bin ../obj/option.bin
 
-    py preope_both.py          # builds the stage
-    py preope_ppf.py discs/int1.bin out/INTEGRAL_disc1_en_preope.ppf
+    py preope_both.py          # the base stage, work/preope_en.bin (re-wrapped, 12/19 pages)
+    py preope_usa.py           # USA's exact pagination on top of it (13/19 pages) - and this
+                               # one DEPLOYS to the mods folder as it runs; there is no --deploy
+
+Removed 2026-09-04 as dead: `preope_ppf.py` (it packed the 12-page base stage,
+so running it would have shipped the superseded layout over the live one),
+`preope_mg1.py`/`preope_mg2.py` (single-recap re-wrap experiments from 08-29
+that nothing reads) and `mg2_recap.inc` (referenced by nothing). `git log` has
+them.
 
     py brf_widen.py            # VRAM placement for the briefing labels
     py brf_build.py            # quad patches + texture swap
@@ -652,7 +667,7 @@ gigabyte of log per minute.
 Two guards now:
 
 - Every tool that builds a PPF asserts its description length — `optsctext.py`,
-  `preope_ppf.py`, `reloc_ppf.py`. They were all padding without truncating; the
+  `preope_usa.py`, `reloc_ppf.py`. They were all padding without truncating; the
   strings happened to be short enough.
 - **`ppfcheck.py`** parses a PPF exactly as Ketchup does and rejects what it
   would choke on: bad magic, records running past EOF, zero-length records,

@@ -19,14 +19,17 @@ Metal Gear is wrapped at 45 and Metal Gear 2 at 46 characters; both stay under
 what the recap texture can show.  No wording is changed - only page counts and
 line breaks.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import struct, sys
 sys.path.insert(0,'.')
 from gclparse import parse_script, containers_over, be16, be32
 from gcldec import chain_at
 def pad(x,a=2048): return (x+a-1)//a*a
 
-REF=open('work/int1_stage.dir','rb').read()
-US =open('work/us1_stage.dir','rb').read()
+REF=open(WORK + '/int1_stage.dir','rb').read()
+US =open(WORK + '/us1_stage.dir','rb').read()
 OVL=open('D:/mgsbuild/d/obj/preope.bin','rb').read()
 IB,UB=0x6A71*2048,0x7659*2048
 scr_off=2048+pad(24911)+pad(113716)          # 0x23000
@@ -126,5 +129,5 @@ print('VERIFY: re-parse PASS, %d records (4 + %d + %d + 3), script_len %d -> %d'
       %(len(c2),S1,S2,slen,s2))
 print('  MG1 first %r'%c2[4][2]);      print('  MG1 last  %r'%c2[3+len(mg1)][2])
 print('  MG2 first %r'%c2[4+S1][2]);   print('  MG2 last  %r'%c2[3+S1+len(mg2)][2])
-open('work/preope_en.bin','wb').write(bytes(stage))
-print('wrote work/preope_en.bin')
+open(WORK + '/preope_en.bin','wb').write(bytes(stage))
+print('wrote %s/preope_en.bin' % WORK)

@@ -8,6 +8,9 @@ file-name table does not mention, so nothing the game reads is overwritten.
 STAGE_TABLE.offset is relative to STAGE.DIR's own LBA (get_stage_pos returns
 dir->offset + fs_table_header.pos), so the value written is position independent.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import struct, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from iso import Disc
@@ -43,7 +46,7 @@ for s in range(need):
     while hi > lo and not page[hi-1]: hi -= 1
     if lo < hi: writes.append((img(du_lba + slot + s, lo), page[lo:hi]))
 
-sd = open('work/int1_stage.dir', 'rb').read()
+sd = open(WORK + '/int1_stage.dir', 'rb').read()
 hsz = struct.unpack('<I', sd[:4])[0]
 ent = None
 for p in range(4, hsz + 12, 12):

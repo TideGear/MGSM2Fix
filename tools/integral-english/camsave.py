@@ -31,13 +31,16 @@ MEMORY CARD 1/2, YES, NO, SAVE DATA) are left alone.
 
 usage: camsave.py [--deploy]      (writes work/ always; PPFs to mods with --deploy)
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import os, struct, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from optscan import ents, stage, pad
 
-INT = {1: 'work/int1_stage.dir', 2: 'work/int2_stage.dir'}
-USA = 'work/usa1_stage.dir'
+INT = {1: WORK + '/int1_stage.dir', 2: WORK + '/int2_stage.dir'}
+USA = WORK + '/usa1_stage.dir'
 BASE_INT, BASE_USA = 0x800C3208, 0x800C5968
 TAB = (0x600, 0x740)                 # pointer-word region in the overlay payload
 POOL = (0x0CB2C, 0x0CD18)            # Integral's Japanese message pool, in the overlay
@@ -181,8 +184,8 @@ def main():
             runs.append([k, k + 1])
     print('%d bytes differ in %d runs' % (len(diffs), len(runs)))
 
-    os.makedirs('work', exist_ok=True)
-    open('work/camera_en.bin', 'wb').write(new)
+    os.makedirs(WORK, exist_ok=True)
+    open(WORK + '/camera_en.bin', 'wb').write(new)
     for disc in (1, 2):
         sect, _ = overlay(INT[disc])
         recs = []
@@ -199,7 +202,7 @@ def main():
             pos = (off % 2352) - HDR
             assert 0 <= pos and pos + len(data) <= 2048, 'record crosses a sector tail'
         blob = ppf3(recs, 'MGS Integral: English photo album messages')
-        p = 'work/%s' % NAMES[disc]
+        p = WORK + '/%s' % NAMES[disc]
         open(p, 'wb').write(blob)
         print('disc %d: %d records, %d bytes -> %s' % (disc, len(recs), sum(len(d) for _, d in recs), p))
         if deploy:

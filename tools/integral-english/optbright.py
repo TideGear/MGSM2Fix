@@ -33,15 +33,18 @@ notes.)
 
 usage: optbright.py            (reads work/, writes work/ and the two PPFs)
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import struct, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gclparse import parse_script, containers_over, be16, be32
 from gcldec import chain_at
 
-BASE   = 'work/int1_stage.dir'            # retail, the PPF's base image
-SHIP   = 'work/int1_stage_opt11.dir'      # what the deployed option PPF contains
+BASE   = WORK + '/int1_stage.dir'            # retail, the PPF's base image
+SHIP   = WORK + '/int1_stage_opt11.dir'      # what the deployed option PPF contains
 OVL    = 'D:/mgsbuild/d/obj/option.bin'   # the rebuilt option overlay
-OUT    = 'work/int1_stage_bright.dir'
+OUT    = WORK + '/int1_stage_bright.dir'
 
 # STAGE.DIR LBA per disc.  No Integral disc image is on disk, so these were
 # solved from the originally deployed option PPF and proved by re-encoding the
@@ -51,7 +54,7 @@ OUT    = 'work/int1_stage_bright.dir'
 # the record counts differ and the check is skipped rather than faked.
 DISCS  = [(0, 136654, 'INTEGRAL_disc1_en_option.ppf'),
           (1, 105178, 'INTEGRAL_disc2_en_option.ppf')]
-BASELINE = 'work/option_ppf_baseline_disc%d.ppf'   # the SHIP-state PPF, for revert
+BASELINE = WORK + '/option_ppf_baseline_disc%d.ppf'   # the SHIP-state PPF, for revert
 HDR    = 24                               # mode 2 form 1
 MODS   = 'D:/Steam/SteamApps/common/MGS1/mods/INTEGRAL/INTEGRAL'
 DESC   = b'MGS Integral: option screen text'
