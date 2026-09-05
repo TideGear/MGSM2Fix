@@ -1805,6 +1805,9 @@ standing and is itself unattributed.
 
 ## Not tested
 
+- **The three item-text fixes on screen** (2026-09-05): SOCOM, ID Card with a
+  level-7 card (`level 7 security`), Mine Detector on HARD/EXTREME after the
+  SOCOM, and every other weapon description. "Three item-text faults".
 - **The MISSION LOG on screen.** `en_abst` was deployed 2026-09-05 after static
   verification only. Load any save and go through the checklist at the end of
   "The MISSION LOG port"; a late-game save (a count-7 page) also shows whether
