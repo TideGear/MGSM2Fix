@@ -1167,8 +1167,8 @@ KCB columns; `ppfcheck --deployed` clean on all 20 files.
 
 **Seen on screen 2026-09-05 (user's shots, morning):** both pages of the
 Heliport and Comm Tower A logs, `1/2 ►` and `◄ 2/2`, EXIT framed, USA's rows.
-The only fault was the slide fragments above, fixed the same day and not yet
-re-seen. **Not verified otherwise:** an unattended smoke test is not possible:
+The only fault was the slide fragments above, fixed the same day and confirmed
+gone by the user at 13:50. **Not verified otherwise:** an unattended smoke test is not possible:
 a `StageSelect = abst` launch on 2026-09-05 00:39 sat in the collection's own
 launcher ("Ver.3.0.0" is the last log line), which waits for a game to be
 chosen before Ketchup or any stage loads; the process was stopped by PID and
@@ -1877,9 +1877,8 @@ standing and is itself unattributed.
   shots): SOCOM `Semi-automatic pistol.` on its own line, ID Card `level 7
   security`, Mine Detector intact after the SOCOM; the log's audit silent,
   `Applied 3755 bytes of RAM patches in 14 blocks (pass 1)`.
-- **The MISSION LOG slide after the sprite-width fix** (deployed 2026-09-05
-  13:05): turn pages on the Comm Tower A log and look for coloured fragments
-  during the slide. Static pages were fine in the same shots.
+- ~~The MISSION LOG slide after the sprite-width fix~~ **Done 2026-09-05 13:50**:
+  the user turned pages on the Comm Tower A log again and the slide is clean.
 - **The MISSION LOG on screen.** `en_abst` was deployed 2026-09-05 after static
   verification only. Load any save and go through the checklist at the end of
   "The MISSION LOG port"; a late-game save (a count-7 page) also shows whether

@@ -138,8 +138,8 @@ equivalence, not a new gameplay test.
 **Mission log:** both pages of two logs were seen right on 2026-09-05 12:54;
 the one fault, coloured fragments during the page slide (stale VRAM in the
 last 8 texels of each line, README "Two departures from USA's code"), was
-fixed and deployed at 13:05 — **turn pages on the Comm Tower A log again**.
-The rest of this checklist stands for anything not yet looked at:
+fixed and deployed at 13:05 and **confirmed clean by the user at 13:50**. The
+rest of this checklist stands for anything not yet looked at:
 `en_abst` was deployed 2026-09-05 after static verification only. Load any
 save (Heliport or Comm Twr A) and compare with the USA shots of 2026-09-04
 (`MGS1 USA/20260904233158_1.jpg`, `…233204_1.jpg`): the caption under READ
