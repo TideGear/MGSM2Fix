@@ -230,6 +230,7 @@ private:
     // brf stage script passes to the menu as its `-f` option.
     uintptr_t MGS1_VarBufPTR = 0;
     unsigned MGS1_UnlockWrites = 0;
+    char MGS1_GaveItemsIn[16] = {};   // stage the GiveItems grant last ran in
     char MGS1_LastStageName[8] = { 0 };
     constexpr static unsigned MGS1_BriefingFlagsOffset = 0x4C;
     constexpr static unsigned char MGS1_BriefingFlagsMask[3] = { 0xFE, 0xFF, 0x01 };

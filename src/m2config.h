@@ -71,6 +71,7 @@ public:
     static inline bool bGameStageSelect;
     static inline bool bGameEnglishText;
     static inline bool bGameUnlockBriefing;
+    static inline std::vector<int> vGameGiveItems;
     static inline bool bPatchesDisableRAM;
     static inline bool bPatchesDisableCDROM;
     static inline bool bPatchesDisableFont;

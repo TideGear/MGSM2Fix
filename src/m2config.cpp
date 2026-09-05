@@ -127,6 +127,24 @@ void M2Config::Load()
     inipp::get_value(ini.sections["Game"], "StageSelect", bGameStageSelect);
     inipp::get_value(ini.sections["Game"], "EnglishText", bGameEnglishText);
     inipp::get_value(ini.sections["Game"], "UnlockBriefing", bGameUnlockBriefing);
+    {
+        // Comma-separated item ids, MGS1's IT_* numbering (Camera is 12).
+        std::string list;
+        if (inipp::get_value(ini.sections["Game"], "GiveItems", list)) {
+            std::stringstream ss(list);
+            std::string tok;
+            while (std::getline(ss, tok, ',')) {
+                try {
+                    int id = std::stoi(tok);
+                    if (id >= 0 && id < 24) vGameGiveItems.push_back(id);
+                    else spdlog::warn("[Config] GiveItems: {} is not an item id (0..23), ignored.", id);
+                } catch (...) {
+                    if (!tok.empty() && tok.find_first_not_of(" \t") != std::string::npos)
+                        spdlog::warn("[Config] GiveItems: '{}' is not a number, ignored.", tok);
+                }
+            }
+        }
+    }
 
     inipp::get_value(ini.sections["Update Notifications"], "CheckForUpdates", bShouldCheckForUpdates);
     inipp::get_value(ini.sections["Update Notifications"], "ConsoleNotifications", bConsoleUpdateNotifications);
@@ -197,6 +215,11 @@ void M2Config::Load()
     spdlog::info("[Config] bGameStageSelect: {}", bGameStageSelect);
     spdlog::info("[Config] bGameEnglishText: {}", bGameEnglishText);
     spdlog::info("[Config] bGameUnlockBriefing: {}", bGameUnlockBriefing);
+    if (!vGameGiveItems.empty()) {
+        std::string ids;
+        for (int id : vGameGiveItems) ids += (ids.empty() ? "" : ",") + std::to_string(id);
+        spdlog::info("[Config] vGameGiveItems: {}", ids);
+    }
     spdlog::info("[Config] bShouldCheckForUpdates: {}", bShouldCheckForUpdates);
     spdlog::info("[Config] bConsoleUpdateNotifications: {}", bConsoleUpdateNotifications);
     spdlog::info("[Config] bDisableWindowsFullscreenOptimization: {}", bDisableWindowsFullscreenOptimization);

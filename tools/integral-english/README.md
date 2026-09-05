@@ -1460,11 +1460,16 @@ standing and is itself unattributed.
   them. The screen test turned out not to work: LOAD DATA in the collection
   goes straight to `No save file.` (slot 4, untouched) and never shows `Now
   checking Memory Card.` — its storage layer is instant. So `Ketchup::Audit`
-  (2026-09-04) now compares every byte of every RAM run read-only every ~5 s and
-  warns on any mid-run mismatch; **the next session's log answers this**: a
-  `differs from what was written` line naming a pool address means the writes
-  stick, silence means they do not. See "The collection's RAM patches collide
-  with `en_savemsg`".
+  (2026-09-04) compares every byte of every RAM run read-only every ~5 s and
+  warns on any mid-run mismatch: a `differs from what was written` line naming
+  a pool address means the writes stick, silence means they do not. **The first
+  audited session (2026-09-04 17:28) was 40 seconds of title → option → title
+  and logged nothing — which is not yet evidence,** because the collection's
+  memory-card rename family is plausibly applied only when a memory-card screen
+  is visited. The session that answers it needs `DisableRAM = false`, a visit
+  to LOAD DATA, and ideally a save; **run it before any achievements-off
+  testing**, since with `DisableRAM = true` there is nothing to observe. See
+  "The collection's RAM patches collide with `en_savemsg`".
 - ~~SCREEN and EXIT after the doorbell build~~ **Done 2026-09-04.** All three
   branches of `case 8` behave: up → SCREEN shows the game's own brightness
   screen, four lines, correctly placed; down → EXIT highlights and confirms out
@@ -2324,6 +2329,26 @@ title actor's heap Work, and the Master Collection keeps its saves in
 those states are ever needed, the honest lever is a cleared save (rank 6) plus
 photo and VR saves; the cheap one is a PPF on the `title` overlay forcing the
 scan's results.
+
+## Give items (test aid): `[Game] GiveItems`
+
+Added 2026-09-04 so disc 2, a Mei Ling save and the PHOTO ALBUM could all be
+tested from one stage-select start instead of a playthrough: the Camera is
+otherwise behind the Nuclear Building B2 armoury's level-6 door.
+
+`GiveItems = 12` (the Camera; the ini lists every id) writes `GM_Items[id] = 1`
+and `GM_ItemsMax[id] = 1` once per gameplay stage, only where the count is still
+zero. Addresses come from `include/linkvar.h`: `GM_Items` is
+`&linkvarbuf[37]` (byte `+0x4A`, "0x4a Items"), `GM_ItemsMax` is `GM_Items + 24`
+(`+0x7A`), both shorts, and `linkvarbuf` is `scene_name + 0x10` — the relation
+`UnlockBriefing` already uses and that was read back on both Integral and USA.
+Gameplay stages are the `sNNx` / `dNNx` names; title, menus and the developer
+`select` stage are left alone. The developer stage select itself
+(`[Game] StageSelect`) sets no inventory — `stage/select.c` only spawns
+`CHARA_STAGESELECT` and the vibration editor — so this is what fills the gap.
+
+`linkvarbuf` is saved with the game, so a save made after the grant keeps the
+item. Use it on a test save with achievements off.
 
 ## Unlock everything (test aid): `unlock_title.py`
 

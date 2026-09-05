@@ -237,6 +237,32 @@ void MGS1::SQOnUpdateGadgets()
         }
     }
 
+    // [Game] GiveItems: a test aid. GM_Items is linkvarbuf[37..60] and
+    // GM_ItemsMax linkvarbuf[61..84], shorts (include/linkvar.h: "0x4a Items",
+    // "0x7a Items max capacity"), and linkvarbuf sits 0x10 above the scene_name
+    // define - the same relation UnlockBriefing already relies on. Granted once
+    // per gameplay stage, only while one is running (names are sNNx / dNNx, read
+    // from the mirrored MGS1_LastStageName; the
+    // menus, title and the developer select are left alone), and only where the
+    // count is still zero, so a real inventory is never reduced. linkvarbuf is
+    // saved with the game, so a save made afterwards keeps the item.
+    if (!M2Config::vGameGiveItems.empty() && MGS1_GlobalsPTR != 0
+        && strlen(MGS1_LastStageName) == 4 && (MGS1_LastStageName[0] == 's' || MGS1_LastStageName[0] == 'd')
+        && isdigit((unsigned char)MGS1_LastStageName[1]) && isdigit((unsigned char)MGS1_LastStageName[2])
+        && strcmp(MGS1_GaveItemsIn, MGS1_LastStageName) != 0) {
+        strcpy(MGS1_GaveItemsIn, MGS1_LastStageName);
+        uintptr_t items = MGS1_GlobalsPTR + 0x10 + 0x4A;     // linkvarbuf + GM_Items
+        uintptr_t maxes = items + 24 * 2;                     // GM_ItemsMax
+        for (int id : M2Config::vGameGiveItems) {
+            SQInteger have = SQEmuTask<Squirk::Standard>::GetRamValue(16, items + id * 2) & 0xFFFF;
+            SQInteger max  = SQEmuTask<Squirk::Standard>::GetRamValue(16, maxes + id * 2) & 0xFFFF;
+            if (have == 0) SQEmuTask<Squirk::Standard>::SetRamValue(16, items + id * 2, 1);
+            if (max == 0)  SQEmuTask<Squirk::Standard>::SetRamValue(16, maxes + id * 2, 1);
+            spdlog::info("[MGS 1] GiveItems: item {} in stage \"{}\" - count {} -> {}, max {} -> {}.",
+                id, MGS1_LastStageName, have, have == 0 ? 1 : have, max, max == 0 ? 1 : max);
+        }
+    }
+
     if (M2Config::bAnalog.has_value() && M2Config::bAnalog.value()) {
         AnalogLoop();
     }
