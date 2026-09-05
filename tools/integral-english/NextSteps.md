@@ -224,6 +224,11 @@ on this branch.
 | `gclparse.py`, `gcldec.py` | GCL container parsing / record walking — `containers_over` for resizing |
 | `optscan.py`, `optbright.py`, `optlabel2.py` | option-stage inspection and earlier chain tools |
 | `unlock_title.py` | builds the (parked) unlock PPFs |
+| `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
+| `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
+| `pcx4.py` | encode/decode the 4-plane RLE PCX the texture loader expects (how `sc_text` and the KEY CONFIG art were read and written) |
+
+Rescued from the session scratchpad on 2026-09-04 (they existed nowhere durable): the four scripts above and `map_pristine.map` (the pristine executable's symbol map, now at `D:\mgsbuild\integral-english-work\`).
 
 The scripts that shaped tonight's documentation live only in the session
 scratchpad and are disposable; everything they established is in the README.

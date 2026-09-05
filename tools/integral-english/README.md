@@ -232,6 +232,20 @@ detail; this is the index.
 
 ### Reading disassembly
 
+**USA's `title` overlay: the true address is the label minus 8** (memory-only
+until 2026-09-04). The header's entry word, the `printf` references and every
+`j` target agree on it; USA's `brf` overlay did **not** have this offset, so
+check per overlay. Take file offsets from the labels and encode jump targets
+from the true addresses. Found while building `unlock_title.py`.
+
+**`stage_lookup` (`0x80022DCC`) has no bounds check** — it returns
+`entry_offset + stagedir_base_lba`; the caller reads one sector and the
+callback at `0x80023274` takes the sector count from `lh [header+2]`. That is
+why a stage may live anywhere past STAGE.DIR with its length coming only from
+its own header — the mechanism the DUMMY3M relocation of `preope`, `brf` and
+`option` relies on. `DUMMY3M.DAT` (13,501 zeroed sectors) is absent from the
+executable's file-name table and is never opened by the game.
+
 - USA's brf/option overlay base is **0x800C5970**, Integral's **0x800C3208**.
   Match functions by call count, never by address.
 - A `jal` takes arguments from its **delay slot** too; scanning only backwards
@@ -262,6 +276,21 @@ detail; this is the index.
 
 ### PPFs and deployment
 
+**Executable PPFs: never let a record cross a 2048-byte payload boundary
+(memory-only until 2026-09-04).** Ketchup mirrors executable writes into RAM
+per byte with `pos = k % 2352; skip if pos >= 2048`, so the part of a record
+that spills into a sector's 304-byte tail is silently lost while the log still
+says "loaded" — `en_savemsg` lost 142 of 442 bytes that way on 2026-09-02.
+Split runs at payload boundaries and replay Ketchup's rule as an assert
+(`savemsg.py` does). Check: the log's "Applied N bytes of RAM patches" must
+equal `en_items`' 3,068 plus yours. Image offset of an executable file offset
+`fo`: `base + ((fo - 0x800) // 2048) * 2352 + (fo - 0x800) % 2048`, where
+`base` is Ketchup's `ram_base` — Integral disc 1 **`0x131D2238`**, disc 2
+**`0x0EB38078`**. The inverse (image → RAM) is
+`0x80010000 + (img - ram_base) // 0x930 * 0x800 + (img - ram_base) % 0x930`;
+an earlier attempt subtracted the exe's 0x800 header a second time and put
+everything one sector low.
+
 - **A PPF record aimed at the executable must not cross a 2048-byte payload
   boundary.** Ketchup mirrors executable writes into RAM byte by byte with
   `sector = k / 2352; pos = k % 2352; if (pos >= 2048) skip`, so a record that
@@ -284,6 +313,46 @@ detail; this is the index.
   against — save a baseline copy first; it is also your revert path.
 
 ### Toolchain and environment
+
+**Where the real USA discs are, and why `work/us1_stage.dir` must not be used
+for text** (memory-only until 2026-09-04). `us1_stage.dir` is the **European**
+release despite its name — found 2026-09-01 when the shipped Previous
+Operations text disagreed with the user's USA screenshots ("mercenary who was
+feared" vs the file's "mercenary. He was feared"); those strings exist only in
+`windata/dlc/dlc_europe.bin`. `work/us1.exe` *is* genuinely USA (SLUS ids at
+0x800, "for North America area", 651,264 bytes = `SLUS_005.94`), so the exe and
+the stage file were taken from different discs. The collection's
+`windata/alldata.bin` holds three PSX images as raw 2352-byte sectors:
+
+| image base | boot file | what |
+|---|---|---|
+| `0xD39B7000` | `SLUS_009.57` | VR Missions (US) |
+| `0xF12F8000` | `SLUS_005.94` | **MGS1 USA disc 1** |
+| `0x11B3E5800` | `SLUS_007.76` | **MGS1 USA disc 2** |
+
+Find them by scanning for `\x01CD001\x01` (the PVD at sector 16; base = hit −
+24 − 16 × 2352), then read the root directory at PVD+156 and `/MGS` for
+`STAGE.DIR`. Extracted: `work/usa1_stage.dir` (71,892,992 bytes) and
+`work/usa2_stage.dir` (71,888,896). European and Japanese releases are in
+`dlc_europe.bin` / `dlc_japan.bin`. How much the mis-sourcing cost: `option`
+DAR and chain byte-identical between EU and USA, `brf` DAR identical, only
+`preope`'s chain differs (re-sourced); the `brf` *overlay* differs in 3,200
+bytes of pointers, and the briefing layout constants were read from the EU copy
+— they measured pixel-perfect against USA shots, but that equality is
+inferred, not verified; re-locate by call count and re-extract if it ever
+matters.
+
+**Reading and poking live RAM through the Squirrel debugger** (memory-only
+until 2026-09-04): enable `[Squirrel Debugger]` in the ini, run `bridge.py`
+**before** launching (the game blocks until a client connects), then drop `.sq`
+files into `sqcmd/` that call `g_emu_task.getRamValue(8|16|32, offset)` /
+`setRamValue(...)`. **Offsets are RAM offsets** (`0xB3CC8`), not KSEG0
+addresses (`0x800B3CC8`): memory defines log as `0xb4d9d`, Ketchup's
+`PSX_ImageBase` is `0x10000`. A poke with the `0x800B…` form still logs
+"Unlocked" because the read-back uses the same wrong convention — verify the
+convention, not the log line. Symbol lookups: the pristine exe's map at
+`D:\mgsbuild\integral-english-work\map_pristine.map` (rescued from the session
+scratchpad 2026-09-04), overlay maps at `D:/mgsbuild/d/obj/asm_<stage>_lhs.map`.
 
 **Where the working data lives — and why that changed 2026-09-03.** Every tool
 here reads `work/…` relative to the current directory: the extracted
