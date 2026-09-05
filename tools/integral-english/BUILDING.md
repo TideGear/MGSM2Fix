@@ -109,6 +109,11 @@ same command in `D:/mgsbuild/repro6` again matched all 18 deployed PPFs by
 effect (16 byte-identical); `en_items` is now 26 records / 3518 bytes per disc and
 `en_savemsg` 3 records / 618 bytes. ZIP SHA-256 `d8dba9d16b2325f60785ab443f8f7429babd6d7178d175dd6942cc0a6f97e9b5`, 21 manifest entries.
 
+**Clean run 2026-09-05 13:06 (slide fix).** After the abst sprite-width fix
+(decomp `26d27f1`, `abst.bin` 48,103 bytes, SHA-256 `f625fc8ece123648…`), `D:/mgsbuild/repro7`
+again matched all 18 deployed PPFs by effect (16 byte-identical). ZIP SHA-256
+`870a691a4782291c5e92d6a68f3035cb102ed132daf5ce478901a14dc8ec51ca`, 21 manifest entries. This is the deployed state.
+
 The collection option builder deliberately uses four brightness lines. Changing
 that constant to six alone does not finish the raw-disc release: disc-change
 text, runtime behavior and raw-image packaging still require work.
