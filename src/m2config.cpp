@@ -124,7 +124,21 @@ void M2Config::Load()
     }
     inipp::get_value(ini.sections["Patches"], "PreserveConfiguration", bPatchesPreserveConfiguration);
 
-    inipp::get_value(ini.sections["Game"], "StageSelect", bGameStageSelect);
+    {
+        // StageSelect is a bool that also accepts a menu name: `true` opens the
+        // developer top menu ("select" - TITLE / DEMO ALL / SOUND TEST), and a
+        // name such as `select3` opens that stage-list menu directly, since the
+        // retail top menu does not link to the four stage lists.
+        std::string v;
+        if (inipp::get_value(ini.sections["Game"], "StageSelect", v)) {
+            std::string lower = v;
+            for (auto &c : lower) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            if (lower == "true" || lower == "1" || lower == "yes" || lower == "on") { bGameStageSelect = true; sGameStageSelect = "select"; }
+            else if (lower == "false" || lower == "0" || lower == "no" || lower == "off" || lower.empty()) { bGameStageSelect = false; sGameStageSelect.clear(); }
+            else if (lower.size() <= 7) { bGameStageSelect = true; sGameStageSelect = lower; }
+            else spdlog::warn("[Config] StageSelect: '{}' is longer than a stage name (7 chars), ignored.", v);
+        }
+    }
     inipp::get_value(ini.sections["Game"], "EnglishText", bGameEnglishText);
     inipp::get_value(ini.sections["Game"], "UnlockBriefing", bGameUnlockBriefing);
     {
@@ -212,7 +226,7 @@ void M2Config::Load()
         eBrightnessText == M2BrightnessText::Fixed    ? "fixed"    :
         eBrightnessText == M2BrightnessText::Original ? "original" : "collection");
     spdlog::info("[Config] bPatchesPreserveConfiguration: {}", bPatchesPreserveConfiguration);
-    spdlog::info("[Config] bGameStageSelect: {}", bGameStageSelect);
+    spdlog::info("[Config] bGameStageSelect: {} ({})", bGameStageSelect, sGameStageSelect);
     spdlog::info("[Config] bGameEnglishText: {}", bGameEnglishText);
     spdlog::info("[Config] bGameUnlockBriefing: {}", bGameUnlockBriefing);
     if (!vGameGiveItems.empty()) {

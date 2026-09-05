@@ -138,8 +138,15 @@ void MGS1::SQOnUpdateGadgets()
         }
 
         if (M2Config::bGameStageSelect) {
-            if (strcmp(MGS1_LoaderName, "title") == 0 && strcmp(MGS1_StageName, "select") != 0) {
-                strcpy(MGS1_LoaderName, "select");
+            // The retail developer menu ("select") offers only TITLE / DEMO ALL /
+            // SOUND TEST; the four stage lists are their own menus - select1
+            // (D00A..S04B), select2 (S05A..S09A), select3 (S11A..S14E, i.e.
+            // disc 2), select4 (S15A..S20A) - which it never links to, so the
+            // setting may name one of them to open it directly.
+            const char *menu = M2Config::sGameStageSelect.empty() ? "select" : M2Config::sGameStageSelect.c_str();
+            if (strcmp(MGS1_LoaderName, "title") == 0 && strncmp(MGS1_StageName, "select", 6) != 0) {
+                strncpy(MGS1_LoaderName, menu, sizeof(MGS1_LoaderName) - 1);
+                MGS1_LoaderName[sizeof(MGS1_LoaderName) - 1] = 0;
                 SQEmuTask<Squirk::Standard>::RamCopy(MGS1_LoaderPTR, MGS1_LoaderName, sizeof(MGS1_LoaderName));
                 spdlog::info("[MGS 1] Set mgs_loader_stage to \"{}\".", MGS1_LoaderName);
             }
