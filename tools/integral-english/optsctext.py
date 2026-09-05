@@ -62,8 +62,8 @@ WHAT THIS TOUCHES
    a 78-sector stage at 90 would silently overwrite 40 sectors of the shipped
    briefing stage, and a blankness check against the pristine image would not
    catch it because PPFs are applied at runtime and never written back. This
-   script composites the deployed PPFs to build the real occupancy map and
-   asserts disjointness. Slot 384 leaves brf 256 sectors of growth room.
+   script checks deployed occupancy when --deploy is requested; rebuild.py
+   checks overlaps across the complete packaged set. Slot 384 leaves brf 256 sectors of growth room.
 
 5. Overlay: the fifth quad. `work->field_2C` is GM_MakePrim(..., 4, ...) so the
    prim needs a fifth pack; field_5D4 and f2AFC grow to 5 and the existing copy
@@ -74,27 +74,24 @@ WHAT THIS TOUCHES
    all 17 of f2B0C[0..16] before the screen draws. Six now-dead
    option_800C3B3C calls in case 7 pay for the addition.
 
-6. The chain is left EXACTLY as the font-text build shipped it, taken from
-   CHAIN_PPF (not from whatever option PPF is deployed - see the note at the
-   constant). Records 13-16/24/27 keep their English text; nothing draws them
-   any more. verify() asserts the records it depends on, because after
-   relocation the old PPFs write to a stage the game no longer reads, so
-   anything they contributed has to already be in the image this script builds.
+6. optlabel2.build reconstructs the current caption chain from retail. Every
+   unowned record, including record 7's colon, remains byte-identical to retail.
+   verify() checks the rebuilt records before emission. No prior PPF is an input.
 
 usage: optsctext.py [--deploy]      (writes work/ always; PPFs only with --deploy)
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-from workdir import WORK
+from workdir import WORK, GAME, DECOMP
 import struct, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 RETAIL   = WORK + '/int1_stage.dir'
-OVL      = 'D:/mgsbuild/d/obj/option.bin'
+OVL      = os.path.join(DECOMP, 'obj/option.bin')
 USA      = WORK + '/usa1_stage.dir'
 OUT      = WORK + '/option_sctext_stage.bin'
-JP       = 'D:/Steam/SteamApps/common/MGS1/windata/dlc/dlc_japan.bin'
-MODS     = 'D:/Steam/SteamApps/common/MGS1/mods/INTEGRAL/INTEGRAL'
+JP       = os.path.join(GAME, 'windata/dlc/dlc_japan.bin')
+MODS     = os.path.join(GAME, 'mods/INTEGRAL/INTEGRAL')
 DESC     = b'MGS Integral: option screen text'
 # PPF3's description field is exactly 50 bytes and `ljust` only pads, never
 # truncates: a longer string shifts every record offset and the loader then
@@ -111,25 +108,12 @@ IMG   = {0: 0x0, 1: 0x2AE54800}
 DU_SECTORS = 13500
 OPTION_ENTRY_FO = 744    # STAGE.DIR file offset of the `option` entry's u32 sector
 
-# The chain edits (records 3/7 blanked, 4/5/12/26/13-16/24 English) come from the
-# last FONT-TEXT option build, optbright.py's output, kept here as a fixed input.
-# They are NOT taken from the deployed option PPF: once this script has shipped,
-# the deployed option PPF is our own output, whose entry repoint would send
-# composite() following the relocated pointer out of the file - and skipping it
-# silently reverts every one of those records to retail Japanese (shipped once,
-# 2026-09-02: 'use directional buttons to test' came back as Japanese).
-CHAIN_PPF = WORK + '/fonttext_disc%d_option.ppf'
 EXPECT_CHAIN = {3: b' \x00', 7: b'\x80:\x00',
                 4: b'screen brightness setup\x00', 5: b'key configuration setup\x00',
                 12: b'use directional buttons to test\x00', 26: b'use directional buttons to test\x00',
                 13: b'Adjust the monitor brightness so the\x00', 24: b'Press the \x90\x1b button to return to the\x00',
                 27: b'option screen.         \x00'}
-# Records the port owns. Every other record must equal retail byte for byte -
-# the font-text build had written an 'e' and a space into record 6 (the EXIT
-# row's help line, which then rendered two wrong glyphs) and blanked record 7
-# (the colon Integral's Japanese help lines use: 字幕設定：オン). Both are
-# repaired from retail in repair_chain(); 27's padding absorbs the +1 byte so
-# the chain length, and every container field after it, stays put.
+# Every unowned record must equal retail byte for byte.
 PORTED_RECORDS = {3, 4, 5, 12, 13, 14, 15, 16, 24, 26, 27}
 CHAIN_OFF, CHAIN_TAG = 0x1B8, 6
 
@@ -233,73 +217,12 @@ def read_ppf(path):
 def img_off(lba, within): return (lba + within // 2048) * 2352 + HDR + within % 2048
 
 
-def composite(disc):
-    """Retail STAGE.DIR with every PPF's STAGE.DIR writes applied, from a FIXED
-    list of sources: the deployed PPFs other than the option one, plus CHAIN_PPF.
-
-    After relocation the old option/menu PPF writes land on a stage the game no
-    longer reads, so whatever they contributed must already be in the image we
-    park in DUMMY3M.  Building from the composite is what carries records 4/5
-    ('screen brightness setup', 'key configuration setup', which come from
-    menu.ppf, not from our option builder) and 3/7/12/13-16/24/26 (CHAIN_PPF)
-    forward.  Any write to the option entry's sector pointer is a hard error:
-    that would be this script's own output being fed back in.
-    """
-    base = bytearray(open(RETAIL, 'rb').read())
-    sd = DISCS[disc]['sd']
-    lo = img_off(sd, 0); hi = img_off(sd + len(base) // 2048, 0)
-    d = os.path.join(MODS, str(disc))
-    sources = [os.path.join(d, name) for name in sorted(os.listdir(d))
-               if name.endswith('.ppf') and name != DISCS[disc]['ppf']]
-    sources.append(CHAIN_PPF % (disc + 1))
-    applied = {}
-    for path in sources:
-        n = 0
-        for off, data in read_ppf(path):
-            if not (lo <= off < hi): continue
-            sec, within = divmod(off - HDR, 2352)
-            fo = (sec - sd) * 2048 + within
-            if fo < 0 or fo + len(data) > len(base): continue
-            assert not (fo <= OPTION_ENTRY_FO < fo + len(data)),                 '%s repoints the option entry - it is a relocated build, not a source' % path
-            base[fo:fo+len(data)] = data; n += len(data)
-        assert n or not path.endswith('_option.ppf'), '%s contributed nothing' % path
-        if n: applied[os.path.basename(path)] = n
-    return bytes(base), applied
-
-
 def chain_records(scr, off=CHAIN_OFF):
     """The option stage's text records: 07 <len> <payload incl. NUL> at `off`."""
     p, out = off, []
     while p < len(scr) and scr[p] == 7:
         n = scr[p+1]; out.append(bytes(scr[p+2:p+2+n])); p += 2 + n
     return out, p
-
-
-def repair_chain(scr, retail_scr):
-    """Restore every record the port does not own to retail, keeping the chain
-    length constant by trading the difference against record 27's padding."""
-    recs, end = chain_records(scr); ret, _ = chain_records(retail_scr)
-    assert len(recs) == len(ret) == 31
-    fixed = []
-    for i, (r, o) in enumerate(zip(recs, ret)):
-        if i not in PORTED_RECORDS and r != o:
-            fixed.append(i); recs[i] = o
-    if 7 in fixed or recs[7] != ret[7]:
-        pass
-    # record 7: the colon, restored from retail (it is "owned" only in the sense
-    # that the font-text build blanked it; the port has no English for it)
-    if recs[7] != ret[7]:
-        fixed.append(7); recs[7] = ret[7]
-    body = b''.join(bytes([7, len(r)]) + r for r in recs)
-    delta = len(body) - (end - CHAIN_OFF)
-    if delta:
-        pad = recs[27]
-        assert pad.endswith(b' \x00') and pad.count(b' ') > delta, 'record 27 cannot absorb %+d' % delta
-        recs[27] = pad[:-1 - delta] + b'\x00'
-        body = b''.join(bytes([7, len(r)]) + r for r in recs)
-    assert len(body) == end - CHAIN_OFF, 'chain length changed'
-    out = bytearray(scr); out[CHAIN_OFF:end] = body
-    return bytes(out), fixed
 
 
 def stage_of(d, name):
@@ -332,8 +255,8 @@ def set_pcxinfo(payload, px, py, cx, cy):
 
 
 def build_stage():
-    comp, applied = composite(0)
-    print('composited base: ' + ', '.join('%s %d bytes' % kv for kv in applied.items()))
+    comp = open(RETAIL, 'rb').read()
+    print('base: retail STAGE.DIR; caption chain rebuilt from source')
     base, sect, tags = stage_of(comp, 'option')
     print('option stage: base sector %d, %d sectors, tags %s'
           % (base // 2048, sect, [(chr(t[1]) + chr(t[2]) if 32 <= t[2] < 127 else chr(t[1]) + '?', t[3]) for t in tags]))
@@ -350,8 +273,8 @@ def build_stage():
         if kk == CHAIN_TAG: break
         roff += pad(rtags[kk][3])
     retail_scr = open(RETAIL, 'rb').read()[rbase+roff:rbase+roff+rtags[CHAIN_TAG][3]]
-    pay[CHAIN_TAG], fixed = repair_chain(pay[CHAIN_TAG], retail_scr)
-    print('chain: records restored to retail: %s' % (fixed or 'none'))
+    from optlabel2 import build as build_chain
+    pay[CHAIN_TAG] = build_chain(retail_scr)
 
     # --- overlay
     ovl = open(OVL, 'rb').read()
@@ -531,7 +454,7 @@ def verify(stage, newsect):
         n = scr[q+1]; recs.append(scr[q+2:q+2+n]); q += 2 + n
     assert len(recs) == 31, 'chain has %d records' % len(recs)
     for i, want in EXPECT_CHAIN.items():
-        assert recs[i] == want, 'chain record %d is %r, want %r (composite lost the font-text edits?)' % (i, recs[i], want)
+        assert recs[i] == want, 'chain record %d is %r, want %r (caption reconstruction failed)' % (i, recs[i], want)
     rbase, _rs, rtags = stage_of(open(RETAIL, 'rb').read(), 'option')
     roff = 2048
     for kk in FILE:
@@ -553,7 +476,7 @@ def emit(stage, deploy):
     f = open(JP, 'rb')
     for D in DISCS:
         disc, sd, du = D['disc'], D['sd'], D['du']
-        used = occupancy(disc)
+        used = occupancy(disc) if deploy else {}
         clash = []
         for name, (a, b, cnt) in used.items():
             if name == D['ppf']: continue          # our own previous build: this replaces it

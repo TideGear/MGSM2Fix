@@ -3,22 +3,23 @@ import struct, sys
 SECTOR = 2352
 
 class Disc:
-    def __init__(self, path):
+    def __init__(self, path, base=0):
         self.f = open(path, 'rb')
+        self.base = base
         self.f.seek(0, 2); self.size = self.f.tell()
         self.nsec = self.size // SECTOR
         # detect header size: mode2 form1 = 24, mode1 = 16
-        self.f.seek(16 * SECTOR)
+        self.f.seek(base + 16 * SECTOR)
         raw = self.f.read(SECTOR)
         self.hdr = 24 if raw[24:24+6] == b'\x01CD001' else 16
         assert raw[self.hdr:self.hdr+6] == b'\x01CD001', raw[12:40]
 
     def sector(self, lba, n=1):
-        out = b''
+        out = bytearray()
         for i in range(n):
-            self.f.seek((lba + i) * SECTOR + self.hdr)
+            self.f.seek(self.base + (lba + i) * SECTOR + self.hdr)
             out += self.f.read(2048)
-        return out
+        return bytes(out)
 
     def offset(self, lba, off=0):
         """byte offset within the raw image of a logical byte in the file data"""

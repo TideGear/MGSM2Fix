@@ -58,7 +58,7 @@ paraphrase them away.
 ## 3. How to work here (distilled from the mistakes)
 
 - **Measure before theorising.** The decompiled source, both games' data, the retail binaries, the font tables and a relaunchable game are all available. Before proposing why something breaks, ask what single check rules it in or out, and run it.
-- **Bisect against a stock run first.** Establish the fault is in our change before reasoning about mechanisms. The option-screen freeze was an overlay 32 bytes over retail; the KEY CONFIG interception was found by bisection plus `SetPatchWatch`, after three wrong theories.
+- **Bisect against a stock run first.** Establish the fault is in our change before reasoning about mechanisms. The option-screen freeze implicated both overlay growth and `f924[12]`; reverting both together confounded the size-only diagnosis. Keep the conservative size guard and retail's `f924[8]`. KEY CONFIG interception was found by bisection plus `SetPatchWatch`.
 - **Check the cheap invariant.** Sizes, counts, hashes against the known-good before logic.
 - **Absence of observation is not a negative result.** Before saying "there is no X", establish you would have *seen* an X. Three wrong conclusions in one day came from this (README "The collection's KEY CONFIG interception").
 - **Re-run every static check on the artefact you actually deploy** — a check on build N says nothing about build N+1.
@@ -97,7 +97,7 @@ paraphrase them away.
 | `[Game] EnglishText` (+hold, +guard restoring English outside scene `option`) | `EnglishText = true` | tested, follow-the-player path tested |
 | `[Patches] PreserveConfiguration` | `= true` | three clean runs; the race it guards has not been caught in the act |
 | `[Game] UnlockBriefing` | `= false` | tested; seeds new-game `var_buf` |
-| `[Game] BrightnessText` (tri-state `fixed` / `original` / `collection`) | `= fixed` | both fixed and original verified in game, both titles |
+| `[Patches] BrightnessText` (tri-state `fixed` / `original` / `collection`) | `= fixed` | USA only; fixed and original verified on disc 1. Integral's paragraph is built into its PPF independently of this setting |
 | Ketchup built-in disc patches + `SetPatchRangeBlacklist` | — | shipping (the USA four-line brightness fix) |
 | `SQHook::SetPatchWatch` (logs collection patches landing in a region) | — | in use; watches on `option` and `abst` spans, both discs |
 | `Ketchup::Audit` (every byte of every RAM run, read-only, every ~5 s) | — | in use; first-byte blind spot of `Update()` documented as open |
@@ -113,13 +113,13 @@ paraphrase them away.
 ## 5. What remains — in the order I would do it
 
 ### 5.1 The disc-2 run (needs the user at the controller; nothing to build)
-Load the **Comm Twr A** save (no debug) and play across the break: Comm Tower
-A → B → Hind D → Sniper Wolf → capture. Watch whether the game's own swap flow
-draws (`Now Checking...` / `Insert DISC 2.` — Japanese in Integral, since the
-visible copies may be the unported ones) or the collection swaps silently; then
-read the log for `Disk ID is 1`. This one run answers: disc 2 in game, the
-reachability of **all four** disc-swap text copies, and whether `en_menu3`
-and the `ab_ch` copy are visible bugs or raw-disc completeness. **The
+Load the **Comm Twr A** save (no debug) and play through the actual story disc
+break. Watch whether the game's own swap flow draws (`Now Checking...` /
+`Insert DISC 2.`) or the collection swaps silently; then read the log for
+`Disk ID is 1`. This validates disc 2 and the normal swap path. It does **not**
+establish reachability of all four copies: title/wrong-disc, demo-theater and
+abstract paths require separate evidence. Unseen text still matters for the
+raw-disc release. **The
 developer menu cannot do this** — disc 2 is set only by `change.c`'s CD check
 (README "The disc-swap text: four copies"). Once on disc 2, glance at SCREEN /
 KEY CONFIG (byte-identical to disc 1, so they should just work) and any
@@ -153,7 +153,8 @@ README "Why `en_menu3` crashes" and "How to test it": shorten the STRING length
 bytes and shrink the enclosing containers per edited record (they span more than
 one OPTION — SCRIPT size `@0x10DA` BE32, ARG `@0x10DF` BE16, COMMAND `0x9906`
 `@0x1139` BE16, OPTION `v` `@0x11AF` u8), `gclparse` self-check, then the
-trivial test: boot to the title. Whether it is worth doing depends on 5.1.
+trivial test: boot to the title. This remains required for raw-disc completeness;
+5.1 helps prioritise it but cannot prove the title copy unreachable.
 
 ### 5.5 A build switch for the raw-disc variant
 Two constants differ between the collection build and a raw PSX disc patch:
@@ -216,13 +217,17 @@ on this branch.
 | `optsctext.py` | builds `en_option` (sc_text texture, KEY CONFIG art, chain, relocation to DUMMY3M slot 384, doorbell stub check) |
 | `verify_integral_option.py`, `verify_usa_brightness.py` | read the deployed PPFs / built-in patch back and check them |
 | `shotcmp_brightness.py A.jpg [B.jpg]` | measures brightness-screen shots |
-| `preope_usa.py`, `preope_both.py` | Previous Operations (USA pagination); `reloc_ppf.py` relocates a stage into DUMMY3M (still used for `brf`) |
+| `preope_usa.py` | Previous Operations directly from retail, USA pagination; stages PPFs unless `--deploy` is supplied |
 | `brf_build.py`, `brf_widen.py` | briefing labels and quads |
 | `savemsg.py`, `camsave.py` | the two memory-card caption ports |
 | `abstscan.py [page N]` | mission-log scoping data, both games |
-| `jpsweep.py` | census of remaining Japanese UI text (stricter second pass documented) |
+| `jpsweep.py` | historical disc-1 pointer-slot candidate scan; not a completeness proof |
 | `gclparse.py`, `gcldec.py` | GCL container parsing / record walking — `containers_over` for resizing |
-| `optscan.py`, `optbright.py`, `optlabel2.py` | option-stage inspection and earlier chain tools |
+| `optscan.py` | option-stage inspection |
+| `optlabel2.py` | current option captions from retail, including the restored colon; replaces the unsafe recovered experiment |
+| `items.py`, `menu2.py` | recovered item/menu builders; `menu2.py` excludes the broken historical `menu3` mode |
+| `audit_text.py` | main-disc and VR candidate inventory, save-title encoding; see `COVERAGE.md` |
+| `rebuild.py` | isolated collection build, checks, manifest and ZIP; see `BUILDING.md` |
 | `unlock_title.py` | builds the (parked) unlock PPFs |
 | `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
 | `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
@@ -251,3 +256,12 @@ brightness lines", "Option → SCREEN", "The sc_text texture port" · briefing �
 "Briefing menu (`brf` stage)" · unlocks → "Unlocks", "Give items", "Unlock
 everything", "Achievements" · tests → "Not tested" (struck-through items are
 done, with dates) · decomp → "Audit against the decomp".
+
+## 9. Documentation and completion follow-up (2026-09-04)
+
+The current collection build is reproducible from retail inputs and an isolated
+decomp export; [BUILDING.md](BUILDING.md) lists prerequisites, hashes, commands
+and packaging checks. The recovered builders no longer need scratchpad scripts
+or old option PPFs. [COVERAGE.md](COVERAGE.md) records the expanded three-disc
+inventory, save-title evidence and the remaining audit limits. These checks do
+not close the gameplay, Mission Log, VR translation or raw-disc tasks above.
