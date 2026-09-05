@@ -5,6 +5,11 @@ Tooling that ports English text from **MGS1 (USA)** into **MGS Integral**
 translated: every English string is copied from the USA disc, and only page
 counts and line breaks change.
 
+**Starting cold? Read [`NextSteps.md`](NextSteps.md) first** — where everything is, the
+user's standing rules verbatim, how far each patch is verified, what remains and in
+what order, and which decisions are the user's to make. This README is the technical
+record; `NextSteps.md` is the map.
+
 ## What ships
 
 | Patch | Contents |
@@ -832,6 +837,12 @@ Still unseen, because they need those states: the other captions on that screen
 (save failed, formatting, no empty block, the card-undetected line) and the six
 slots where Integral's Japanese is kept.
 
+**Fully verified 2026-09-04.** With a photo saved, the PHOTO ALBUM's load and
+overwrite screens were exercised and the deployed PPF was applied to the
+extracted `camera` overlay for a slot-by-slot comparison with USA: all 23
+English strings present, the six USA-blank slots Japanese as designed, nothing
+else. Details under "Not tested" → the PHOTO ALBUM item.
+
 ## Sweep: is any UI text still Japanese? (`jpsweep.py`, 2026-09-03)
 
 **Result withdrawn 2026-09-04.** The sweep pairs *overlay pointer words*, so it
@@ -875,7 +886,12 @@ disc 2 or the VR disc.
 **Status: unported, in scope, awaiting the go-ahead.** Loading a save shows
 `READ MISSION LOG? YES / NO` and then a page of story-so-far text; in Integral
 it is entirely Japanese (with furigana), USA has the same text in English, so by
-the port's rule it is portable. It is the largest text port left on the main
+the port's rule it is portable. **Seen again the same evening** loading the
+Comm Twr A save: a *different* page (the PAL-key / Sniper Wolf /
+Meryl-captured recap), so the page follows the save point — the `l`/`r`/`e`
+ids — and a USA save at the same point would give the exact English
+counterpart for a before/after pair; that shot is kept at
+`D:\mgsbuild\integral-english-work\` as the reference JP page. It is the largest text port left on the main
 discs — 122 text pages, ~1,000 records, a different per-screen layout and a
 stage relocation — so it was scoped fully and deliberately **not** started
 unasked. `abstscan.py` prints every number below; `abstscan.py page N` dumps a
@@ -954,6 +970,62 @@ COMMAND size shrink. Here the `e` option's own length byte *is* consulted —
 `GetOption('a')` scans first and, `a` being present, stops before `e`; but keep
 `e`'s length byte consistent with its payload regardless, since it is the
 container the strings live in.
+
+## The disc-swap text: four copies, and why only real play can reach the swap (2026-09-04)
+
+The `Insert DISC 2.` / `Now Checking...` family exists in **four** stages. Their
+states, so nobody has to re-derive them:
+
+| copy | stage | state |
+|---|---|---|
+| 1 | `demosel` | **ported**, `en_menu2` |
+| 2 | `change` - the stage that performs the disc check and the swap | **ported**, `en_menu2` |
+| 3 | `title` | **not shipping** - `en_menu3`, diagnosed (container sizes), disabled pending the rebuild described under "Why `en_menu3` crashes" |
+| 4 | `abst` - `ab_ch.c`, the disc-change abstract | **not ported**, found 2026-09-04 (previous section) |
+
+**None of the four has been seen in the collection.** The open question is
+whether the collection ever shows the game's own swap prompt at all, or swaps
+silently before `change` draws it. If it swaps silently, all four are
+unreachable in the collection and matter only for a raw disc patch - still
+worth shipping under the port's rule, but untestable here. (This absorbs the
+former "Not tested" item on `en_menu3`'s reachability: it is the same question
+for all four copies.)
+
+**Disc 2 is set in exactly one place, so the developer menu can never reach
+it.** `onoda/change/change.c` performs a literal CD check and is the sole
+writer of the disc number:
+
+    status = FS_ResetCdFilePosition( alloc );
+    if ( status == 1 ) { printf( "THIS IS DISC 2!!\n" ); FS_DiskNum = status; }
+
+(`FS_DiskNum` is read everywhere else - `gamed.c` builds the exe name and
+`GM_Disk` from it, `radio.c` and `ab_ch.c` display it - but only `change`
+assigns it.) The developer stage-select writes `mgs_loader_stage` and loads the
+stage overlay directly; it never runs `change`, so **every debug load logs
+`Disk ID is 0`** whatever stage is named. Two attempts on 2026-09-04 confirmed
+it from both sides:
+
+- `StageSelect = select3` -> **s11a** loaded and was fully playable (all items
+  and weapons granted by the developer entry proc; a photo was taken and a
+  save made) - but the save reads **DISC 1 / Comm Twr A**, and the log shows
+  `Disk ID is 0` throughout. s11a is late disc 1, not disc 2 as first assumed.
+- `StageSelect = s14e` -> **Cargo Elevator** loaded but the world never
+  advanced: pause and the item/weapon menus worked (they are context-free), the
+  stage did not (an event stage that needs prior story state). Killed by PID;
+  no error in the log, just `scene "" -> "s14e"` and silence.
+
+So a plain gameplay area (s11a) debug-loads clean, an event stage (s14e)
+hangs, and neither touches the disc. **The only way onto disc 2, and the only
+way to see whether the swap prompt appears, is to play across the break** -
+the user holds a Comm Tower A save (disc 1) for exactly that: Comm Tower A ->
+B -> Hind D -> Sniper Wolf -> capture, then watch the transition and read the
+log for `Disk ID` becoming 1.
+
+`StageSelect` therefore accepts three kinds of name, documented in the ini:
+`true` (the top menu - TITLE / DEMO ALL / SOUND TEST only), a **menu**
+(`select1`..`select4`, `selectd`; the lists the top menu never links to), or a
+**stage** (`s11a`), which drops straight in with no menu. Event stages may hang
+as above, and no debug load ever changes the disc.
 
 ## What stays Japanese, and why (consolidated 2026-09-03)
 
@@ -1518,10 +1590,14 @@ standing and is itself unattributed.
 
 ## Not tested
 
-- **Disc 2 in game.** Never launched — and neither has any *other* title's
-  disc 2, which is why no disc-2 patch candidate has ever appeared in a log.
-  But it is now measured rather than assumed (2026-09-03), and everything the
-  port touches is identical across the two discs:
+- **Disc 2 in game.** Still never reached — and now it is known why the
+  developer menu cannot get there: disc 2 is set only by `change.c`'s CD check,
+  which only the real story swap runs, so every debug load stays `Disk ID 0`
+  (two attempts 2026-09-04: s11a playable but DISC 1; s14e hung). See "The
+  disc-swap text: four copies". The route is the Comm Tower A save played
+  across the break. Neither has any *other* title's disc 2 been launched, which
+  is why no disc-2 patch candidate has ever appeared in a log. What the port
+  touches is measured identical across the two discs (2026-09-03):
 
   | what the port patches | disc 1 vs disc 2 |
   |---|---|
@@ -1584,13 +1660,23 @@ standing and is itself unattributed.
   re-applied 0.6 s later — the deferred-RAM case it exists for. Residual caveat:
   a mid-run write followed within 30 frames by an unrelated re-apply would be
   invisible to both checks; nothing suggests that happens.
-- **Whether `en_menu3`'s text is reachable in the collection at all.** The
-  collection swaps discs by itself, so the title stage may never reach a "wrong
-  disc" prompt. Cheap to check, and it decides whether `en_menu3` is a visible
-  bug or disc-patch completeness. See "How to test it" under
-  "Why `en_menu3` crashes".
-- **The other ~22 PHOTO ALBUM strings.** `en_camsave` ships 23; only
-  `No save file.` has been seen on screen.
+- **Whether the disc-swap prompt is reachable in the collection at all** (all
+  four copies, `en_menu3` included). The collection swaps discs by itself, so
+  the game's own prompt may never draw. Decided by the same disc-2 run above.
+  See "The disc-swap text: four copies".
+- ~~The other ~22 PHOTO ALBUM strings~~ **Done 2026-09-04.** PHOTO ALBUM →
+  SELECT MEMORY CARD → load and overwrite, with a photo on the card: `PHOTO
+  DATA`, `PHOTO 01`, `TIME`, `LOADING...`, `COMPLETE`, `OVERWRITE OK?`,
+  `YES`/`NO` all English. The deployed PPF was then applied to the extracted
+  overlay and every caption slot compared with USA: all 23 English strings
+  present and identical; the only Japanese left is the six slots USA itself
+  leaves blank, and the three seen on screen are exactly those — `ロード中です`
+  (0x65C), `ロードが完了しました` (0x63C), `変更内容を上書き保存しますか？`
+  (0x668). Verification gotcha: `int1_stage.dir` is the *unpatched* extraction,
+  so reading it shows Japanese everywhere — apply the deployed PPF first, or
+  the comparison is meaningless; and the three `addiu sp` function pointers at
+  0x6E0–0x6E8 decode as "text" and look like misses — they are code, the
+  documented camsave trap.
 - **`[Patches] PreserveConfiguration` catching a real stale write.** Three clean
   runs; the race it guards is intermittent and has not been caught in the act.
   See `UPSTREAM.md`.
