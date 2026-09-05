@@ -1442,12 +1442,18 @@ standing and is itself unattributed.
   discs identically.
 - **`en_savemsg` with achievements live.** The six collection RAM patches that
   fall inside its pool land mid-run, where Ketchup's first-byte check cannot see
-  them. Enter LOAD DATA with `DisableRAM = false` and watch `Now checking Memory
-  Card.` — see "The collection's RAM patches collide with `en_savemsg`".
-- **SCREEN and EXIT after the doorbell build.** The doorbell sits in `case 8` of
-  `option_800C5150` beside the branches those two take; KEY CONFIG's
-  interception was confirmed, the neighbours were not re-shot afterwards. One
-  visit each.
+  them. The screen test turned out not to work: LOAD DATA in the collection
+  goes straight to `No save file.` (slot 4, untouched) and never shows `Now
+  checking Memory Card.` — its storage layer is instant. So `Ketchup::Audit`
+  (2026-09-04) now compares every byte of every RAM run read-only every ~5 s and
+  warns on any mid-run mismatch; **the next session's log answers this**: a
+  `differs from what was written` line naming a pool address means the writes
+  stick, silence means they do not. See "The collection's RAM patches collide
+  with `en_savemsg`".
+- **EXIT after the doorbell build.** SCREEN is confirmed (2026-09-04: the
+  game's own brightness screen, four lines, correctly placed, while KEY CONFIG
+  hands off to the collection's panel — the intended pair). EXIT sits in the
+  same `case 8` and was not mentioned; one visit.
 - **The save side of the memory-card messages.** Only LOAD has been shot. The
   save flow (a Mei Ling call) would exercise the "no empty block", "failed" and
   "now checking" captions, and slot 1's kept Japanese line after a success.
