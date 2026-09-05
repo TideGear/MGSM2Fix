@@ -22,5 +22,7 @@ on its own. Add an entry whenever a commit touching `src/`, `MGSM2Fix.ini` or
 
 | this commit | `[Game] GiveItems`: a test aid — comma-separated MGS1 item ids handed to Snake once per gameplay stage, writing `GM_Items[id]` / `GM_ItemsMax[id]` (linkvarbuf `+0x4A` / `+0x7A`, shorts, off the same `scene_name` relation UnlockBriefing uses) only where the count is still zero. Exists so a tester can reach, say, the PHOTO ALBUM without a full playthrough; the inventory is saved, so it persists in any save made afterwards | anyone testing MGS1 in the collection | built 2026-09-04, first use pending (Camera = 12 for the PHOTO ALBUM test) |
 
+| this commit | `[Game] StageSelect` accepts a menu name as well as a bool. The retail developer top menu (`select`) offers only TITLE / DEMO ALL / SOUND TEST and never links to the four stage lists, which are their own menus — `select1` (D00A..S04B), `select2` (S05A..S09A), `select3` (S11A..S14E, disc 2), `select4` (S15A..S20A). Naming one opens it directly; `true` keeps the old behaviour | anyone using the developer menu to reach a stage, any MGS1 version with these menus | built 2026-09-04, first use pending (select3 for a disc-2 test) |
+
 Not for upstream: `tools/integral-english/*`, the PPF outputs under the mods
 folder, and README sections that describe the port itself.

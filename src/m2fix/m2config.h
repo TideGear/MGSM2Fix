@@ -69,6 +69,7 @@ public:
     static inline bool bLauncherSkipNotice;
     static inline bool bLauncherStartGame;
     static inline bool bGameStageSelect;
+    static inline std::string sGameStageSelect;   // the menu stage to open: "select", or select1..4 / selectd
     static inline bool bGameEnglishText;
     static inline bool bGameUnlockBriefing;
     static inline std::vector<int> vGameGiveItems;
