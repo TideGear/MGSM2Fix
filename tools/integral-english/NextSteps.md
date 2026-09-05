@@ -385,6 +385,12 @@ night, from data to deployment:
 - **Verified statically** (README "The MISSION LOG port" lists it); **not yet
   on screen** — that is §5.1, the first thing to do. An unattended smoke test
   was tried and cannot work: the collection's launcher waits for a game choice.
+- **Item text, later the same night:** the user's first shots showed two glitches
+  in `en_items`; three faults fixed (README "Three item-text faults"): the card
+  level digit offset (code, 46 → 45), the SOCOM suppressor rewrite into the
+  Mine Detector text (code, six stores NOPed) and a retail-equal byte the
+  collection's RAM patch owned (both exe PPFs now write every byte of their
+  regions). Static until seen — §5.1.
 - Doc corrections found the same night and folded in: the `_disabled` path,
   the PatchWatch-blind-under-DisableCDROM note, the upstream re-port sizing,
   eight stale README passages (verify_shipped.py, scratchpad tools, the

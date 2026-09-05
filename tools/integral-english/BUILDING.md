@@ -103,6 +103,12 @@ entries. `abst_build.py` also reads the mods folder to refuse any overlap with
 the other PPFs' bytes, so a clean run wants the game installed even though it
 never writes to it.
 
+**Clean run 2026-09-05, later (item fixes).** After `items.py` and `savemsg.py`
+changed to own every byte of their pools (README "Three item-text faults"), the
+same command in `D:/mgsbuild/repro6` again matched all 18 deployed PPFs by
+effect (16 byte-identical); `en_items` is now 26 records / 3518 bytes per disc and
+`en_savemsg` 3 records / 618 bytes. ZIP SHA-256 `d8dba9d16b2325f60785ab443f8f7429babd6d7178d175dd6942cc0a6f97e9b5`, 21 manifest entries.
+
 The collection option builder deliberately uses four brightness lines. Changing
 that constant to six alone does not finish the raw-disc release: disc-change
 text, runtime behavior and raw-image packaging still require work.
