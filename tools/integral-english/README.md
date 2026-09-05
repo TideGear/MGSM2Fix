@@ -1106,7 +1106,21 @@ The `Work` layout of the port matches USA's field for field (polys1[7],
 kcb[24], tpage[12], field_51C[24], cursor/page/scroll at +0x7844/48/4C,
 `sizeof` 0x7854), which made the disassembly readable against the C.
 
-**One guard USA lacks.** USA colours lines `base+1..base+7` of a page without
+**Two departures from USA's code, both invisible at rest.**
+
+*The second sprite is 248 px wide, not 256.* `font_get_buffer_size` sizes a
+128-word KCB's buffer and its VRAM upload to `kcb->width` = 504 px (42 cells of
+12), so texels 504..511 of every line are never written and hold whatever the
+VRAM had there. USA's second sprite (`text_sprt2`, x 264) is 256 wide and
+reaches them; at rest they sit off screen at x 512, but the page slide drags
+them across the panel as coloured 8-px fragments, one per line row — seen
+2026-09-05 on the Comm Tower A page mid-slide (shot `20260905125444`), not on
+the Heliport page, because the stale VRAM differed. `func_800C47A8` now sets
+the second sprite's width to `kcb->width - 256`; the longest USA line is
+~300 px, so nothing drawn changes. Retail Integral and USA have the same hole
+and simply never move the sprites.
+
+*A guard USA lacks.* USA colours lines `base+1..base+7` of a page without
 checking the count; a count-7 page has 8 KCBs, and `font_set_color` on an
 unallocated KCB writes through its NULL CLUT buffer. `abst_color_page` stops at
 the page's last record. Nothing visible changes: those pages still show `1/2`
@@ -1151,7 +1165,10 @@ cursor-frame and counter immediates and the pad masks; the collage images
 (BRF.DAT, 160 px at VRAM x 128 and 256, CLUTs (768,245/246)) are clear of the
 KCB columns; `ppfcheck --deployed` clean on all 20 files.
 
-**Not verified:** anything on screen. An unattended smoke test is not possible:
+**Seen on screen 2026-09-05 (user's shots, morning):** both pages of the
+Heliport and Comm Tower A logs, `1/2 ►` and `◄ 2/2`, EXIT framed, USA's rows.
+The only fault was the slide fragments above, fixed the same day and not yet
+re-seen. **Not verified otherwise:** an unattended smoke test is not possible:
 a `StageSelect = abst` launch on 2026-09-05 00:39 sat in the collection's own
 launcher ("Ver.3.0.0" is the last log line), which waits for a game to be
 chosen before Ketchup or any stage loads; the process was stopped by PID and
@@ -1214,6 +1231,17 @@ is not known: a named-file patch's bytes are only visible through
 only. **Watches now cover `change`, `demosel`, `title` and `camera` on both
 discs** (`mgs1.h`), so the next run with `DisableCDROM = false` logs their
 content and size.
+
+**What the new watches showed (2026-09-05 12:57 log):** the six `camera`
+patches are the collection's STORAGE rename (`  STORAGE 1  `, `  STORAGE 2  `
+and runs of spaces, 8–29 bytes), the two `title` offset patches are
+`  STORAGE SLOT 1/2  `, and the option doorbell is its 24 bytes — none touches a
+port record. The named files (`disc1_18345E07_patch` at `change`, twice;
+`disc1_18412A95` / `disc1_18412BD8` at `demosel`; `disc1_1822B55D` at `title`;
+`disc1_132F2716_patch` at `abst`) are registered with **0 bytes of data in the
+call** — the game reads them from its archive later — so the watch proves they
+apply on Windows (the `abst` one included, answering the `_PS5` question) but
+cannot show their content. Only the disc-swap screens themselves can.
 
 Which bytes win where a collection patch and a port record overlap is a
 question of the patch table's order: both go through the same
@@ -1845,9 +1873,13 @@ standing and is itself unattributed.
 
 ## Not tested
 
-- **The three item-text fixes on screen** (2026-09-05): SOCOM, ID Card with a
-  level-7 card (`level 7 security`), Mine Detector on HARD/EXTREME after the
-  SOCOM, and every other weapon description. "Three item-text faults".
+- ~~The three item-text fixes on screen~~ **Done 2026-09-05 12:55** (user's
+  shots): SOCOM `Semi-automatic pistol.` on its own line, ID Card `level 7
+  security`, Mine Detector intact after the SOCOM; the log's audit silent,
+  `Applied 3755 bytes of RAM patches in 14 blocks (pass 1)`.
+- **The MISSION LOG slide after the sprite-width fix** (deployed 2026-09-05
+  13:05): turn pages on the Comm Tower A log and look for coloured fragments
+  during the slide. Static pages were fine in the same shots.
 - **The MISSION LOG on screen.** `en_abst` was deployed 2026-09-05 after static
   verification only. Load any save and go through the checklist at the end of
   "The MISSION LOG port"; a late-game save (a count-7 page) also shows whether

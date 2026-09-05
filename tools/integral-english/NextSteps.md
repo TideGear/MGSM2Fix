@@ -132,12 +132,14 @@ equivalence, not a new gameplay test.
 ## 5. What remains — in the order I would do it
 
 ### 5.1 See the item fixes and the MISSION LOG on screen (needs the user; nothing to build)
-**Items (2026-09-05 fixes):** SOCOM description (title line, then `Semi-automatic
-pistol.` on its own line), ID Card (`level 7 security` with a level-7 card), a
-Mine Detector on HARD/EXTREME after viewing the SOCOM, and a look at every
-weapon description. README "Three item-text faults".
+**Items:** ~~SOCOM, ID Card, Mine Detector~~ **seen fixed 2026-09-05 12:55**
+(user's shots; audit silent). Other weapon descriptions still worth a glance.
 
-**Mission log:**
+**Mission log:** both pages of two logs were seen right on 2026-09-05 12:54;
+the one fault, coloured fragments during the page slide (stale VRAM in the
+last 8 texels of each line, README "Two departures from USA's code"), was
+fixed and deployed at 13:05 — **turn pages on the Comm Tower A log again**.
+The rest of this checklist stands for anything not yet looked at:
 `en_abst` was deployed 2026-09-05 after static verification only. Load any
 save (Heliport or Comm Twr A) and compare with the USA shots of 2026-09-04
 (`MGS1 USA/20260904233158_1.jpg`, `…233204_1.jpg`): the caption under READ
@@ -389,6 +391,13 @@ night, from data to deployment:
 - **Verified statically** (README "The MISSION LOG port" lists it); **not yet
   on screen** — that is §5.1, the first thing to do. An unattended smoke test
   was tried and cannot work: the collection's launcher waits for a game choice.
+- **Morning of 2026-09-05:** the user's shots showed the mission log right and
+  the item fixes right; the page slide showed coloured fragments (stale VRAM in
+  texels 504..511 of each line, reached by USA's 256-wide second sprite) —
+  fixed by drawing 248 px. The new watches showed the collection's `camera` and
+  `title` offset patches are its STORAGE rename strings, and that its named
+  patches to all four disc-swap blocks register with no inline data (README
+  "Where the collection's own disc patches land").
 - **Item text, later the same night:** the user's first shots showed two glitches
   in `en_items`; three faults fixed (README "Three item-text faults"): the card
   level digit offset (code, 46 → 45), the SOCOM suppressor rewrite into the
