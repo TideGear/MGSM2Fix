@@ -87,12 +87,12 @@ paraphrase them away.
 
 | patch | what | verified |
 |---|---|---|
-| `en_items` | item descriptions (executable) | in game; proven intact against the collection's RAM patches |
+| `en_items` | item and weapon descriptions (executable) | in game; **three faults found and fixed 2026-09-05** from the user's shots (card level offset, SOCOM suppressor rewrite, a retail-equal byte the collection's RAM patch owned) — README "Three item-text faults"; the fixes are static until seen |
 | `en_menu`, `en_menu2` | menu strings; `en_menu2` includes the `demosel` and `change` disc-swap copies | in game (menus); the disc-swap copies **never seen** (see §5.1) |
 | `en_option` | option-screen strings; KEY CONFIG labels (8 textures); brightness paragraph as USA's `sc_text` texture, four lines in the collection build | in game, pixel-measured; SCREEN / KEY CONFIG (collection panel via the doorbell) / EXIT all confirmed 2026-09-04 |
 | `en_preope` | Previous Operations, USA's exact pagination (MG1 13 pages, MG2 19) | in game, 29 lines pixel-exact |
 | `en_brf` | briefing labels, quads, row arithmetic | in game, 26 shot pairs, 0.00% right-column diff |
-| `en_savemsg` | memory-card captions in the executable | in game 2026-09-04: save + load; kept slots idx 1/9 Japanese by rule; `Ketchup::Audit` saw no collision with the collection's RAM patches |
+| `en_savemsg` | memory-card captions in the executable | in game 2026-09-04: save + load; kept slots idx 1/9 Japanese by rule; since 2026-09-05 the PPF owns every byte of the pool and tables, so the collection's six writes can no longer survive at retail-equal bytes |
 | `en_camsave` | the PHOTO ALBUM's own captions (`camera` overlay) | **fully verified 2026-09-04**: all 23 English on screen / by slot comparison; the six USA-blank slots stay Japanese (`ロード中です`, `ロードが完了しました`, `変更内容を上書き保存しますか？` are those) |
 | `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built and deployed 2026-09-05, verified statically only**: pages re-parse and equal USA's byte for byte, the PPF records rebuild the relocated 88-sector stage exactly on both discs, the overlay carries USA's constants. Not yet seen on screen (§5.1). Its stage lives in DUMMY3M slots 462..549 |
 | `en_menu3` | the `title` disc-swap copy | **disabled** — crashes the title stage; diagnosed, not rebuilt (§5.3). Its two PPFs sit in `mods\_disabled\` (the top level of the mods folder, not under INTEGRAL), where Ketchup does not read them |
@@ -131,7 +131,13 @@ equivalence, not a new gameplay test.
 
 ## 5. What remains — in the order I would do it
 
-### 5.1 See the MISSION LOG on screen (needs the user; nothing to build)
+### 5.1 See the item fixes and the MISSION LOG on screen (needs the user; nothing to build)
+**Items (2026-09-05 fixes):** SOCOM description (title line, then `Semi-automatic
+pistol.` on its own line), ID Card (`level 7 security` with a level-7 card), a
+Mine Detector on HARD/EXTREME after viewing the SOCOM, and a look at every
+weapon description. README "Three item-text faults".
+
+**Mission log:**
 `en_abst` was deployed 2026-09-05 after static verification only. Load any
 save (Heliport or Comm Twr A) and compare with the USA shots of 2026-09-04
 (`MGS1 USA/20260904233158_1.jpg`, `…233204_1.jpg`): the caption under READ
@@ -214,10 +220,10 @@ covers title 981 (USA) only.
 - `PreserveConfiguration` catching a real stale write (intermittent race).
 - `GiveItems` in a stage where the inventory is actually empty (a real save,
   not the developer menu).
-- If `Ketchup::Audit` ever reports a `differs from what was written` line in
-  the `en_savemsg` pool: decide between completing Ketchup's check (flicker
-  risk) and adopting the collection's English rename strings. README "The
-  collection's RAM patches collide with `en_savemsg`".
+- `Ketchup::Audit` did report two `differs from what was written` lines on
+  2026-09-05 — both were the game's own code editing ported strings, fixed in
+  `items.py`. Both pools are now owned byte for byte; a future audit line means
+  the collection wrote *after* Ketchup's pass, which has not been seen.
 
 ### 5.8 Finish the text census (`COVERAGE.md`)
 `audit_text.py` inventories GCL string candidates and address references
