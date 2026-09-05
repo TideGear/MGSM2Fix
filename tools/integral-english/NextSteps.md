@@ -1,7 +1,8 @@
 # Next steps — MGS Integral English text port
 
-Written 2026-09-04 (evening) and updated the same night after the
-reproducible-build pass (§9), for whoever picks this up cold: a later session of
+Written 2026-09-04 (evening), updated the same night after the
+reproducible-build pass (§9) and again on 2026-09-05 after the MISSION LOG
+port (§10), for whoever picks this up cold: a later session of
 the same assistant, a different model, or a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
 remains and in what order, and which decisions are the user's to make. The
@@ -80,7 +81,7 @@ paraphrase them away.
 
 ---
 
-## 4. State on 2026-09-04: what ships, and how far each is verified
+## 4. State on 2026-09-05: what ships, and how far each is verified
 
 ### PPF patches (all deployed for both discs unless noted)
 
@@ -93,10 +94,11 @@ paraphrase them away.
 | `en_brf` | briefing labels, quads, row arithmetic | in game, 26 shot pairs, 0.00% right-column diff |
 | `en_savemsg` | memory-card captions in the executable | in game 2026-09-04: save + load; kept slots idx 1/9 Japanese by rule; `Ketchup::Audit` saw no collision with the collection's RAM patches |
 | `en_camsave` | the PHOTO ALBUM's own captions (`camera` overlay) | **fully verified 2026-09-04**: all 23 English on screen / by slot comparison; the six USA-blank slots stay Japanese (`ロード中です`, `ロードが完了しました`, `変更内容を上書き保存しますか？` are those) |
-| `en_menu3` | the `title` disc-swap copy | **disabled** — crashes the title stage; diagnosed, not rebuilt (§5.4). Its two PPFs sit in `mods\INTEGRAL\INTEGRAL\_disabled\`, where Ketchup does not read them |
+| `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built and deployed 2026-09-05, verified statically only**: pages re-parse and equal USA's byte for byte, the PPF records rebuild the relocated 88-sector stage exactly on both discs, the overlay carries USA's constants. Not yet seen on screen (§5.1). Its stage lives in DUMMY3M slots 462..549 |
+| `en_menu3` | the `title` disc-swap copy | **disabled** — crashes the title stage; diagnosed, not rebuilt (§5.3). Its two PPFs sit in `mods\_disabled\` (the top level of the mods folder, not under INTEGRAL), where Ketchup does not read them |
 | unlock PPFs | title-screen extras | **parked**, `unlocks_parked\`, not deployed |
 
-**Reproducibility (2026-09-04, late):** every one of the eight shipping families
+**Reproducibility (2026-09-04, late; nine families since 2026-09-05, §10):** every one of the eight shipping families
 was rebuilt from retail inputs in an isolated directory by `rebuild.py` — stage
 files extracted from the collection, the four retail executables as hashed
 inputs, the decomp exported at `7964de7` plus `decomp-overlay-changes.patch`,
@@ -129,7 +131,18 @@ equivalence, not a new gameplay test.
 
 ## 5. What remains — in the order I would do it
 
-### 5.1 The disc-2 run (needs the user at the controller; nothing to build)
+### 5.1 See the MISSION LOG on screen (needs the user; nothing to build)
+`en_abst` was deployed 2026-09-05 after static verification only. Load any
+save (Heliport or Comm Twr A) and compare with the USA shots of 2026-09-04
+(`MGS1 USA/20260904233158_1.jpg`, `…233204_1.jpg`): the caption under READ
+MISSION LOG? is still Japanese (by rule, §6); page `1/2` with ► framed and
+seven English lines at USA's rows (ink tops game y 52, 74, 96, 118, 140, 162,
+184; x from 8); RIGHT moves the frame to EXIT; ○ on ► slides to `2/2` with ◄;
+SELECT hides the text; × leaves. README "The MISSION LOG port" has the full
+list and the measuring method. If anything is off, bisect first: move the two
+`en_abst` PPFs out of the mods folders and confirm the log is Japanese again.
+
+### 5.2 The disc-2 run (needs the user at the controller; nothing to build)
 Load the **Comm Twr A** save (no debug) and play through the actual story disc
 break. Watch whether the game's own swap flow draws (`Now Checking...` /
 `Insert DISC 2.`) or the collection swaps silently; then read the log for
@@ -137,74 +150,64 @@ break. Watch whether the game's own swap flow draws (`Now Checking...` /
 establish reachability of all four copies: title/wrong-disc, demo-theater and
 abstract paths require separate evidence. Unseen text still matters for the
 raw-disc release. **The developer menu cannot do this** — disc 2 is set only by
-`change.c`'s CD check
-(README "The disc-swap text: four copies"). Once on disc 2, glance at SCREEN /
-KEY CONFIG (byte-identical to disc 1, so they should just work) and any
-disc-2 mission-log page.
+`change.c`'s CD check (README "The disc-swap text: four copies"). Once on disc
+2, glance at SCREEN / KEY CONFIG (byte-identical to disc 1) and load a disc-2
+save to see a mission-log page from demo.gcx and a count-7 page.
 
-### 5.2 The MISSION LOG port (`abst` stage) — the largest remaining port
-The user said "We're gonna have to port that over too" but has not said start;
-it was scoped and deliberately left. README "TO DO: port the MISSION LOG" has
-every number; `abstscan.py` prints them and `abstscan.py page N` dumps a page
-from both games. In short: 122 text pages in each game; the text is the `i`
-option's payload (`INT count` then `count+1` STRING records); **never touch the
-`i` option's length byte** (overflowed u8, never read); USA draws 7 lines per
-screen, two screens per page, in 128×20 KCBs with a VRAM column wrap, Integral
-up to 11 on one screen (`abst.c`, `kcb[12]`, 128×21). Method = the `preope`
-method (resize records + the COMMAND's BE16), grow `abst.c` to USA's model,
-relocate into DUMMY3M from slot 462 and build from retail the way `optsctext.py`
-now does (no deployed PPF as an input; `rebuild.py` checks overlaps across the
-whole set). Add the new family to `rebuild.py` so it stays reproducible. Open
-before the first
-edit: USA's two-screen paging code, pairing pages by the shared `l`/`r`/`e`
-ids, the USA counterpart of the `READ MISSION LOG?` caption, and the
-collection's `disc1_132F2716_patch_PS5.bin` inside the stage (watch registered,
-nothing logged yet). A USA screenshot of the mission log would confirm the
-layout in one look. Reference JP shot: `D:\mgsbuild\integral-english-work\`.
+This is also the **first run since achievements were re-enabled** (the last
+log, 2026-09-04 19:15, ran with both Disable flags true), so it is the first
+session that can show the `abst` patch watch, the `_PS5` question and the
+save-message audit — see 5.7.
 
-### 5.3 The disc-change abstract (`ab_ch.c`, in `abst`)
-Small: eight strings inside the `e` option of one block (Integral chunk
-`+0xB0A5`, USA `+0xC6D1`); USA's are shorter so the block shrinks; keep `e`'s
-length byte consistent. Do it together with 5.2 (same stage, same relocation)
-or with 5.4 (same text family). README "TO DO: the disc-change abstract".
-
-### 5.4 Rebuild `en_menu3` (the `title` copy)
+### 5.3 Rebuild `en_menu3` (the `title` copy)
 README "Why `en_menu3` crashes" and "How to test it": shorten the STRING length
 bytes and shrink the enclosing containers per edited record (they span more than
 one OPTION — SCRIPT size `@0x10DA` BE32, ARG `@0x10DF` BE16, COMMAND `0x9906`
 `@0x1139` BE16, OPTION `v` `@0x11AF` u8), `gclparse` self-check, then the
-trivial test: boot to the title. This remains required for raw-disc completeness;
-5.1 helps prioritise it but cannot prove the title copy unreachable.
+trivial test: boot to the title. Required for raw-disc completeness; 5.2 helps
+prioritise it but cannot prove the title copy unreachable. The disabled PPFs
+sit in `mods/_disabled/` (the top level of the mods folder), where Ketchup does
+not read them.
 
-### 5.5 A build switch for the raw-disc variant
+### 5.4 A build switch for the raw-disc variant
 Two constants differ between the collection build and a raw PSX disc patch:
 `SC_KEEP_LINES` (4 collection / 6 raw — `optsctext.py`) and
 `OPTION_MC_CONTROL_SETTINGS` (1 / 0 — `opt.c`). Today they are edited by hand;
 they should be one switch that builds both variants, and `rebuild.py` should
-package the raw variant too (today it packages only the collection variant and
-the package README says so). The raw variant then needs its own runtime
-validation on a real PSX image, where the disc-swap text (§5.3, §5.4) is
-reachable. README "The sc_text texture port" and "The collection's KEY CONFIG
-interception".
+package the raw variant too. The raw variant then needs its own runtime
+validation on a real PSX image, where the disc-swap text (5.3, and the
+disc-change abstract now inside `en_abst`) is reachable. README "The sc_text
+texture port" and "The collection's KEY CONFIG interception".
 
-### 5.6 The VR disc (SLPM-86249)
+### 5.5 The VR disc (SLPM-86249)
 Not started. USA's `SLUS-00957` exists in `windata\alldata.bin` (base
-`0xD39B7000`), so it is portable in principle. README "Not ported at all: the
-VR disc".
+`0xD39B7000`), so it is portable in principle. `audit_text.py` counts 4,449
+flagged Integral candidates against USA's 200 across its 105 stages, and its
+reference scan is disabled because the VR overlay load bases are unknown — a
+port on the scale of the main game. README "Not ported at all: the VR disc".
 
-### 5.7 Upstream pull request
-Rebase the general-benefit commits onto MGSM2Fix **3.7.2** and offer them
-separately; `UPSTREAM.md` lists them with test status. Port-only commits stay
-on this branch. Two things to separate when doing it: `SetPatchWatch` goes
-upstream as a mechanism, without the Integral `option`/`abst` ranges `mgs1.h`
-registers; `BrightnessText` covers title 981 (USA) only — other versions need
-their own offsets.
+### 5.6 Upstream pull request — a re-port, not a rebase
+Upstream 3.7 (tagged 2026-09-01 .. 09-04) moved `src/mgs1.{cpp,h}` to
+`src/games/`, `src/sqhook.{cpp,h}` to `src/modules/`, `src/psx.*` to
+`src/machines/`, cut ~130 lines of mgs1.cpp (54% similarity) and added MGS
+Vol. 2 / MGS1in4. This branch's base is `8fb944d` (v3.6 + 5 commits) and it
+adds ~870 lines over 10 files, the biggest three in the moved or rewritten
+files (244 in mgs1.cpp, 193 in mgs1.h, 166 in ketchup.cpp). `UPSTREAM.md`
+lists the commits; its two omissions are right (789f4a2 is superseded by the
+BrightnessText tri-state, fbb170c is the port-only abst watch comment). Two
+things to separate when doing it: `SetPatchWatch` goes upstream as a mechanism
+without the Integral `option`/`abst` ranges `mgs1.h` registers; `BrightnessText`
+covers title 981 (USA) only.
 
-### 5.8 Still untested, low effort when the moment comes
+### 5.7 Still untested, low effort when the moment comes
+- **The patch watch is blind while `DisableCDROM = true`**: the early return
+  in `sqhook.cpp` precedes the watch loop. The 2026-09-04 19:15 log's
+  `filtering CD-ROM patch file disc1_132F2716_patch` line is that filter, not
+  evidence about `_PS5`. One hint: the loader checked the `_PS5.bin` path and
+  the patch table names the un-suffixed file. The next achievements-live run
+  answers it — and after the `en_abst` relocation that patch is orphaned
+  anyway (README "The MISSION LOG port").
 - `PreserveConfiguration` catching a real stale write (intermittent race).
-- The `_PS5` patch inside `abst` — does a `_PS5`-suffixed collection patch
-  apply on Windows at all? The watch will say the next time `abst` loads under a
-  fresh patch application.
 - `GiveItems` in a stage where the inventory is actually empty (a real save,
   not the developer menu).
 - If `Ketchup::Audit` ever reports a `differs from what was written` line in
@@ -212,16 +215,22 @@ their own offsets.
   risk) and adopting the collection's English rename strings. README "The
   collection's RAM patches collide with `en_savemsg`".
 
-### 5.9 Finish the text census (`COVERAGE.md`)
+### 5.8 Finish the text census (`COVERAGE.md`)
 `audit_text.py` inventories GCL string candidates and address references
-across all three Integral images and USA's, but it is a framing heuristic:
-residual candidates still need verification against their callers, the font
-bank (`0x80xx` is Latin, `0x9001` a space — encoded glyphs are not "Japanese"
-by themselves), the USA path and a reachable screen before anyone declares the
-port complete. `jpsweep.py`'s equal-offset pairing was never a completeness
-proof. Texture lettering and runtime language branches are outside both tools.
+across all three Integral images and USA's, but it is a framing heuristic.
+Of disc 1's 1,414 flagged Integral candidates, 1,025 were the mission log (now
+ported), 111 are preope's retained unread recap bytes, 51 `rank`'s Integral-only
+sentences, 45 the 1P MODE pages, 20 the option screen's Japanese help lines;
+about 160 remain across gameplay stages and need verification against their
+callers, the font bank (`0x80xx` is Latin, `0x9001` a space) and a reachable
+screen — USA itself shows 307 flagged, so a flag is not a Japanese string.
+Texture lettering and runtime language branches are outside both tools.
 
-### 5.10 Optional, ask first
+### 5.9 Optional, ask first
+- The caption under READ MISSION LOG? (作戦記録を参照しますか？): kept because
+  USA draws nothing there; `KEEP_PROMPT_CAPTION = False` in `abst_build.py`
+  gives USA's empty record. Also the `1/2` counter and empty second screen on
+  count-7 pages — USA's own behaviour, reproduced.
 - Location-name spellings in `abst` (`Tank Hanger` / `Medi rm` / `Cmnder rm`
   vs USA `Hangar` / `Medi room` / `Cmnder room`): Integral's own English, not
   Japanese — outside the rule as written, so ask.
@@ -232,15 +241,18 @@ proof. Texture lettering and runtime language branches are outside both tools.
 
 ## 6. Decisions that are the user's — ask, do not assume
 
-- Whether and when to start the mission-log port (5.2), and whether a USA
-  screenshot can be produced first.
+- The caption under READ MISSION LOG? (kept Japanese by rule; one constant
+  blanks it) and USA's `1/2` on single-screen pages (reproduced) — §5.9.
+- Whether `en_abst` stays deployed if the on-screen check (5.1) finds a fault:
+  bisect by moving its two PPFs out of the mods folders.
 - Anything under the 2026-09-03 amendment: moving English text to fit
   Integral's own art.
 - The `en_savemsg` collision approach, if one is ever observed.
 - Achievements on or off for a given test session (`DisableRAM` /
   `DisableCDROM`); they are **on** now. Turning them off keeps SPECIAL / PHOTO
   ALBUM reachable without earning it and has never affected the PPFs.
-- Anything that touches Integral's own English (5.9).
+- Anything that touches Integral's own English (5.9), the `abst` location
+  spellings first.
 
 ---
 
@@ -256,7 +268,8 @@ proof. Texture lettering and runtime language branches are outside both tools.
 | `preope_usa.py` | Previous Operations directly from retail, USA pagination; stages PPFs unless `--deploy` is supplied |
 | `brf_build.py`, `brf_widen.py` | briefing labels and quads |
 | `savemsg.py`, `camsave.py` | the two memory-card caption ports |
-| `abstscan.py [page N]` | mission-log scoping data, both games |
+| `abst_build.py [--deploy]` | the MISSION LOG port: rewrites both GCX scripts in the `abst` stage with USA's pages, swaps the bottom-bar art, packs the stage with `obj/abst.bin`, relocates to DUMMY3M slot 462, verifies, stages/deploys the PPFs |
+| `abstscan.py [page N]` | mission-log scoping data, both games (retail data; the port's own checks are in `abst_build.py`) |
 | `jpsweep.py` | historical disc-1 pointer-slot candidate scan; not a completeness proof |
 | `gclparse.py`, `gcldec.py` | GCL container parsing / record walking — `containers_over` for resizing |
 | `optscan.py` | option-stage inspection |
@@ -296,8 +309,8 @@ textures, disassembly, screenshots, PPFs, toolchain) · "The three limits" ·
 KEY CONFIG port was built" · PPF → "PPF3's description field is 50 bytes" ·
 captions → "Memory-card messages (`en_savemsg`)", "The PHOTO ALBUM's own
 memory-card messages (`en_camsave`)" · sweep → "Sweep: is any UI text still
-Japanese?" · TO DO → "TO DO: port the MISSION LOG", "TO DO: the disc-change
-abstract", "The disc-swap text: four copies" · scope → "Scope", "What stays
+Japanese?" · mission log → "The MISSION LOG port", "The disc-swap text: four
+copies" · scope → "Scope", "What stays
 Japanese, and why" · brightness → "The collection shows only four of USA's six
 brightness lines", "Option → SCREEN", "The sc_text texture port" · briefing →
 "Briefing menu (`brf` stage)" · unlocks → "Unlocks", "Give items", "Unlock
@@ -333,6 +346,36 @@ build anyone can reproduce and check:
   flags, the decomp patch equal to the live decomp diff, deployed mods untouched
   (`ppfcheck --deployed` clean on all 18 files).
 
-None of this closes the gameplay items (§5.1), the Mission Log (§5.2), the
-disc-text family (§5.3–5.4), the raw-disc variant (§5.5), VR (§5.6) or the
-census (§5.9). It makes them buildable and checkable when they are done.
+None of this closed the gameplay items, the disc-text family, the raw-disc
+variant, VR or the census. It made them buildable and checkable when they are
+done — which the Mission Log then was (§10).
+
+## 10. The 2026-09-05 pass: the MISSION LOG
+
+The user's go-ahead came with the USA screenshots ("the English one takes 2
+screens") and "I want everything ported over perfectly when I return. Don't
+forget to use the decomp files for reference where it helps." Done in one
+night, from data to deployment:
+
+- **Data**: `abst_build.py` rewrites the two GCX scripts (scenerio.gcx and
+  demo.gcx — the cache section's tag sizes are offsets, and the 42 `d`-PROCID
+  pages are demo.gcx's) with USA's counts and line records verbatim, keeps
+  Integral's record 0 (the caption) and both fonts, and re-stamps every
+  container. The disc-change abstract gets USA's eight strings. +13,804 bytes.
+- **Code**: `abst.c` grown to USA's model (128×20 KCBs in two VRAM columns,
+  the 15-entry line table, the counter, the cursor frame, the slide, USA's
+  input model), read from USA's overlay instruction by instruction; one guard
+  added against colouring KCBs a count-7 page never allocates. Decomp commit
+  `042531c`, in `decomp-overlay-changes.patch`.
+- **Art**: USA's three bottom-bar textures in the footprint of Integral's two;
+  every other texture and palette stays Integral's.
+- **Packaging**: 88 sectors, DUMMY3M 462..549, both discs, 760 records each;
+  `rebuild.py` builds nine families and three overlays. `ppfcheck --deployed`
+  clean on 20 files.
+- **Verified statically** (README "The MISSION LOG port" lists it); **not yet
+  on screen** — that is §5.1, the first thing to do.
+- Doc corrections found the same night and folded in: the `_disabled` path,
+  the PatchWatch-blind-under-DisableCDROM note, the upstream re-port sizing,
+  eight stale README passages (verify_shipped.py, scratchpad tools, the
+  optbright build paragraph, `discs/`, the pinned chain input, the What ships
+  row, the mission-log cross-reference, the ini snapshot path).

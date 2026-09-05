@@ -1,7 +1,7 @@
 # Rebuilding and packaging the current collection patch
 
-`rebuild.py` builds all eight enabled patch families for both main discs in a
-fresh directory. It never installs patches or changes game files. This is the
+`rebuild.py` builds all nine enabled patch families for both main discs in a
+fresh directory (the ninth, `en_abst`, since 2026-09-05). It never installs patches or changes game files. This is the
 collection variant; raw-disc packaging and the disabled `en_menu3` remain open.
 M2Package packages the ASI separately and is not the Integral asset packager.
 
@@ -42,13 +42,13 @@ py rebuild.py --output D:/mgsbuild/repro4 --game D:/Steam/SteamApps/common/MGS1 
 ```
 
 The output directory must not exist and must have a short path without spaces.
-`--compare-deployed` requires the existing 16 named PPFs under the game's
+`--compare-deployed` requires the existing 18 named PPFs under the game's
 `mods/INTEGRAL/INTEGRAL/{0,1}`. Omit it for an independent build without that
 reference set. Existing PPFs are read only as comparison references.
 
 The builder exports the pinned decomp revision into the output directory,
 applies the tracked patch, generates the build graph, and compiles only the
-requested `option.bin` and `preope.bin` targets and their dependencies. The
+requested `option.bin`, `preope.bin` and `abst.bin` targets and their dependencies. The
 original decomp checkout is not modified. It then runs the asset builders,
 stages the two discs, validates PPF framing/sector boundaries and checks
 conflicting writes across each complete patch set.
@@ -59,7 +59,7 @@ A failed comparison retains the report and does not create a ZIP.
 
 ## Outputs
 
-- `Integral-English-collection.zip`: 16 PPFs in installation paths, README,
+- `Integral-English-collection.zip`: 18 PPFs in installation paths, README,
   `build-report.json` and `SHA256SUMS.txt`.
 - `package/`: the same unpacked files for review.
 - `work/`, `decomp/`, `build.log`: extracted inputs, intermediate assets and
@@ -90,6 +90,18 @@ directly from retail and preserves the colon and all other unowned records.
 experiment, not a prerequisite. Old `optbright.py`/font-text PPF output is not
 an input. Briefing construction uses the USA donor; its 16 row and 53 quad
 argument tuples were checked against the former European donor and match.
+
+**Clean run 2026-09-05 (nine families).** After the MISSION LOG port, the same
+command rebuilt all 18 PPFs in `D:/mgsbuild/repro5`; every one matched the
+deployed set's effective changed bytes (16 byte-identical, the two `en_menu2`
+differing only in record grouping as before). The exported decomp compiled
+`abst.bin` byte-identical to the live checkout's (SHA-256
+`a491c1d27a256cb7295da12f543620ef955c33ef3e72fa719c9c9d531283c966`, 48,087
+bytes). ZIP SHA-256
+`02346ac790a218429220b65f2c8bc930ea07f01cf07eab1f4e090d6f931a42f0`, 21 manifest
+entries. `abst_build.py` also reads the mods folder to refuse any overlap with
+the other PPFs' bytes, so a clean run wants the game installed even though it
+never writes to it.
 
 The collection option builder deliberately uses four brightness lines. Changing
 that constant to six alone does not finish the raw-disc release: disc-change

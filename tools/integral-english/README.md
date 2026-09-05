@@ -16,11 +16,12 @@ record; `NextSteps.md` is the map.
 |---|---|
 | `en_items` | item descriptions |
 | `en_menu`, `en_menu2` | menu strings |
-| `en_option` | `screen brightness setup`, `key configuration setup`, `use directional buttons to test` |
+| `en_option` | `screen brightness setup`, `key configuration setup`, `use directional buttons to test`; the brightness paragraph as USA's `sc_text` texture (four lines in the collection build); the eight KEY CONFIG label textures |
 | `en_preope` | Previous Operations with USA's exact pagination: Metal Gear (13 pages, 7 lines each, last page 6), Metal Gear 2 (19 pages) — `preope_usa.py` |
 | `en_brf` | briefing menu labels (20 PCX textures, quads, USA's row arithmetic and `above`) |
 | `en_savemsg` | memory-card messages (`datasave.c` save/load caption tables in the executable) |
 | `en_camsave` | the PHOTO ALBUM's own copy of those messages, inside the `camera` overlay |
+| `en_abst` | the MISSION LOG: 122 pages in USA's two-screen layout with its page counter, arrows and EXIT, and the disc-change abstract's eight strings — `abst_build.py`, 2026-09-05 |
 
 `en_menu3` is disabled — it crashes the title stage with `GCL:WRONG CODE`. See
 "Why `en_menu3` crashes" below; diagnosed 2026-09-03, not yet rebuilt.
@@ -204,6 +205,16 @@ detail; this is the index.
   USA ships 24 of them.
 - `GCL_GetString` returns a pointer *into* the chain; the text is read in place,
   so there is no separate string table to update.
+- **A command's value list ends with a GCL_END byte, and `GCL_GetOption` stops
+  only there.** A scan for a letter the command lacks steps over every option
+  by its length byte — including `i`'s overflowed one — and walks into the
+  text, printing `GCL:WRONG CODE` until it meets a NUL. Read only options every
+  block is known to carry (the abst port does not read USA's `d`).
+- **In a stage's cache section the tag sizes are offsets**, not lengths
+  (`LoadCacheSection`): five files share the `c?` payload, and the last file's
+  offset and the 0xFF fake tag's total must move when an earlier file grows.
+  `abst_build.py` shows the arithmetic; `portio.pack_stage` fixes only the 0xFF
+  size.
 
 ### Textures and quads
 
@@ -358,7 +369,8 @@ scratchpad 2026-09-04), overlay maps at `D:/mgsbuild/d/obj/asm_<stage>_lhs.map`.
 **Where the working data lives — and why that changed 2026-09-03.** Every tool
 here reads `work/…` relative to the current directory: the extracted
 `int1_stage.dir` / `int2_stage.dir` / `usa1_stage.dir` / `usa2_stage.dir`, both
-games' executables, the pinned `fonttext_disc*_option.ppf` chain input, every
+games' executables, (formerly the pinned `fonttext_disc*_option.ppf` chain input, gone since
+2026-09-04), every
 revert PPF, and the parked unlock PPFs. Until tonight all of it sat in the
 session scratchpad under `%LOCALAPPDATA%\Temp\claude\…` — a directory that is
 session-specific and lives under Windows Temp. Three gigabytes of re-extractable
@@ -393,7 +405,10 @@ prints what it resolved to. Anything a tool writes goes to `WORK` as well.
   pristine one.
 - **Do not author Python through shell heredocs.** Escapes get eaten — `\x00`
   became a literal NUL byte in a source file twice, and a `str.replace` silently
-  matched nothing. Write files with an editor tool.
+  matched nothing. Write files with an editor tool. **It happened a third time
+  on 2026-09-05** (`abst_build.py`): even a doubled backslash inside a quoted
+  heredoc loses a level. Author source with the editor tool, and repair a NUL
+  with a script that was itself written by the editor tool.
 - The console is cp1252: printing a 0x90 byte raises `UnicodeEncodeError`.
   Escape non-ASCII before printing.
 - `MGSM2Fix.log` contains `exceptions are enabled` for every script VM it hooks,
@@ -410,7 +425,8 @@ its caption chain and no longer needs a pinned font-text PPF or deployed inputs.
 The older experiments below are historical, not prerequisites for this build.
 
 Needs the decompilation at `D:\mgsbuild\d` (branch `integral-english-text`,
-see `decomp-overlay-changes.patch`) and disc images in `discs/`.
+see `decomp-overlay-changes.patch`). The `discs/` images were only ever for the
+legacy `reloc_ppf.py`; `portio.relocation` reads the collection's containers.
 
     cd D:/mgsbuild/d/build
     py build.py --psyq_path D:/mgsbuild/psyq --variant main_exe
@@ -928,7 +944,7 @@ else. Details under "Not tested" → the PHOTO ALBUM item.
 **Result withdrawn 2026-09-04.** The sweep pairs *overlay pointer words*, so it
 sees only strings the overlay addresses directly. GCL script text — read via
 `GCL_GetString` from a command's string list — is invisible to it, and that is
-where the MISSION LOG's Japanese lives (see "Not yet ported: the MISSION LOG").
+where the MISSION LOG's Japanese lived until 2026-09-05 (see "The MISSION LOG port").
 Treat the section below as "no overlay-pointed Japanese remains", not "no
 Japanese remains".
 
@@ -961,96 +977,153 @@ single word with no space, text in the GCL scripts rather than the overlays
 (which is where the ported menus live, and those are handled), and anything on
 disc 2 or the VR disc.
 
-## TO DO: port the MISSION LOG (`abst` stage) — found and scoped 2026-09-04, not started
+## The MISSION LOG port (`abst` stage, `en_abst`, built 2026-09-05)
 
-**Status: unported, in scope, awaiting the go-ahead.** Loading a save shows
-`READ MISSION LOG? YES / NO` and then a page of story-so-far text; in Integral
-it is entirely Japanese (with furigana), USA has the same text in English, so by
-the port's rule it is portable. **Seen again the same evening** loading the
-Comm Twr A save: a *different* page (the PAL-key / Sniper Wolf /
-Meryl-captured recap), so the page follows the save point — the `l`/`r`/`e`
-ids — and a USA save at the same point would give the exact English
-counterpart for a before/after pair; that shot is kept at
-`D:\mgsbuild\integral-english-work\` as the reference JP page. It is the largest text port left on the main
-discs — 122 text pages, ~1,000 records, a different per-screen layout and a
-stage relocation — so it was scoped fully and deliberately **not** started
-unasked. `abstscan.py` prints every number below; `abstscan.py page N` dumps a
-block from both games.
+**Status: ported and deployed, verified statically; not yet seen on screen.**
+Loading a save shows `READ MISSION LOG? YES / NO` and then a page of
+story-so-far text. Integral drew it in Japanese with furigana; USA has the same
+122 pages in English. `abst_build.py` gives Integral USA's text, USA's layout
+and USA's controls. The user's USA screenshots of 2026-09-04 (Heliport save,
+`MGS1 USA/20260904233158` and `…233204`) are the reference: two screens of 7
+lines, `1/2 ►` then `◄ 2/2`, EXIT at the right.
 
-**Which actor — corrected the same evening.** The mission log is
-**`onoda/abst/abst.c`** (`NewAbstract`). `ab_ch.c` (`NewAbstractChange`), which
-the first scoping pass measured, is the *disc-change abstract* — see the next
-section. Everything below is `abst.c` and its USA counterpart.
+### What the stage is
 
-| | Integral | USA |
+Both discs carry one identical copy: STAGE.DIR sector 139, 80 sectors. It is
+the whole LOAD DATA / SAVE DATA flow, not just the log: overlay `sb` (mload.c
+`NewLoadData`/`NewSaveData`, abst.c `NewAbstract`, ab_demo1/2.c, ab_ch.c),
+texture DAR `nd`, a cache section, two sound files (identical to USA's).
+
+**The cache section's tag sizes are offsets** (`libfs/cdstage.c`,
+`LoadCacheSection`: `GV_LoadInit(current_ptr + tag->size, id, CACHE)`). The
+`c?` payload is five files: `k` @0, `l` @180, `h` @184, **scenerio.gcx @236**
+(tag id 0xEA54 = `GV_StrCode("scenerio")`), **demo.gcx @57900** (0xA242 =
+"demo"), and the 0xFF fake tag whose size is the section total. `portio.stage`
+already skips the non-0xFF `c` tags; `pack_stage` sets the 0xFF size from the
+payload, and the builder re-stamps demo.gcx's offset itself. Files are
+4-aligned in the original; the builder keeps that.
+
+**Each .gcx is `GCL_LoadScript`'s layout:** BE32 proclen, proc table
+(id:BE16 offset:BE16 …, zero word), contiguous proc bodies (each a GCL ARG
+`40 BE16`), BE32 script length, the script ARG, BE32 font length, the font
+glyphs (`font_set_font_addr(2, …)`). scenerio.gcx: 86 procs, 80 pages (one
+`0x9906` command per proc), the disc-change block, the English location list
+in the script body, an 11,520-byte font. demo.gcx: 110 procs (USA 109 — the
+extra 0x5FD9 is the Japanese location list's), 42 pages, the Japanese location
+list, an 11,412-byte font. **The 42 demo pages are the 42 pages that carry
+`d` = PROCID 0x6025.** All 122 pair 1:1 with USA's in order: every `e`/`l`/`r`
+option equal (checked on every build).
+
+**Page grammar:** `60 <BE16 size> 99 06 07` · STRID STRID · OPTION `e` ·
+`l` · `r` · (`d`) · OPTION `i`: SHORT count, then count+1 STRING records
+(`07 len payload`, NUL included in len), then **one `00` — the command's
+GCL_END, which is what stops `GCL_GetOption`'s scan**. The `i` option's own
+length byte is an overflowed u8 in both games (234 / 49) and is never read;
+the builder leaves it. **Record 0 is not a header: it is the caption drawn
+under READ MISSION LOG?** — `D_800C3238[0] = {88, 180, 0x6739}`, lit at init,
+hidden on YES. Integral's is 作戦記録を参照しますか？ with the furigana
+ミッションログ (`#{…}#` is the ruby syntax; `<9002>` separates base from
+ruby); USA's is empty. 80 Integral pages carry it, the 42 demo pages have it
+empty. **Kept** (`KEEP_PROMPT_CAPTION = True`): USA draws nothing there, so
+under the no-translation rule the Japanese caption stays — the same case as
+the memory-card captions USA leaves blank. Flipping the constant gives USA's
+empty record. The user's call; not asked yet.
+
+### What USA's overlay does (read from SLUS-00594 `sb`, base 0x800C5968)
+
+| | Integral retail | USA / this port |
 |---|---|---|
-| stage | `abst`, STAGE.DIR sector 139, **80 sectors**, identical on both discs | sector 146, 76 sectors |
-| overlay | `sb` 47,071 bytes, base `0x800C3208` | `sb` 50,811, base `0x800C5968` |
-| script chunk `c?` | 90,796 bytes | 79,116 bytes |
-| `0x9906` blocks | 126 in all: **122 text pages** — 91 with `i` count **8** and 31 with count **7** — plus the 31-string location list, the disc-change block and two others | 125: **122 text pages** — 108 with count **14** and 14 with count **7** (a few carry 15–16 records) — plus the same others. **122 = 122**, so pairing pages by order is plausible; confirm against the shared `l`/`r`/`e` ids |
-| a page's `i` option | `INT count`, then `count + 1` STRING records: record 0 the header, then the lines | same, with USA's count |
-| lines per screen | up to **11** (+ header): `KCB kcb[12]`, `D_800C3238` = `{88, 180}` header then 11 × `{x 16, y 35 + 19k}` | **7** per screen, two screens per page: the 14-entry table at overlay `+0x34` = `{color, x 8, y 35 + 22k}` for k 0..6, twice |
-| KCB rect / origin | **128 × 21**, `font 704/256`, `clut 704/276`, `+= 21` | **128 × 20**, `704/256`, `clut_y 275`, `+= 20`, **wrap when `font_y + 20 >= 512` → 256/704/704/275** (init fn `0x800C6DB0..0x800C6F44`; needed because 15 × 20 from 256 passes 512) |
-| string loop bound | `for (i < field_2C4 + 1)`, `field_2C4` = the `i` count (default 12) | `slti a1, 14` at `0x800C8230` |
-| text | game-encoded Japanese; longest record 99 bytes | plain ASCII; longest line **54 chars** |
-| DUMMY3M for relocation | free from slot **462** (preope 0..89, brf 128..266, option 384..461); `DU_SECTORS` 13,500 | — |
-| collection patch inside the stage | **one**: `disc1_132F2716_patch_PS5.bin` at stage sector +51 (the script chunk). Watches registered for both discs' `abst` spans; whether a `_PS5` patch is applied on Windows decides whether relocating orphans anything | — |
+| line table `D_800C3238` | caption {88,180}, then 11 × {x 16, y 35+19k} | caption, then **14 × {x 8, y 35+22k mod 7}** (lines 8–14 reuse 1–7's rows) |
+| KCB | 128×21, `+= 21`, one column at x 704 from y 256, CLUT y 276 | **128×20, `+= 20`, column at x 576 from y 256, CLUT y 275; when `font_y + 20 >= 512` the 13th KCB starts a second column at x 704** (12 per column) |
+| KCB count | 12 | **24** (default count 24; the port clamps to 23 so 24 is enough) |
+| sprite height | `max_height` | **`max_height − 1`** (keeps the CLUT row of each 20-row band off screen) |
+| draw | one column, tpage 704/768 | **entries 0–11 with tpage x 576/640, 12–23 with 704/768**, 12 DR_TPAGEs; every sprite's x0 gets the page-slide offset |
+| bottom bar | `abst_d_l` + `abst_d_r` (EXIT centred) | **`abst_d_l` (◄ at x 115–125), `abst_d_r1` (► at 193–203, first 80 px of the right half), `abst_d_r2` (EXIT, last 80 px)**; the arrow polys toggle attr 0x100 (shown) / 0 (hidden) per page |
+| cursor frame | fixed around EXIT (−33..33, 81..105) | **moved at runtime** by `abst_cursor_frame(x,y,w,h,rgb,mode)`: ► = (30,86,16,14), ◄ = (−46,86,16,14), EXIT = (90,87,54,12), mode 1 = 6-px outer margin, 2-px inner overlap; USA only ever uses mode 1 |
+| page counter | none | **`MENU_Printf("%d", page)` at (145,202), `"/"` at (156,202), `"%d", 2` at (167,202)**, colour (86,137,116); the total is USA's literal 2 |
+| reading state | ×/○ exit, SELECT hides text | cursor on ►: RIGHT → EXIT; ○ or R1 → next page (cursor lands on EXIT). On ◄: RIGHT → EXIT; ○ or L1 → previous page (cursor lands on ►). On EXIT: LEFT → ◄ (page 2) or ► (page 1); L1 → previous page (not on page 1); R1 → next page (not on page 2; cursor lands on ◄); ○/× exit. SELECT hides/shows the current page's 7 lines; × on an arrow exits. Cursor moves play SE 31, page turns **SE 176**, exit SE 33 |
+| page turn | — | **states 4/5: 8 frames sliding out at 40 px/frame, swap the lit lines at frame 9, 8 frames sliding in, then page ±1**; the counter is drawn throughout |
+| fade in | cursor pieces fade in frames 0–8 | l/r images 0–64, panel constant from 65, text 80–144, **cursor pieces 136–144**; state 2 at 145 with the cursor on ► |
+| fade out | 96 frames | same, plus the counter fading with the cursor over the first 8 |
+| option `d` | not read | read; **`d == 1` skips the prompt**. No page sets it (80 lack it, 42 carry the PROCID), and a GetOption scan for a missing letter walks past `i`'s bad length byte into the text, so **the port does not read it** |
 
-**Page grammar** (both games): `60 <BE16 size> 99 06 <ofs=7>` · `STRID` `STRID`
-· `OPTION l` (left image id) · `r` (right image) · `e` (end proc) · (`d`, some)
-· **`OPTION i`**: `INT count` then the `07 <len> <bytes>` records.
+The `Work` layout of the port matches USA's field for field (polys1[7],
+kcb[24], tpage[12], field_51C[24], cursor/page/scroll at +0x7844/48/4C,
+`sizeof` 0x7854), which made the disassembly readable against the C.
 
-**The `i` length byte — settled.** It reads 49 (USA) / 234 (Integral) against a
-~560-byte payload: the low byte of a length that overflowed u8. It is **never
-used**: `abst.c` reaches the text with `GCL_GetOption('i')`, which positions
-`next_str_ptr` at the payload, reads the count with `GCL_StrToInt`, then walks
-`count + 1` records with `GCL_GetString(GCL_NextStr())`; every `GetOption` scan
-(`l`, `r`, `e`, `i`) stops at its own letter and `i` is last, so nothing ever
-skips past it by that byte. **Leave it exactly as the game wrote it.** A plain
-value-list walk *does* break right after `i` (`WRONG CODE`, confirmed by
-simulating `parse.c`) — which is why `gclparse` cannot parse these blocks and
-the sweep missed them.
+**One guard USA lacks.** USA colours lines `base+1..base+7` of a page without
+checking the count; a count-7 page has 8 KCBs, and `font_set_color` on an
+unallocated KCB writes through its NULL CLUT buffer. `abst_color_page` stops at
+the page's last record. Nothing visible changes: those pages still show `1/2`
+and can flip to an empty second screen, exactly as USA does. The 14 USA pages
+with count 7 are k = 83, 85, 86, 99, 100, 101, 102, 105, 106, 113, 116, 118,
+121, 122 (0-based over the 122); all other 108 have count 14.
 
-**Method, when started** (the `preope` method): per page, replace the `count`
-INT and the `07`-record run with USA's, resizing each record's own length byte
-and the COMMAND's BE16 size (the blocks are top-level in the chunk — confirm
-with `gclparse.containers_over` that nothing else encloses them); grow `abst.c`
-to USA's model — `kcb[15]`, rect 128×20, the wrap, the two-screens-of-7 paging
-and its 14-entry position table (USA's paging logic has to be read from its
-overlay; Integral's `abst.c` has no second screen); relocate the stage into
-DUMMY3M and reconstruct all owned caption edits from retail as `optsctext.py`
-does; verify with
-`abstscan.py`, `ppfcheck.py` and a readback like `verify_integral_option.py`;
-test by loading the save (the user has one).
+### The build
 
-**Still open before the first edit:** USA's two-screen paging code (which
-function flips from lines 0–6 to 7–13, and on what input); pairing Integral's
-pages with USA's when the counts differ — pair by the shared `l`/`r` image ids
-and `e` proc ids, not by order; the USA counterpart of the `READ MISSION LOG?`
-Japanese caption; and the `_PS5` patch. A USA screenshot of the mission log
-would confirm the 7-line screen in one look.
+`abst_build.py` (both discs, `--deploy` to install):
 
-## TO DO: the disc-change abstract (`ab_ch.c`) — a fourth copy of the disc-swap messages
+1. Parses scenerio.gcx and demo.gcx out of Integral's and USA's chunks, walks
+   the procs in table order, and for every page replaces the `i` payload with
+   `SHORT count_usa`, Integral's record 0, USA's records 1.. verbatim (the
+   pages with 16–17 records keep their trailing empty ones), and the GCL_END.
+   The COMMAND's BE16, the body's ARG length, the table offsets, proclen and the
+   script length are recomputed; the fonts are untouched. Chunk 90,796 →
+   104,600 bytes (+13,804).
+2. The disc-change block (`a` + `e`, `ab_ch.c`) takes USA's whole `e` option
+   from its letter to the block end: PROCID plus the eight strings `Insert DISC
+   1.` … `The correct DISC has not been insert.` (USA's own spelling). That is
+   the **fourth copy of the disc-swap text, now ported**.
+3. DAR: `abst_d_l` ← USA's payload (same VRAM (0,256), same CLUT (832,233));
+   `abst_d_r` → `abst_d_r1` at (0,286) with CLUT (848,233) and `abst_d_r2` at
+   (20,286) with CLUT (960,233), i.e. inside the 40×30-word footprint the old
+   texture freed. Everything else — including the SOLID strip and the cursor
+   pieces, whose palettes differ from USA's — stays Integral's. 22 → 23
+   entries.
+4. Packs the stage with `obj/abst.bin` (48,087 bytes, retail 47,071), the new
+   DAR and chunk: **88 sectors**, relocated into **DUMMY3M slots 462..549**
+   (disc 1 LBA 292792, disc 2 303898; the STAGE.DIR `abst` entry becomes
+   156138 / 198720), 760 records per disc. The builder refuses any overlap with
+   the other PPFs' bytes in the mods folder.
 
-Found while scoping the mission log. `NewAbstractChange` in `ab_ch.c` reads
-options `a` (disc number) and `e`, then eight strings from inside `e`'s payload,
-draws them in eight 64×21 KCBs (`font 832/256`, `clut 832/276`, `+= 21`),
-centred at x 160 via `D_800C3750[8]` `{num 1, x 160, y 190/210, 0x6739}`. The
-one block that feeds it in each game (`OPT a(5) OPT e(244)`, at Integral chunk
-`+0xB0A5`, USA `+0xC6D1`) holds — Japanese in Integral, English in USA:
+**Verified statically:** every rebuilt body re-parses with `gclparse` (the
+container sizes are self-checking); all 122 pages re-extract with USA's count
+and USA's line records byte for byte, record 0 unchanged, fonts unchanged; the
+PPF records rebuild the 88-sector stage byte for byte in the DUMMY3M slot and
+the entry repoint lands on the `abst` STAGE.DIR entry, both discs; the compiled
+overlay carries the 15-entry table, the 576/704 columns, the wrap at 512, the
+cursor-frame and counter immediates and the pad masks; the collage images
+(BRF.DAT, 160 px at VRAM x 128 and 256, CLUTs (768,245/246)) are clear of the
+KCB columns; `ppfcheck --deployed` clean on all 20 files.
 
-    Insert DISC 1. / after inserting DISC 1. / Insert DISC 2. /
-    after inserting DISC 2. / Press the Start Button / Now Checking... /
-    <9001> / The correct DISC has not been insert.
+**Not verified:** anything on screen. First things to look at when a save is
+loaded: the caption under READ MISSION LOG? still Japanese (by rule); page
+`1/2` with ► highlighted and seven English lines at USA's rows (ink tops at
+game y 52, 74, 96, 118, 140, 162, 184; x from 8); RIGHT moves the frame to
+EXIT; ○ on ► slides to `2/2` with ◄; SELECT hides the text; × leaves. Then a
+count-7 page (a late-game save) shows `1/2` with an empty second screen — USA's
+own behaviour, worth a decision. Measure the shots against
+`MGS1 USA/20260904233158_1.jpg` the way "Measuring from screenshots" says.
 
-That is the same family `en_menu2` ported in `demosel`/`change` and `en_menu3`
-targets in `title` — the **fourth** copy, in `abst`. Same reachability question
-as `en_menu3`: the collection swaps discs itself, so this screen may be
-unreachable in it. Portable; USA's strings are shorter, so the records and the
-COMMAND size shrink. Here the `e` option's own length byte *is* consulted —
-`GetOption('a')` scans first and, `a` being present, stops before `e`; but keep
-`e`'s length byte consistent with its payload regardless, since it is the
-container the strings live in.
+**The collection's `disc1_132F2716_patch_PS5.bin` is orphaned by the
+relocation.** It lands at stage byte 51×2048+166 = chunk +0xB0A6 — the BE16
+size of the disc-change block. Whatever the PS5 build did there (unknown; the
+watch is blind while `DisableCDROM` is true), the relocated stage no longer
+receives it; the block now holds USA's English. The watch on the original span
+stays registered so the next achievements-live run shows what the collection
+wanted to write.
+
+**Left as it was:** block 80 (count 1: the caption plus one game-encoded line
+in *both* games, USA's included — nothing English to port); the two location
+lists (Integral's own English `Tank Hanger` / `Medi rm` / `Cmnder rm` /
+`Cmnd rm` against USA's `Hangar` / `room` — Integral's text, ask before
+changing; and the Japanese list, USA has none); every other texture.
+
+**Gotchas met on the way** (also indexed under Gotchas): the heredoc ate a
+backslash again and put a NUL into `abst_build.py`; `GCL_GetOption` for a
+letter the command lacks walks past `i` by its bad length byte and spews
+`GCL:WRONG CODE` until a NUL; `portio.read_ppf` takes a path, not bytes;
+`WORK` is already the `work` directory.
 
 ## The disc-swap text: four copies, and why only real play can reach the swap (2026-09-04)
 
@@ -1062,7 +1135,7 @@ states, so nobody has to re-derive them:
 | 1 | `demosel` | **ported**, `en_menu2` |
 | 2 | `change` - the stage that performs the disc check and the swap | **ported**, `en_menu2` |
 | 3 | `title` | **not shipping** - `en_menu3`, diagnosed (container sizes), disabled pending the rebuild described under "Why `en_menu3` crashes" |
-| 4 | `abst` - `ab_ch.c`, the disc-change abstract | **not ported**, found 2026-09-04 (previous section) |
+| 4 | `abst` - `ab_ch.c`, the disc-change abstract | **ported 2026-09-05** in `en_abst` ("The MISSION LOG port") |
 
 **None of the four has been seen in the collection.** The open question is
 whether the collection ever shows the game's own swap prompt at all, or swaps
@@ -1121,6 +1194,9 @@ see [COVERAGE.md](COVERAGE.md) for the expanded inventory and its limits.
 | `savemsg` indices 1 and 9 (`セーブ中です`, `セーブが完了しました`) | USA draws nothing at those indices, so there is no text to port. Integral therefore flashes Japanese during and after a save | "Memory-card messages" |
 | six `camsave` slots (`0x60C`, `0x62C`, `0x63C`, `0x65C`, `0x668`, `0x66C`) | USA's strings at those slots are **empty** | "The PHOTO ALBUM's own memory-card messages" |
 | camera GCL caption at script `+0x1B8` | Integral has a nonempty game-encoded caption; the corresponding USA record is empty | [COVERAGE.md](COVERAGE.md) |
+| the caption under READ MISSION LOG? (作戦記録を参照しますか？, record 0 of every mission-log page) | USA's record 0 is empty, so it is kept by the same rule as the memory-card captions; one constant (`KEEP_PROMPT_CAPTION`) blanks it — the user's call | "The MISSION LOG port" |
+| mission-log block 80's one game-encoded line | USA's copy is game-encoded too, not English — nothing to port | "The MISSION LOG port" |
+| the Japanese location list in demo.gcx; Integral's spellings in the English list (`Tank Hanger`, `Medi rm`, `Cmnder rm`, `Cmnd rm`) | USA has no Japanese list; the English list is Integral's own text (ask before changing) | "The MISSION LOG port" |
 | the save-slot title (full-width Latin) | USA also uses full-width Shift-JIS; Integral has its own product suffix. No ASCII conversion is warranted | [COVERAGE.md](COVERAGE.md#save-slot-title-encoding) |
 | record 3, the vibration-test row's label (`振動テスト`) | **kept blank, not Japanese** — the user's decision 2026-09-02: Integral's line is the row name plus a sentence USA's own line already covers | the scope table |
 | `rank`'s 36 ranking-commentary sentences | Integral-only; USA's `rank` has the shared location names and none of these sentences, so there is nothing to port unless a USA counterpart turns up elsewhere | "`rank` is Integral-only text" |
@@ -1594,7 +1670,7 @@ the collection's re-centred text would drag the opaque canvas's top edge onto
 the ramp's brighter 16 band, a worse notch than the one being fixed.
 
 **Verified statically end to end, on both disks, against the shipped binary.**
-`scratchpad/verify_shipped.py` trusts nothing the build tools claim: it pulls
+`verify_usa_brightness.py` (the scratchpad's `verify_shipped.py`, rescued 2026-09-04) trusts nothing the build tools claim: it pulls
 the 426 bytes out of the deployed `MGSM2Fix64.asi` (they sit at file offset
 `0x259BA0`, exactly once), reads the two offsets out of the shipped table,
 checks each against the image offset recomputed from that disk's STAGE.DIR,
@@ -1670,6 +1746,10 @@ standing and is itself unattributed.
 
 ## Not tested
 
+- **The MISSION LOG on screen.** `en_abst` was deployed 2026-09-05 after static
+  verification only. Load any save and go through the checklist at the end of
+  "The MISSION LOG port"; a late-game save (a count-7 page) also shows whether
+  USA's `1/2` on a single-screen page is wanted.
 - **Disc 2 in game.** Still never reached — and now it is known why the
   developer menu cannot get there: disc 2 is set only by `change.c`'s CD check,
   which only the real story swap runs, so every debug load stays `Disk ID 0`
@@ -2439,10 +2519,11 @@ chain is reconstructed from retail by `optlabel2.py`, without any prior PPF.
 
 ### Building and deploying
 
-`optbright.py` needs `work/int1_stage.dir` (retail), `work/int1_stage_opt11.dir`
-(whatever the deployed option PPF currently contains) and a rebuilt
-`D:/mgsbuild/d/obj/option.bin`, and it rewrites both discs' option PPFs in
-place.
+**Historical — the font-text build.** `optbright.py` needed `work/int1_stage.dir`
+(retail), `work/int1_stage_opt11.dir` (whatever the deployed option PPF
+contained) and a rebuilt `D:/mgsbuild/d/obj/option.bin`, and rewrote both
+discs' option PPFs in place. Since 2026-09-04 `optsctext.py` builds from retail
+and stages (see [BUILDING.md](BUILDING.md)); nothing below is a build step.
 
 No Integral disc image is on disk, so the STAGE.DIR LBA cannot be looked up the
 way `ppfgen.py` does it. Instead the script **recovers the geometry from the
@@ -2668,7 +2749,7 @@ chaining to the next through the window's `-p` option — 0x28CC (3 pages),
 0x963D. The pages exist only as the Japanese `-b` strings: USA has no 1P MODE
 and Integral has no English for them, so under the no-translation rule they stay
 exactly as shipped. They are a kept Integral difference, not an unported one.
-(`gclprocs.py` / `gcldump.py` in the scratchpad decode a stage script's procs;
+(`gclprocs.py` / `gcldump.py`, in this directory since 2026-09-04, decode a stage script's procs;
 the title's proc table sits at chunk offset 0xEC: BE32 length, then
 `id:BE16 offset:BE16` entries ending in a zero word, bodies after it, script
 body at 0x10DE.)
@@ -2862,5 +2943,5 @@ almost certainly one per language. All of that is the memory-card module's
 The deployed ini is a symlink into Vortex's mod folder
 (`%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-*\MGSM2Fix.ini`); edit the
 target, not the link (`sed -i` on the link replaces it with a plain file).
-Pre-change copy: `scratchpad/MGSM2Fix.ini.before_achievements`. To restore
+Pre-change copy: `MGSM2Fix.ini.before_achievements` at the working-data root (NextSteps §1). To restore
 achievements, set both back to `false`.
