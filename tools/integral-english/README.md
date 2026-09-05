@@ -1028,13 +1028,15 @@ collection writes first (pass 1 only, every session); and the frozen Ration /
 Ketchup descriptions were never lost — Integral's item table has 26 entries
 whose last two are that pair, USA's likewise, so `N_ITEM = 26` ports them.
 
-Both fixes are static until seen: check the SOCOM, the ID Card (`level 7
-security` with a level-7 card), a Mine Detector on HARD/EXTREME after viewing
-the SOCOM, and any weapon whose description you look at.
+All three fixes were seen on screen at 12:55 the same day (SOCOM, ID Card
+`level 7 security`, Mine Detector), with the audit silent. Other weapon
+descriptions have not been looked at individually.
 
 ## The MISSION LOG port (`abst` stage, `en_abst`, built 2026-09-05)
 
-**Status: ported and deployed, verified statically; not yet seen on screen.**
+**Status: ported, deployed and seen on screen 2026-09-05** (both pages of two
+logs, the controls, the slide after its fix); a demo.gcx page and a count-7
+page are the parts not yet looked at.
 Loading a save shows `READ MISSION LOG? YES / NO` and then a page of
 story-so-far text. Integral drew it in Japanese with furigana; USA has the same
 122 pages in English. `abst_build.py` gives Integral USA's text, USA's layout

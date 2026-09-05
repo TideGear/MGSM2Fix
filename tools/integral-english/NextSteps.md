@@ -1,8 +1,9 @@
 # Next steps — MGS Integral English text port
 
 Written 2026-09-04 (evening), updated the same night after the
-reproducible-build pass (§9) and again on 2026-09-05 after the MISSION LOG
-port (§10), for whoever picks this up cold: a later session of
+reproducible-build pass (§9), and through 2026-09-05 as the MISSION LOG port,
+the item-text fixes and their on-screen checks landed (§10), for whoever picks
+this up cold: a later session of
 the same assistant, a different model, or a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
 remains and in what order, and which decisions are the user's to make. The
@@ -29,7 +30,7 @@ authoritative**; if they disagree with a memory file, the memory file is stale.
 | decompilation | `D:\mgsbuild\d`, branch `integral-english-text`, origin `FoxdieTeam/mgs_reversing` — **do not push there** | our source changes are captured as `tools/integral-english/decomp-overlay-changes.patch` (= `git diff 7964de7`); regenerate it after any decomp edit. Local decomp commits exist (e.g. `0534934` for the doorbell in `opt.c`) |
 | working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, the four retail executables, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, `map_pristine.map` (the pristine exe's symbol map), ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `workdir.py` also exports `GAME` (`INTEGRAL_ENGLISH_GAME`, default the Steam folder) and `DECOMP` (`INTEGRAL_ENGLISH_DECOMP`, default `D:\mgsbuild\d`); no tool hardcodes those paths any more. `py workdir.py` prints what it resolved |
 | retail executables | `work\int1.exe`, `int2.exe` (641,024 bytes each), `us1.exe`, `us2.exe` (651,264) — hashes in `BUILDING.md`; `rebuild.py` rejects any other | **the collection's ISO executable extents are zero-filled**, so extracting an exe from `alldata.bin`/`dlc_japan.bin` yields no code — the first clean-build attempt failed on exactly that. These four files are the only source of executable bytes |
-| reproducible build | `py rebuild.py --output <fresh dir> --game … --decomp … --psyq D:\mgsbuild\psyq --executables …\work --compare-deployed` (see `BUILDING.md`) | never installs anything. Last artefact: `D:\mgsbuild\repro4\Integral-English-collection.zip`, SHA-256 `b052a710…0366`, all 16 PPFs' effective bytes equal to the deployed set (14 byte-identical; `en_menu2` ×2 differ only in record grouping) |
+| reproducible build | `py rebuild.py --output <fresh dir> --game … --decomp … --psyq D:\mgsbuild\psyq --executables …\work --compare-deployed` (see `BUILDING.md`) | never installs anything. Last artefact: `D:\mgsbuild\repro7\Integral-English-collection.zip`, SHA-256 `870a691a…51ca` (2026-09-05 13:06), all 18 PPFs' effective bytes equal to the deployed set (16 byte-identical; `en_menu2` ×2 differ only in record grouping) |
 | game | `D:\Steam\SteamApps\common\MGS1` (Master Collection Vol. 1, Steam app **2131630**) | launch: `Start-Process steam://rungameid/2131630`; process name `METAL GEAR SOLID`; **kill by PID only, never `taskkill /IM`** |
 | Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2) | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually |
 | deployed ini | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.ini` is a **Vortex symlink**; edit the target: `%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-5-3-6-0-1774482213\MGSM2Fix.ini` | edit with Python or via `realpath`; `sed -i` on the link would replace the link with a file. The repo's `MGSM2Fix.ini` is the committed default, not what the game reads |
@@ -87,23 +88,24 @@ paraphrase them away.
 
 | patch | what | verified |
 |---|---|---|
-| `en_items` | item and weapon descriptions (executable) | in game; **three faults found and fixed 2026-09-05** from the user's shots (card level offset, SOCOM suppressor rewrite, a retail-equal byte the collection's RAM patch owned) — README "Three item-text faults"; the fixes are static until seen |
+| `en_items` | item and weapon descriptions, the frozen Ration/Ketchup pair, the HARD/EXTREME Mine Detector message (executable) | in game. Three faults found from the user's shots and fixed 2026-09-05 (card level digit offset, SOCOM suppressor rewrite, a retail-equal byte the collection's RAM patch owned — README "Three item-text faults"); **the fixes were seen on screen at 12:55** (SOCOM, ID Card `level 7 security`, Mine Detector) and the audit is silent. The PPF owns every byte of both arenas |
 | `en_menu`, `en_menu2` | menu strings; `en_menu2` includes the `demosel` and `change` disc-swap copies | in game (menus); the disc-swap copies **never seen** (see §5.1) |
 | `en_option` | option-screen strings; KEY CONFIG labels (8 textures); brightness paragraph as USA's `sc_text` texture, four lines in the collection build | in game, pixel-measured; SCREEN / KEY CONFIG (collection panel via the doorbell) / EXIT all confirmed 2026-09-04 |
 | `en_preope` | Previous Operations, USA's exact pagination (MG1 13 pages, MG2 19) | in game, 29 lines pixel-exact |
 | `en_brf` | briefing labels, quads, row arithmetic | in game, 26 shot pairs, 0.00% right-column diff |
-| `en_savemsg` | memory-card captions in the executable | in game 2026-09-04: save + load; kept slots idx 1/9 Japanese by rule; since 2026-09-05 the PPF owns every byte of the pool and tables, so the collection's six writes can no longer survive at retail-equal bytes |
+| `en_savemsg` | memory-card captions in the executable | in game 2026-09-04: save + load; kept slots idx 1/9 Japanese by rule. Since 2026-09-05 the PPF owns every byte of the pool and tables, so the collection's six writes cannot survive at retail-equal bytes (the mechanism that broke the SOCOM line) |
 | `en_camsave` | the PHOTO ALBUM's own captions (`camera` overlay) | **fully verified 2026-09-04**: all 23 English on screen / by slot comparison; the six USA-blank slots stay Japanese (`ロード中です`, `ロードが完了しました`, `変更内容を上書き保存しますか？` are those) |
-| `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built and deployed 2026-09-05, verified statically only**: pages re-parse and equal USA's byte for byte, the PPF records rebuild the relocated 88-sector stage exactly on both discs, the overlay carries USA's constants. Not yet seen on screen (§5.1). Its stage lives in DUMMY3M slots 462..549 |
+| `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built 2026-09-05 and seen on screen the same day**: both pages of the Heliport and Comm Tower A logs, the controls and the slide (the one fault, stale-VRAM fragments during the slide, fixed at 13:05 and confirmed clean at 13:50). Statically, pages re-parse and equal USA's byte for byte and the PPF records rebuild the relocated 88-sector stage exactly on both discs. Stage in DUMMY3M slots 462..549. Not yet seen: a demo.gcx page (disc-2 saves) and a count-7 page |
 | `en_menu3` | the `title` disc-swap copy | **disabled** — crashes the title stage; diagnosed, not rebuilt (§5.3). Its two PPFs sit in `mods\_disabled\` (the top level of the mods folder, not under INTEGRAL), where Ketchup does not read them |
 | unlock PPFs | title-screen extras | **parked**, `unlocks_parked\`, not deployed |
 
-**Reproducibility (2026-09-04, late; nine families since 2026-09-05, §10):** every one of the eight shipping families
-was rebuilt from retail inputs in an isolated directory by `rebuild.py` — stage
-files extracted from the collection, the four retail executables as hashed
-inputs, the decomp exported at `7964de7` plus `decomp-overlay-changes.patch`,
-both overlays recompiled (byte-identical to the shipped ones) — and all 16 PPFs
-matched the deployed set's effective changed bytes. So the deployed patches are
+**Reproducibility:** every one of the nine shipping families is rebuilt from
+retail inputs in an isolated directory by `rebuild.py` — stage files extracted
+from the collection, the four retail executables as hashed inputs, the decomp
+exported at `7964de7` plus `decomp-overlay-changes.patch`, three overlays
+recompiled (byte-identical to the shipped ones) — and all 18 PPFs match the
+deployed set's effective changed bytes (last run `repro7`, 2026-09-05 13:06,
+after the final fix). So the deployed patches are
 no longer artefacts of a lost scratchpad: they can be regenerated. `BUILDING.md`
 has the inputs, hashes, command, outputs and the ZIP's hash. This is static
 equivalence, not a new gameplay test.
@@ -118,8 +120,8 @@ equivalence, not a new gameplay test.
 | `[Game] UnlockBriefing` | `= false` | tested; seeds new-game `var_buf` |
 | `[Patches] BrightnessText` (tri-state `fixed` / `original` / `collection`) | `= fixed` | USA only; fixed and original verified on disc 1. Integral's paragraph is built into its PPF independently of this setting |
 | Ketchup built-in disc patches + `SetPatchRangeBlacklist` | — | shipping (the USA four-line brightness fix) |
-| `SQHook::SetPatchWatch` (logs collection patches landing in a region) | — | in use; watches on `option` and `abst` spans, both discs |
-| `Ketchup::Audit` (every byte of every RAM run, read-only, every ~5 s) | — | in use; first-byte blind spot of `Update()` documented as open |
+| `SQHook::SetPatchWatch` (logs collection patches landing in a region) | — | in use; watches on `option`, `abst`, `change`, `demosel`, `title` and `camera` spans, both discs (ASI rebuilt and deployed 2026-09-05 12:49) |
+| `Ketchup::Audit` (every byte of every RAM run, read-only, every ~5 s) | — | in use; it caught two of the three item faults on 2026-09-05. Since both exe PPFs own whole regions it now sees every byte of both pools |
 | `[Game] GiveItems` (test aid) | `GiveItems =` (empty) | built; **never exercised** — the developer menu grants everything anyway |
 | `[Game] StageSelect` = `true` / menu name / stage name | `StageSelect = false` | works; see README "The disc-swap text" for what it can and cannot reach |
 
@@ -131,28 +133,15 @@ equivalence, not a new gameplay test.
 
 ## 5. What remains — in the order I would do it
 
-### 5.1 See the item fixes and the MISSION LOG on screen (needs the user; nothing to build)
-**Items:** ~~SOCOM, ID Card, Mine Detector~~ **seen fixed 2026-09-05 12:55**
-(user's shots; audit silent). Other weapon descriptions still worth a glance.
-
-**Mission log:** both pages of two logs were seen right on 2026-09-05 12:54;
-the one fault, coloured fragments during the page slide (stale VRAM in the
-last 8 texels of each line, README "Two departures from USA's code"), was
-fixed and deployed at 13:05 and **confirmed clean by the user at 13:50**. The
-rest of this checklist stands for anything not yet looked at:
-`en_abst` was deployed 2026-09-05 after static verification only. Load any
-save (Heliport or Comm Twr A) and compare with the USA shots of 2026-09-04
-(`MGS1 USA/20260904233158_1.jpg`, `…233204_1.jpg`): the caption under READ
-MISSION LOG? is still Japanese (by rule, §6); page `1/2` with ► framed and
-seven English lines at USA's rows (ink tops game y 52, 74, 96, 118, 140, 162,
-184; x from 8); RIGHT moves the frame to EXIT; ○ on ► slides to `2/2` with ◄;
-SELECT hides the text; × leaves. README "The MISSION LOG port" has the full
-list and the measuring method. If anything is off, bisect first: move the two
-`en_abst` PPFs out of the mods folders and confirm the log is Japanese again.
-No debug shortcut exists: the collection's launcher needs a game chosen before
-anything loads, so even a `StageSelect = abst` smoke test needs a person at the
-controls (tried 2026-09-05 00:39: the process idled in the launcher and was
-stopped by PID; the ini was restored from `MGSM2Fix.ini.before_abst_smoke`).
+### 5.1 Still to be seen (needs the user; nothing to build)
+Everything built so far has been seen on screen except: a mission-log page from
+demo.gcx (a disc-2 save) and a count-7 page (USA's `1/2` with an empty second
+screen — reproduced on purpose, §5.9); the other weapon descriptions besides the
+SOCOM; and the disc-swap screens, which only 5.2 can reach. If anything looks
+wrong, bisect first: move the family's two PPFs out of the mods folders and
+confirm the retail text comes back. No debug shortcut exists for any of it —
+the collection's launcher waits for a game to be chosen before anything loads
+(a `StageSelect = abst` smoke test idled there on 2026-09-05 00:39).
 
 ### 5.2 The disc-2 run (needs the user at the controller; nothing to build)
 Load the **Comm Twr A** save (no debug) and play through the actual story disc
@@ -166,14 +155,14 @@ raw-disc release. **The developer menu cannot do this** — disc 2 is set only b
 2, glance at SCREEN / KEY CONFIG (byte-identical to disc 1) and load a disc-2
 save to see a mission-log page from demo.gcx and a count-7 page.
 
-This is also the **first run since achievements were re-enabled** (the last
-log, 2026-09-04 19:15, ran with both Disable flags true), so it is the first
-session that can show the patch watches — now on `option`, `abst`, `change`,
-`demosel`, `title` and `camera` for both discs — the `_PS5` question and the
-save-message audit. Read the `WATCH` lines afterwards: the collection patches
-all four disc-swap text copies with named files that begin two bytes before
-`en_menu2`'s records (README "Where the collection's own disc patches land");
-the lines show what it writes and whether the port's bytes are overlapped.
+Read the log afterwards for `Disk ID is 1`, any `WATCH` line on disc 2's
+spans, and any audit line. The collection patches all four disc-swap text
+copies with named files that begin two bytes before `en_menu2`'s `change` and
+`demosel` records (README "Where the collection's own disc patches land"); the
+watches proved on 2026-09-05 that those patches register on Windows but carry
+no inline data, so only the swap screens themselves show whose bytes win. If
+the game's own prompt draws in English, ours won; if it draws something else,
+note exactly what.
 
 ### 5.3 Rebuild `en_menu3` (the `title` copy)
 README "Why `en_menu3` crashes" and "How to test it": shorten the STRING length
@@ -217,12 +206,10 @@ covers title 981 (USA) only.
 
 ### 5.7 Still untested, low effort when the moment comes
 - **The patch watch is blind while `DisableCDROM = true`**: the early return
-  in `sqhook.cpp` precedes the watch loop. The 2026-09-04 19:15 log's
-  `filtering CD-ROM patch file disc1_132F2716_patch` line is that filter, not
-  evidence about `_PS5`. One hint: the loader checked the `_PS5.bin` path and
-  the patch table names the un-suffixed file. The next achievements-live run
-  answers it — and after the `en_abst` relocation that patch is orphaned
-  anyway (README "The MISSION LOG port").
+  in `sqhook.cpp` precedes the watch loop. Answered 2026-09-05 12:57 with the
+  flags live: the `_PS5`-suffixed `abst` patch does register on Windows (and is
+  orphaned by the `en_abst` relocation); named-file patches carry no inline
+  data, so their content stays unknown to the watch.
 - `PreserveConfiguration` catching a real stale write (intermittent race).
 - `GiveItems` in a stage where the inventory is actually empty (a real save,
   not the developer menu).
@@ -259,8 +246,6 @@ Texture lettering and runtime language branches are outside both tools.
 
 - The caption under READ MISSION LOG? (kept Japanese by rule; one constant
   blanks it) and USA's `1/2` on single-screen pages (reproduced) — §5.9.
-- Whether `en_abst` stays deployed if the on-screen check (5.1) finds a fault:
-  bisect by moving its two PPFs out of the mods folders.
 - Anything under the 2026-09-03 amendment: moving English text to fit
   Integral's own art.
 - The `en_savemsg` collision approach, if one is ever observed.
@@ -366,46 +351,48 @@ None of this closed the gameplay items, the disc-text family, the raw-disc
 variant, VR or the census. It made them buildable and checkable when they are
 done — which the Mission Log then was (§10).
 
-## 10. The 2026-09-05 pass: the MISSION LOG
+## 10. The 2026-09-05 pass: the MISSION LOG, then three item faults
 
 The user's go-ahead came with the USA screenshots ("the English one takes 2
 screens") and "I want everything ported over perfectly when I return. Don't
-forget to use the decomp files for reference where it helps." Done in one
-night, from data to deployment:
+forget to use the decomp files for reference where it helps." In order:
 
-- **Data**: `abst_build.py` rewrites the two GCX scripts (scenerio.gcx and
-  demo.gcx — the cache section's tag sizes are offsets, and the 42 `d`-PROCID
-  pages are demo.gcx's) with USA's counts and line records verbatim, keeps
-  Integral's record 0 (the caption) and both fonts, and re-stamps every
-  container. The disc-change abstract gets USA's eight strings. +13,804 bytes.
-- **Code**: `abst.c` grown to USA's model (128×20 KCBs in two VRAM columns,
-  the 15-entry line table, the counter, the cursor frame, the slide, USA's
-  input model), read from USA's overlay instruction by instruction; one guard
-  added against colouring KCBs a count-7 page never allocates. Decomp commit
-  `042531c`, in `decomp-overlay-changes.patch`.
-- **Art**: USA's three bottom-bar textures in the footprint of Integral's two;
-  every other texture and palette stays Integral's.
-- **Packaging**: 88 sectors, DUMMY3M 462..549, both discs, 760 records each;
-  `rebuild.py` builds nine families and three overlays. `ppfcheck --deployed`
-  clean on 20 files.
-- **Verified statically** (README "The MISSION LOG port" lists it); **not yet
-  on screen** — that is §5.1, the first thing to do. An unattended smoke test
-  was tried and cannot work: the collection's launcher waits for a game choice.
-- **Morning of 2026-09-05:** the user's shots showed the mission log right and
-  the item fixes right; the page slide showed coloured fragments (stale VRAM in
-  texels 504..511 of each line, reached by USA's 256-wide second sprite) —
-  fixed by drawing 248 px. The new watches showed the collection's `camera` and
-  `title` offset patches are its STORAGE rename strings, and that its named
-  patches to all four disc-swap blocks register with no inline data (README
-  "Where the collection's own disc patches land").
-- **Item text, later the same night:** the user's first shots showed two glitches
-  in `en_items`; three faults fixed (README "Three item-text faults"): the card
-  level digit offset (code, 46 → 45), the SOCOM suppressor rewrite into the
-  Mine Detector text (code, six stores NOPed) and a retail-equal byte the
-  collection's RAM patch owned (both exe PPFs now write every byte of their
-  regions). Static until seen — §5.1.
-- Doc corrections found the same night and folded in: the `_disabled` path,
-  the PatchWatch-blind-under-DisableCDROM note, the upstream re-port sizing,
-  eight stale README passages (verify_shipped.py, scratchpad tools, the
-  optbright build paragraph, `discs/`, the pinned chain input, the What ships
-  row, the mission-log cross-reference, the ini snapshot path).
+- **Night — the port.** `abst_build.py` rewrites the two GCX scripts
+  (scenerio.gcx and demo.gcx — the cache section's tag sizes are offsets, and
+  the 42 `d`-PROCID pages are demo.gcx's) with USA's counts and line records
+  verbatim, keeps Integral's record 0 (the caption) and both fonts, and
+  re-stamps every container; the disc-change abstract gets USA's eight strings
+  (+13,804 bytes). `abst.c` grown to USA's model (128×20 KCBs in two VRAM
+  columns, the 15-entry line table, the counter, the cursor frame, the slide,
+  USA's input model), read from USA's overlay instruction by instruction, with
+  one guard against colouring KCBs a count-7 page never allocates. USA's three
+  bottom-bar textures in the footprint of Integral's two; every other texture
+  and palette stays Integral's. 88 sectors, DUMMY3M 462..549, both discs.
+  `rebuild.py` builds nine families and three overlays. An unattended smoke
+  test was tried and cannot work: the collection's launcher waits for a game.
+- **Night — three item faults**, found from the user's first shots after the
+  deployment and pinned down by Ketchup's audit lines (README "Three item-text
+  faults"): the card level digit offset (code, 46 → 45), the SOCOM suppressor
+  rewrite into the Mine Detector text (code, six stores NOPed), and a
+  retail-equal byte the collection's RAM patch owned (both exe PPFs now write
+  every byte of their regions; `Applied … RAM patches` reads 3,755).
+- **Night — the collection's disc-patch map** (README "Where the collection's
+  own disc patches land"): it patches all four disc-swap text copies with named
+  files two bytes before `en_menu2`'s `change`/`demosel` records; watches added
+  for `change`, `demosel`, `title`, `camera` on both discs. The ASI build hung
+  overnight (six idle `cl.exe`, stopped by PID); rebuilt and deployed 12:49.
+- **Morning — on screen.** The user's shots: both mission-log pages of two
+  logs right; the item fixes right; the page slide showed coloured fragments
+  (stale VRAM in texels 504..511 of each line — the KCB buffer is 504 px wide
+  and USA's second sprite 256 — fixed by drawing 248 px, decomp `26d27f1`,
+  deployed 13:05, **confirmed clean 13:50**). The watches showed the
+  collection's `camera` and `title` offset patches are its STORAGE rename
+  strings and that its named disc-swap patches register with no inline data.
+- **Clean run `repro7`** (13:06) reproduces all 18 deployed PPFs after every
+  fix; `ppfcheck --deployed` clean on 20 files.
+- Doc corrections found on the way and folded in: the `_disabled` path, the
+  PatchWatch-blind-under-DisableCDROM note, the upstream re-port sizing, eight
+  stale README passages (verify_shipped.py, scratchpad tools, the optbright
+  build paragraph, `discs/`, the pinned chain input, the What ships row, the
+  mission-log cross-reference, the ini snapshot path), and the "items proven
+  intact" conclusion, which held only for bytes a record named.
