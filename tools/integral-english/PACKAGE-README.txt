@@ -15,8 +15,8 @@ variant. Do not apply this package to an original PlayStation disc.
 
 Known unfinished work: the title screen's disc-swap copy (en_menu3) and the VR
 disc. Disc 2's patches pass static verification but still need a normal-gameplay
-disc transition test, and the Mission Log (en_abst, 2026-09-05) has been verified
-statically only until it is seen on screen. Some Japanese is retained because USA provides no English
+disc transition test. The Mission Log (en_abst) and the item-text fixes of
+2026-09-05 were verified on screen the same day. Some Japanese is retained because USA provides no English
 counterpart; no new translation has been made. Existing USA spelling is kept.
 
 Uninstall: remove the nine INTEGRAL_discN_en_*.ppf files from each folder.
