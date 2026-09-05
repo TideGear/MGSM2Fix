@@ -13,6 +13,9 @@ The overlay's load address is not in its header; it is derived as the base that
 gives every `key_*` string an adjacent lui+addiu reference, which is only true
 of the right one (all sixteen must resolve).
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import sys, struct, re, json
 sys.path.insert(0, 'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 from optscan import stage, parse, strcode
@@ -95,7 +98,7 @@ def extract(sd):
 
 if __name__ == '__main__':
     res = {}
-    for sd, label in (('work/usa1_stage.dir', 'USA'), ('work/int1_stage.dir', 'INTEGRAL')):
+    for sd, label in ((WORK + '/usa1_stage.dir', 'USA'), (WORK + '/int1_stage.dir', 'INTEGRAL')):
         base, tex, q = extract(sd)
         print('== %s  overlay base 0x%08X' % (label, base))
         print('   %-12s %-9s %-26s %s' % ('texture', 'size', 'quad (x0,y0,x1,y1)', 'abe,or'))
@@ -109,5 +112,5 @@ if __name__ == '__main__':
                      '%s,%s' % (a[4], a[5]), '' if good else '<-- quad != texture'))
         print('   %d/8 quads equal their texture size' % ok)
         res[label] = {'base': base, 'tex': tex, 'quads': q}
-    json.dump(res, open('work/keyconfig_quads.json', 'w'), indent=1)
+    json.dump(res, open(WORK + '/keyconfig_quads.json', 'w'), indent=1)
     print('\nwrote work/keyconfig_quads.json')

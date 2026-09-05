@@ -6,6 +6,9 @@ POLY_FT4: x0 at +8, y0 +10, x1 +16, y1 +18, x2 +24, y2 +26, x3 +32, y3 +34,
 40 bytes per poly. Registers are simulated so `sh rt, off(rs)` can be attributed
 to a poly index via the base register's offset from work->field_674.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import sys, struct
 sys.path.insert(0, 'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 from optscan import stage
@@ -37,8 +40,8 @@ def rects(sd, lo, hi):
     return out
 
 if __name__ == '__main__':
-    for sd, label, lo, hi in (('work/int1_stage.dir', 'INTEGRAL', 0x1200, 0x1900),
-                              ('work/usa1_stage.dir', 'USA', 0x1200, 0x1900)):
+    for sd, label, lo, hi in ((WORK + '/int1_stage.dir', 'INTEGRAL', 0x1200, 0x1900),
+                              (WORK + '/usa1_stage.dir', 'USA', 0x1200, 0x1900)):
         print('== %s' % label)
         cur = {}
         for off, basev, fieldoff, val in rects(sd, lo, hi):

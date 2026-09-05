@@ -4,6 +4,9 @@ Takes the 426 bytes out of the SHIPPED binary, puts them at the offset the
 shipped table names, over the collection's OWN unpatched data, and decodes the
 texture that results. Nothing here trusts the build tools' intent.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import re, struct, sys, io
 sys.path.insert(0, r'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 import pcx4
@@ -12,8 +15,8 @@ from optsctext import ents, dar_entries, pad, SC_TEXT
 ASI = (r'C:/Users/Tideg/AppData/Roaming/Vortex/metalgearsolidmc/'
        r'mods/MGSM2Fix-5-3-6-0-1774482213/MGSM2Fix64.asi')
 HDR, SIZE, PAY_OFF = 24, 5852, 0x1064
-DISCS = [(1, 'work/usa1_stage.dir', 132344, 0x165A4790, 0xF12F8000),
-         (2, 'work/usa2_stage.dir', 100801, 0x11EE3E40, None)]
+DISCS = [(1, WORK + '/usa1_stage.dir', 132344, 0x165A4790, 0xF12F8000),
+         (2, WORK + '/usa2_stage.dir', 100801, 0x11EE3E40, None)]
 
 # --- the patch bytes, and the offsets, straight out of the header the build used
 hdr = io.open(r'C:/Users/Tideg/My Drive/Development/MGSM2Fix/src/mgs1.h',
@@ -81,7 +84,7 @@ for no, path, lba, off_expect, alldata_base in DISCS:
     prof = [sum(1 for x in range(2, 227) if rows[y][x] not in (12, 0, 11, 5)) for y in range(h)]
     starts = [y for y in range(h) if prof[y] and (y == 0 or not prof[y - 1])]
     bar = (rows[0].count(0), rows[1].count(0))
-    orig = pcx4.decode(open('work/usa_sc_text.pcx', 'rb').read())[3]
+    orig = pcx4.decode(open(WORK + '/usa_sc_text.pcx', 'rb').read())[3]
     assert (w, h) == (232, 70), (w, h)
     assert starts == [0, 12, 24, 38], starts
     assert min(bar) > 150, bar

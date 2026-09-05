@@ -9,6 +9,9 @@ candidate - and because the slot matches, the pairing is exact.
 Guards, both learned the hard way: a target must look like text, not code (a
 MIPS prologue reads as high bytes), and must terminate.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import sys, struct
 sys.path.insert(0, 'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 from optscan import ents, stage
@@ -42,13 +45,13 @@ def targets(ov, base, ok):
     return out
 
 def sweep():
-    di = dict(ents(open('work/int1_stage.dir', 'rb').read()))
-    du = dict(ents(open('work/usa1_stage.dir', 'rb').read()))
+    di = dict(ents(open(WORK + '/int1_stage.dir', 'rb').read()))
+    du = dict(ents(open(WORK + '/usa1_stage.dir', 'rb').read()))
     hits = []
     for name in sorted(set(di) & set(du)):
         try:
-            _c, ti, Fi, pi = stage('work/int1_stage.dir', name)
-            _c, tu, Fu, pu = stage('work/usa1_stage.dir', name)
+            _c, ti, Fi, pi = stage(WORK + '/int1_stage.dir', name)
+            _c, tu, Fu, pu = stage(WORK + '/usa1_stage.dir', name)
         except Exception:
             continue
         for k in Fi:

@@ -39,10 +39,13 @@ executable bytes for this module.
 
 usage: savemsg.py [--deploy]     (writes work/ always; PPFs to mods with --deploy)
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import os, struct, sys
 
 TADDR, HDR = 0x80010000, 0x800
-US_EXE, IN_EXE = 'work/us1.exe', 'work/int1.exe'
+US_EXE, IN_EXE = WORK + '/us1.exe', WORK + '/int1.exe'
 IN_SAVE_TAB, IN_LOAD_TAB = 0x8009EB4C, 0x8009EB7C
 IN_POOL = (0x80011F18, 0x800120CB)          # 17 Japanese strings, NUL-terminated, contiguous
 N = 12
@@ -158,8 +161,8 @@ def main():
     for k in diffs:
         if runs and k == runs[-1][1]: runs[-1][1] = k + 1
         else: runs.append([k, k + 1])
-    os.makedirs('work', exist_ok=True)
-    open('work/int1_savemsg.exe', 'wb').write(chk)
+    os.makedirs(WORK, exist_ok=True)
+    open(WORK + '/int1_savemsg.exe', 'wb').write(chk)
     # A run may cross a 2048-byte payload boundary; the image has 304 bytes of
     # sector tail there, and Ketchup drops any byte whose in-sector position is
     # >= 2048, so every record must stay inside one sector's payload.
@@ -176,7 +179,7 @@ def main():
             k = off - base
             assert k % SECTOR_RAW + len(data) <= SECTOR_DATA, 'record crosses a sector tail'
         blob = ppf3(recs, 'MGS Integral: English memory card messages')
-        p = 'work/%s' % NAMES[disc]; open(p, 'wb').write(blob)
+        p = WORK + '/%s' % NAMES[disc]; open(p, 'wb').write(blob)
         print('disc %d: %d runs -> %d records, %d bytes -> %s' % (disc + 1, len(runs), len(recs), sum(len(d) for _, d in recs), p))
         if deploy:
             d = os.path.join(MODS, str(disc), NAMES[disc]); open(d, 'wb').write(blob); print('   deployed %s' % d)

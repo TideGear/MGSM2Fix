@@ -11,6 +11,9 @@ several labels share one - the compiler keeps 122 in s4 across two call sites.
 A shared immediate is sized to the largest member of its group; the smaller
 members are simply padded out, so they still render at their own true width.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import struct, json, sys
 sys.path.insert(0, '.')
 import pcx4
@@ -25,15 +28,15 @@ from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BAS
                        S01_ADDR, S01_OLD, S01_NEW, CONNECTOR_END,
                        RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX, ANIM_X)
 
-si, ti, Fi, pi = stage('work/int1_stage.dir')
-su, tu, Fu, pu = stage('work/us1_stage.dir')
+si, ti, Fi, pi = stage(WORK + '/int1_stage.dir')
+su, tu, Fu, pu = stage(WORK + '/us1_stage.dir')
 ni = [k for k, t in enumerate(ti) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 nu = [k for k, t in enumerate(tu) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])
 U = {e[0]: e[3] for e in eu}
-target = {int(k, 16): tuple(v) for k, v in json.load(open('work/brf_target.json')).items()}
-place  = {int(k, 16): tuple(v) for k, v in json.load(open('work/brf_widen.json')).items()}
-newimm = {int(k, 16): v for k, v in json.load(open('work/brf_imm.json')).items()}
+target = {int(k, 16): tuple(v) for k, v in json.load(open(WORK + '/brf_target.json')).items()}
+place  = {int(k, 16): tuple(v) for k, v in json.load(open(WORK + '/brf_widen.json')).items()}
+newimm = {int(k, 16): v for k, v in json.load(open(WORK + '/brf_imm.json')).items()}
 LAB = set(range(0x1D82, 0x1D8C)) | set(range(0x1DA2, 0x1DA8)) | {0xE981, 0xE982, 0xE983, 0xE984}
 
 # ---- overlay: patch the quad immediates -------------------------------------
@@ -245,4 +248,4 @@ print('\nlabel textures:')
 for tid, uw, uh, cw, ch, how in sorted(report):
     print('   %04X  USA %3dx%-3d -> canvas %3dx%-3d  %s' % (tid, uw, uh, cw, ch, how))
 print('\nverified: every quad equals its texture, no page crossings, no overlaps; %d sectors' % nsect)
-open('work/brf_en.bin', 'wb').write(bytes(out))
+open(WORK + '/brf_en.bin', 'wb').write(bytes(out))

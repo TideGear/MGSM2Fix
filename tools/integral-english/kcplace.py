@@ -9,6 +9,9 @@ USA texture is placed largest-first. Constraints, per the sc_text work:
   * the display area and every other texture must not be touched
 CLUTs are 16 entries -> 16 words on one row, at a 16-word-aligned x.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import sys
 sys.path.insert(0, 'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 from optscan import stage, parse, geo, strcode
@@ -95,7 +98,7 @@ def clut_slot(occ, clut, nc):
 PAD_TO = {}          # not needed: every rectangle now equals its art (USA's own)
 
 def allocate():
-    I = inventory('work/int1_stage.dir'); U = inventory('work/usa1_stage.dir')
+    I = inventory(WORK + '/int1_stage.dir'); U = inventory(WORK + '/usa1_stage.dir')
     ug = {n: dict(g) for _t, n, g, _b in U if n}
     for n, w in PAD_TO.items(): ug[n]['w'] = w
     ig = {n: g for _t, n, g, _b in I if n}

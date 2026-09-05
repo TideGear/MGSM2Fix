@@ -8,6 +8,9 @@ option chain (records 13-16 plus 24).  Run as a script it diffs the two option
 DARs, which is how sc_text turned up - it is the only large texture USA has and
 Integral does not.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import struct, sys
 
 def pad(x, a=2048): return (x + a - 1) // a * a
@@ -92,7 +95,7 @@ if __name__ == '__main__':
     import sys
     stg = sys.argv[1] if len(sys.argv) > 1 else 'option'
     D = {}
-    for path, tag in (('work/us1_stage.dir', 'USA'), ('work/int1_stage.dir', 'INTEGRAL')):
+    for path, tag in ((WORK + '/us1_stage.dir', 'USA'), (WORK + '/int1_stage.dir', 'INTEGRAL')):
         D[tag] = dar(path, stg)
         print('=== %s %s: %d PCX entries' % (tag, stg, len(D[tag])))
         for name, k, j, x in find(path, stg):

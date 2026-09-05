@@ -39,17 +39,21 @@ recaps in the chain hit a size threshold that has never been explained.
 
 usage: preope_usa.py            (reads work/, writes work/ and the two PPFs)
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import struct, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from gclparse import parse_script, containers_over, be16, be32
 
-BASE_STAGE = 'work/preope_en.bin'          # last known-good stage, same layout
-USA        = 'work/usa1_stage.dir'         # the real USA PSX stage file
+BASE_STAGE = WORK + '/preope_en.bin'          # last known-good stage, same layout
+USA        = WORK + '/usa1_stage.dir'         # the real USA PSX stage file
 OVL        = 'D:/mgsbuild/d/obj/preope.bin'
-OUT        = 'work/preope_usa.bin'
+OUT        = WORK + '/preope_usa.bin'
 JP         = 'D:/Steam/SteamApps/common/MGS1/windata/dlc/dlc_japan.bin'
 MODS       = 'D:/Steam/SteamApps/common/MGS1/mods/INTEGRAL/INTEGRAL'
 DESC       = b'MGS Integral: English Previous Operations'
+assert len(DESC) <= 50, 'PPF3 description field is 50 bytes; ljust does NOT truncate'
 
 # Integral discs inside dlc_japan.bin, read from their own ISO filesystems.
 # The STAGE.DIR LBAs independently match the ones solved from the deployed
@@ -226,7 +230,7 @@ def emit(stage):
     standalone .bin, since no disc image is on disk. PPF offsets are relative to
     each disc image's own start, so the container base is subtracted.
     """
-    sd_file = open('work/int1_stage.dir', 'rb').read()
+    sd_file = open(WORK + '/int1_stage.dir', 'rb').read()
     entp = [p for n, _s, p in ents(sd_file) if n == 'preope'][0]
     old_sector = struct.unpack('<I', sd_file[entp+8:entp+12])[0]
     need = len(stage) // 2048

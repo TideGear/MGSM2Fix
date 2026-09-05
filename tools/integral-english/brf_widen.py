@@ -8,6 +8,9 @@ Two edits that must land together:
 VRAM units are ceil(w * bpp / 16); the archive mixes 4bpp and 8bpp textures.
 A texture must also fit inside one 64-unit texture page.
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import struct, json, sys
 sys.path.insert(0, '.')
 
@@ -72,13 +75,13 @@ def strcode(s):
     for ch in s.encode(): i = (((i << 5) | (i >> 11)) & 0xFFFF); i = (i + ch) & 0xFFFF
     return i
 
-si, ti, Fi, pi = stage('work/int1_stage.dir')
-su, tu, Fu, pu = stage('work/us1_stage.dir')
+si, ti, Fi, pi = stage(WORK + '/int1_stage.dir')
+su, tu, Fu, pu = stage(WORK + '/us1_stage.dir')
 ni = [k for k, t in enumerate(ti) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 nu = [k for k, t in enumerate(tu) if chr(t[1]) + chr(t[2]) == 'nd'][0]
 ei, taili = parse(pi[ni]); eu, _ = parse(pu[nu])
 U = {e[0]: e[3] for e in eu}
-quads = json.load(open('work/brf_quads_all.json'))
+quads = json.load(open(WORK + '/brf_quads_all.json'))
 
 # Horizontal: move the whole submenu group to USA's absolute position.
 #
@@ -553,8 +556,8 @@ for n in ALL:
         w = geo(U[t])['w'] if n == 'br_s00' else g['w']
         target[t] = (w, 17 if n.startswith('br_f') else geo(U[t])['h'])
 assert len(target) == 20, 'expected all 20 labels, got %d' % len(target)
-json.dump({hex(k): list(v) for k, v in target.items()}, open('work/brf_target.json', 'w'))
-json.dump({hex(k): v for k, v in newimm.items()}, open('work/brf_imm.json', 'w'))
+json.dump({hex(k): list(v) for k, v in target.items()}, open(WORK + '/brf_target.json', 'w'))
+json.dump({hex(k): v for k, v in newimm.items()}, open(WORK + '/brf_imm.json', 'w'))
 
 # ---- VRAM occupancy from everything that is NOT being widened ---------------
 grid = bytearray(1024 * 512)
@@ -605,5 +608,5 @@ for tid in sorted(place, key=lambda t: WIDEN[t]):
           else 'SCALE to fit')
     print('  %-8s %-9s (%3d,%3d)     %3dx%-3d    %3dx%-3d    %s'
           % (WIDEN[tid], tag, place[tid][0], place[tid][1], tw, th, ug['w'], ug['h'], fit))
-json.dump({hex(k): list(v) for k, v in place.items()}, open('work/brf_widen.json', 'w'))
+json.dump({hex(k): list(v) for k, v in place.items()}, open(WORK + '/brf_widen.json', 'w'))
 print('placed %d widened labels' % len(place))

@@ -83,13 +83,16 @@ WHAT THIS TOUCHES
 
 usage: optsctext.py [--deploy]      (writes work/ always; PPFs only with --deploy)
 """
+import os as _os, sys as _sys
+_sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+from workdir import WORK
 import struct, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-RETAIL   = 'work/int1_stage.dir'
+RETAIL   = WORK + '/int1_stage.dir'
 OVL      = 'D:/mgsbuild/d/obj/option.bin'
-USA      = 'work/usa1_stage.dir'
-OUT      = 'work/option_sctext_stage.bin'
+USA      = WORK + '/usa1_stage.dir'
+OUT      = WORK + '/option_sctext_stage.bin'
 JP       = 'D:/Steam/SteamApps/common/MGS1/windata/dlc/dlc_japan.bin'
 MODS     = 'D:/Steam/SteamApps/common/MGS1/mods/INTEGRAL/INTEGRAL'
 DESC     = b'MGS Integral: option screen text'
@@ -115,7 +118,7 @@ OPTION_ENTRY_FO = 744    # STAGE.DIR file offset of the `option` entry's u32 sec
 # composite() following the relocated pointer out of the file - and skipping it
 # silently reverts every one of those records to retail Japanese (shipped once,
 # 2026-09-02: 'use directional buttons to test' came back as Japanese).
-CHAIN_PPF = 'work/fonttext_disc%d_option.ppf'
+CHAIN_PPF = WORK + '/fonttext_disc%d_option.ppf'
 EXPECT_CHAIN = {3: b' \x00', 7: b'\x80:\x00',
                 4: b'screen brightness setup\x00', 5: b'key configuration setup\x00',
                 12: b'use directional buttons to test\x00', 26: b'use directional buttons to test\x00',
@@ -586,7 +589,7 @@ def emit(stage, deploy):
             p = os.path.join(MODS, str(disc), D['ppf'])
             open(p, 'wb').write(bytes(out)); print('   -> %s' % p)
         else:
-            p = 'work/option_sctext_disc%d.ppf' % (disc + 1)
+            p = WORK + '/option_sctext_disc%d.ppf' % (disc + 1)
             open(p, 'wb').write(bytes(out)); print('   -> %s  (staged, NOT deployed)' % p)
 
 
