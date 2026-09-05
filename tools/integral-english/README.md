@@ -834,6 +834,13 @@ slots where Integral's Japanese is kept.
 
 ## Sweep: is any UI text still Japanese? (`jpsweep.py`, 2026-09-03)
 
+**Result withdrawn 2026-09-04.** The sweep pairs *overlay pointer words*, so it
+sees only strings the overlay addresses directly. GCL script text — read via
+`GCL_GetString` from a command's string list — is invisible to it, and that is
+where the MISSION LOG's Japanese lives (see "Not yet ported: the MISSION LOG").
+Treat the section below as "no overlay-pointed Japanese remains", not "no
+Japanese remains".
+
 The photo album's messages were found by accident, from a screenshot, which
 raised the obvious question: what else is hiding in an overlay? `jpsweep.py`
 answers it with the same trick that made that port small. Overlays load at a
@@ -862,6 +869,41 @@ Blind spots, stated so the result is not over-read: strings reached by
 single word with no space, text in the GCL scripts rather than the overlays
 (which is where the ported menus live, and those are handled), and anything on
 disc 2 or the VR disc.
+
+## Not yet ported: the MISSION LOG (`abst` stage) — found 2026-09-04
+
+Loading a save shows `READ MISSION LOG? YES / NO` and then a full page of
+story-so-far text, which in Integral is **entirely Japanese** (with furigana);
+USA has it in English. It was missed for a specific reason: `jpsweep.py` finds
+text by **pointer words in the overlay**, and the mission log's lines are GCL
+script strings — `ab_ch.c:673` reads them with `GCL_GetString(GCL_NextStr())`
+from the command's string list — which nothing in the overlay points at. So the
+sweep's "disc 1 swept clean" (below) is **withdrawn**: it covered only
+overlay-pointed strings, and every chain/script text — the option chain,
+preope, this — is outside its reach. The sweep needs a second pass that walks
+each stage's script chunk.
+
+What is known so far, for the port:
+
+- USA `abst`: 76 sectors, script tag `c?` 79,116 bytes; `Alaska` ×2,
+  `Shadow Moses`, `DARPA` ×16 present as ASCII in the stage, ~56 KB of ASCII
+  runs. Integral `abst`: 80 sectors, `c?` 90,796 bytes, **zero** Shift-JIS and
+  no ASCII text — its Japanese is game-encoded (`0x80xx`-style), like the
+  title's disc messages.
+- `ab_ch.c` draws **eight lines** per page (`KCB kcb[8]`, pitch 21 px, all
+  centred at x 160 via `D_800C3750`) into a KCB of **`rect.w = 64`** words — the
+  same font path and the same `u8 max_width` / 256-texel limits that forced the
+  option help lines to be widened. USA's lines are long; USA's `abst` overlay is
+  50,811 bytes against Integral's 47,071, so its `ab_ch.c` may size the KCB
+  differently. Check USA's constant before assuming the lines fit.
+- The variant (which page of text) is chosen by the script per save point;
+  `DARPA` ×16 in USA suggests on the order of 16+ variants. The port is
+  therefore preope-shaped: many strings inside script containers, English
+  shorter than Japanese, so the STRING length bytes and every enclosing
+  container shrink (`gclparse.containers_over`, per record).
+- The `READ MISSION LOG?` box is a shared texture; the Japanese caption under
+  it (`作戦記録を参照しますか？`) is an Integral help line whose USA counterpart
+  is still to be checked.
 
 ## What stays Japanese, and why (consolidated 2026-09-03)
 
@@ -1475,9 +1517,22 @@ standing and is itself unattributed.
   screen, four lines, correctly placed; down → EXIT highlights and confirms out
   of the menu; confirm → KEY CONFIG hands off to the collection's panel. The
   doorbell fires only where it should.
-- **The save side of the memory-card messages.** Only LOAD has been shot. The
-  save flow (a Mei Ling call) would exercise the "no empty block", "failed" and
-  "now checking" captions, and slot 1's kept Japanese line after a success.
+- ~~The save side of the memory-card messages~~ **Done 2026-09-04**, new game →
+  Mei Ling → save, then LOAD DATA with the file present. `セーブ中です` /
+  `セーブが完了しました` and `ロード中です` / `ロードが完了しました` showed — the
+  kept indices 9 and 1 of each table, where USA draws nothing — and nothing
+  else Japanese or garbled. The collection's STORAGE rename was visibly active
+  (`SELECT STORAGE`, `STORAGE 1 / 2`, `NEW FILE [ NEED 1 BLOCK ]`), so its RAM
+  family was applied during the run.
+- ~~`en_savemsg` with achievements live~~ **No collision observed, 2026-09-04.**
+  `Ketchup::Audit` ran every ~5 s across the whole save-and-load session above
+  with the rename active and logged nothing. The one `pass 2` in the log is
+  Ketchup itself: the reset back to the title re-initialised the machine
+  (`__SN_ENTRY_POINT`, `InitHeap`, new `[PSX] Machine` addresses), the emulator
+  discarded the memory Ketchup had just patched on setup, and Ketchup
+  re-applied 0.6 s later — the deferred-RAM case it exists for. Residual caveat:
+  a mid-run write followed within 30 frames by an unrelated re-apply would be
+  invisible to both checks; nothing suggests that happens.
 - **Whether `en_menu3`'s text is reachable in the collection at all.** The
   collection swaps discs by itself, so the title stage may never reach a "wrong
   disc" prompt. Cheap to check, and it decides whether `en_menu3` is a visible
