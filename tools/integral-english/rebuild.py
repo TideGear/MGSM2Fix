@@ -1,5 +1,9 @@
 """Clean collection-patch build and local packaging; never writes to the game.
 
+Nine families: the eight of 2026-09-04 plus en_abst (the MISSION LOG, added
+2026-09-05), whose overlay abst.bin is compiled alongside option.bin and
+preope.bin.
+
 Usage: py rebuild.py --output D:/mgsbuild/repro1 [--compare-deployed]
 Requires the local decomp Git repository, PSYQ SDK, and installed collection.
 The output directory must not exist. It retains inputs, logs and build hashes.
@@ -18,7 +22,7 @@ from portio import (INTEGRAL_IMAGES, USA_IMAGES, stage, relocation, sha256,
                     read_ppf)
 
 TOOLS = Path(__file__).resolve().parent
-FAMILIES = ('items', 'menu', 'menu2', 'preope', 'brf', 'option', 'savemsg', 'camsave')
+FAMILIES = ('items', 'menu', 'menu2', 'preope', 'brf', 'option', 'savemsg', 'camsave', 'abst')
 BASE = '7964de7'
 EXE_HASHES = {
     'int1.exe': '4b8252b65953a02021486406cfcdca1c7670d1d1a8f3cf6e750ef6e360dc3a2f',
@@ -127,20 +131,20 @@ def main():
     run(['git','apply','--check',patch],decomp,env,log)
     run(['git','apply',patch],decomp,env,log)
     # Exported build.py normally builds/compares the entire matching game.
-    # Stop after generation so only the two changed overlays are compiled.
+    # Stop after generation so only the three changed overlays are compiled.
     generator = decomp/'build/build.py'
     text = generator.read_text(encoding='utf-8')
     marker = 'time_before = time.time()'
     assert text.count(marker) == 1
     generator.write_text(text.split(marker)[0]+'sys.exit(0)\n',encoding='utf-8')
     run([sys.executable,'build.py','--psyq_path',psyq,'--variant','main_exe'],decomp/'build',env,log)
-    run([sys.executable,'-m','ninja','-j','2','../obj/preope.bin','../obj/option.bin'],decomp/'build',env,log)
-    report['overlays'] = {n:sha256((decomp/'obj'/(n+'.bin')).read_bytes()) for n in ('option','preope')}
+    run([sys.executable,'-m','ninja','-j','2','../obj/preope.bin','../obj/option.bin','../obj/abst.bin'],decomp/'build',env,log)
+    report['overlays'] = {n:sha256((decomp/'obj'/(n+'.bin')).read_bytes()) for n in ('option','preope','abst')}
     # Only source geometry is copied; all derived placements are regenerated.
     (work/'brf_quads_all.json').write_bytes((TOOLS/'brf_quads_all.json').read_bytes())
-    print('Building eight patch families...',flush=True)
+    print('Building nine patch families...',flush=True)
     for script in ('items.py','menu2.py','preope_usa.py','brf_build.py','optsctext.py',
-                   'savemsg.py','camsave.py'):
+                   'savemsg.py','camsave.py','abst_build.py'):
         run([sys.executable,TOOLS/script],TOOLS,env,log)
     dist = output/'package'
     mods = dist/'mods/INTEGRAL/INTEGRAL'
@@ -198,7 +202,7 @@ def main():
                 info = zipfile.ZipInfo(path.relative_to(dist).as_posix(),(2026,9,4,0,0,0))
                 info.compress_type = zipfile.ZIP_DEFLATED
                 archive.writestr(info,path.read_bytes())
-    print('Verified 16 PPFs; '+str(zip_path),flush=True)
+    print('Verified %d PPFs; %s' % (2*len(FAMILIES), zip_path),flush=True)
 
 
 if __name__ == '__main__':

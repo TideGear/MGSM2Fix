@@ -1,8 +1,9 @@
 # Text coverage evidence (2026-09-04)
 
-The current patch is not a complete English port. Mission Log (`abst`), the
-title's disc-swap copy (`en_menu3`), the disc-change abstract (`ab_ch`, in
-`abst`) and VR remain open in [NextSteps.md](NextSteps.md).
+The current patch is not a complete English port. The title's disc-swap copy
+(`en_menu3`) and VR remain open in [NextSteps.md](NextSteps.md); the Mission
+Log and the disc-change abstract (both in `abst`) were ported on 2026-09-05
+(`en_abst`, verified statically, not yet on screen).
 The expanded scan closes the old tool's disc-1-only coverage gap for stage
 inventory; it does not establish that every visible string has been audited.
 

@@ -92,7 +92,10 @@ public:
             "Integral disc 1 option stage");
         SQHook<Squirk::Standard>::SetPatchWatch(0x128C92F8ull, 0x128F4408ull,
             "Integral disc 2 option stage");
-        // The MISSION LOG stage (`abst`, sectors 139..218 on both discs) is next
+        // The MISSION LOG stage (`abst`, sectors 139..218 on both discs) was
+        // ported on 2026-09-05 (en_abst) and relocated into DUMMY3M, so the
+        // collection's patch below now lands on a stage the game no longer
+        // reads. The watch stays to show what it wanted to write. It
         // to be relocated for the English port, and the collection offers one
         // patch inside it: disc1_132F2716_patch_PS5.bin, stage sector +51, in
         // the script chunk. Whether a _PS5 patch is applied on Windows at all,
