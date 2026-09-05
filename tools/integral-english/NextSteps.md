@@ -1,19 +1,21 @@
 # Next steps — MGS Integral English text port
 
-Written 2026-09-04 (evening) for whoever picks this up cold: a later session of
+Written 2026-09-04 (evening) and updated the same night after the
+reproducible-build pass (§9), for whoever picks this up cold: a later session of
 the same assistant, a different model, or a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
 remains and in what order, and which decisions are the user's to make. The
 technical record — byte formats, mechanisms, every gotcha with its evidence —
 is `README.md` beside this file; section names are quoted below so they can be
-found. `UPSTREAM.md` at the repo root tracks the MGSM2Fix changes that deserve
+found. [`BUILDING.md`](BUILDING.md) is the reproducible build and packaging
+procedure; [`COVERAGE.md`](COVERAGE.md) is the text-coverage inventory and its
+limits. `UPSTREAM.md` at the repo root tracks the MGSM2Fix changes that deserve
 their own upstream pull request.
 
 Everything that used to live only in the assistant's private memory files
 (`~/.claude/projects/.../memory/*.md`) was merged into these two documents on
-2026-09-04. Those files may still exist, but **`README.md` + `NextSteps.md`
-are authoritative**; if they disagree with a memory file, the memory file is
-stale.
+2026-09-04. Those files may still exist, but **these repo documents are
+authoritative**; if they disagree with a memory file, the memory file is stale.
 
 ---
 
@@ -24,7 +26,9 @@ stale.
 | MGSM2Fix repo | `C:\Users\Tideg\My Drive\Development\MGSM2Fix`, branch **`integral-english-text`** | based on MGSM2Fix **3.6.0**; upstream is now **3.7.2** — a rebase is needed before any upstream PR |
 | remotes | `origin` = `https://github.com/TideGear/MGSM2Fix.git` (push here); `upstream` = nuggslet's MGSM2Fix — **never push to upstream** | |
 | decompilation | `D:\mgsbuild\d`, branch `integral-english-text`, origin `FoxdieTeam/mgs_reversing` — **do not push there** | our source changes are captured as `tools/integral-english/decomp-overlay-changes.patch` (= `git diff 7964de7`); regenerate it after any decomp edit. Local decomp commits exist (e.g. `0534934` for the doorbell in `opt.c`) |
-| working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, exes, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `py workdir.py` prints what it resolved |
+| working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, the four retail executables, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, `map_pristine.map` (the pristine exe's symbol map), ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `workdir.py` also exports `GAME` (`INTEGRAL_ENGLISH_GAME`, default the Steam folder) and `DECOMP` (`INTEGRAL_ENGLISH_DECOMP`, default `D:\mgsbuild\d`); no tool hardcodes those paths any more. `py workdir.py` prints what it resolved |
+| retail executables | `work\int1.exe`, `int2.exe` (641,024 bytes each), `us1.exe`, `us2.exe` (651,264) — hashes in `BUILDING.md`; `rebuild.py` rejects any other | **the collection's ISO executable extents are zero-filled**, so extracting an exe from `alldata.bin`/`dlc_japan.bin` yields no code — the first clean-build attempt failed on exactly that. These four files are the only source of executable bytes |
+| reproducible build | `py rebuild.py --output <fresh dir> --game … --decomp … --psyq D:\mgsbuild\psyq --executables …\work --compare-deployed` (see `BUILDING.md`) | never installs anything. Last artefact: `D:\mgsbuild\repro4\Integral-English-collection.zip`, SHA-256 `b052a710…0366`, all 16 PPFs' effective bytes equal to the deployed set (14 byte-identical; `en_menu2` ×2 differ only in record grouping) |
 | game | `D:\Steam\SteamApps\common\MGS1` (Master Collection Vol. 1, Steam app **2131630**) | launch: `Start-Process steam://rungameid/2131630`; process name `METAL GEAR SOLID`; **kill by PID only, never `taskkill /IM`** |
 | Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2) | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually |
 | deployed ini | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.ini` is a **Vortex symlink**; edit the target: `%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-5-3-6-0-1774482213\MGSM2Fix.ini` | edit with Python or via `realpath`; `sed -i` on the link would replace the link with a file. The repo's `MGSM2Fix.ini` is the committed default, not what the game reads |
@@ -69,6 +73,9 @@ paraphrase them away.
 - **Never let an executable PPF record cross a 2048-byte payload boundary** — Ketchup drops the spill silently while logging success.
 - **The extracted `int1_stage.dir` is unpatched.** To see what the deployed game shows, apply the deployed PPF first (see the `en_camsave` verification, 2026-09-04) — reading the extraction alone shows Japanese everywhere and proves nothing.
 - **Function pointers decode as "text".** `addiu sp,sp,-N` (`c0 ff bd 27`…) in a pointer table is code. Known in `camera` at overlay 0x6E0–0x6E8.
+- **Never take executable bytes from the collection's disc images** — their exe extents are zero-filled. Use the four retail executables in `work\` (§1).
+- **Builders stage into `WORK` and deploy only with an explicit `--deploy`**; `rebuild.py` never touches the game folder. Compare a rebuild to the deployed set by *effective changed bytes* (`--compare-deployed`), not by PPF file hash — record grouping and the description text can differ without changing game data.
+- **A normal disc swap proves only the normal swap path.** The title / wrong-disc, demo-theater and abstract copies of the disc-swap text need their own evidence; do not infer "unreachable" for all four from one silent swap.
 - Absolute dates in notes, not "yesterday". Kill by PID. No AI attribution in commits.
 
 ---
@@ -86,8 +93,18 @@ paraphrase them away.
 | `en_brf` | briefing labels, quads, row arithmetic | in game, 26 shot pairs, 0.00% right-column diff |
 | `en_savemsg` | memory-card captions in the executable | in game 2026-09-04: save + load; kept slots idx 1/9 Japanese by rule; `Ketchup::Audit` saw no collision with the collection's RAM patches |
 | `en_camsave` | the PHOTO ALBUM's own captions (`camera` overlay) | **fully verified 2026-09-04**: all 23 English on screen / by slot comparison; the six USA-blank slots stay Japanese (`ロード中です`, `ロードが完了しました`, `変更内容を上書き保存しますか？` are those) |
-| `en_menu3` | the `title` disc-swap copy | **disabled** — crashes the title stage; diagnosed, not rebuilt (§5.4) |
+| `en_menu3` | the `title` disc-swap copy | **disabled** — crashes the title stage; diagnosed, not rebuilt (§5.4). Its two PPFs sit in `mods\INTEGRAL\INTEGRAL\_disabled\`, where Ketchup does not read them |
 | unlock PPFs | title-screen extras | **parked**, `unlocks_parked\`, not deployed |
+
+**Reproducibility (2026-09-04, late):** every one of the eight shipping families
+was rebuilt from retail inputs in an isolated directory by `rebuild.py` — stage
+files extracted from the collection, the four retail executables as hashed
+inputs, the decomp exported at `7964de7` plus `decomp-overlay-changes.patch`,
+both overlays recompiled (byte-identical to the shipped ones) — and all 16 PPFs
+matched the deployed set's effective changed bytes. So the deployed patches are
+no longer artefacts of a lost scratchpad: they can be regenerated. `BUILDING.md`
+has the inputs, hashes, command, outputs and the ZIP's hash. This is static
+equivalence, not a new gameplay test.
 
 ### MGSM2Fix features on this branch (see `UPSTREAM.md` for the upstream view)
 
@@ -119,8 +136,8 @@ break. Watch whether the game's own swap flow draws (`Now Checking...` /
 `Disk ID is 1`. This validates disc 2 and the normal swap path. It does **not**
 establish reachability of all four copies: title/wrong-disc, demo-theater and
 abstract paths require separate evidence. Unseen text still matters for the
-raw-disc release. **The
-developer menu cannot do this** — disc 2 is set only by `change.c`'s CD check
+raw-disc release. **The developer menu cannot do this** — disc 2 is set only by
+`change.c`'s CD check
 (README "The disc-swap text: four copies"). Once on disc 2, glance at SCREEN /
 KEY CONFIG (byte-identical to disc 1, so they should just work) and any
 disc-2 mission-log page.
@@ -135,7 +152,10 @@ option's payload (`INT count` then `count+1` STRING records); **never touch the
 screen, two screens per page, in 128×20 KCBs with a VRAM column wrap, Integral
 up to 11 on one screen (`abst.c`, `kcb[12]`, 128×21). Method = the `preope`
 method (resize records + the COMMAND's BE16), grow `abst.c` to USA's model,
-relocate into DUMMY3M from slot 462, composite the PPFs. Open before the first
+relocate into DUMMY3M from slot 462 and build from retail the way `optsctext.py`
+now does (no deployed PPF as an input; `rebuild.py` checks overlaps across the
+whole set). Add the new family to `rebuild.py` so it stays reproducible. Open
+before the first
 edit: USA's two-screen paging code, pairing pages by the shared `l`/`r`/`e`
 ids, the USA counterpart of the `READ MISSION LOG?` caption, and the
 collection's `disc1_132F2716_patch_PS5.bin` inside the stage (watch registered,
@@ -160,8 +180,12 @@ trivial test: boot to the title. This remains required for raw-disc completeness
 Two constants differ between the collection build and a raw PSX disc patch:
 `SC_KEEP_LINES` (4 collection / 6 raw — `optsctext.py`) and
 `OPTION_MC_CONTROL_SETTINGS` (1 / 0 — `opt.c`). Today they are edited by hand;
-they should be one switch that builds both variants. README "The sc_text
-texture port" and "The collection's KEY CONFIG interception".
+they should be one switch that builds both variants, and `rebuild.py` should
+package the raw variant too (today it packages only the collection variant and
+the package README says so). The raw variant then needs its own runtime
+validation on a real PSX image, where the disc-swap text (§5.3, §5.4) is
+reachable. README "The sc_text texture port" and "The collection's KEY CONFIG
+interception".
 
 ### 5.6 The VR disc (SLPM-86249)
 Not started. USA's `SLUS-00957` exists in `windata\alldata.bin` (base
@@ -171,7 +195,10 @@ VR disc".
 ### 5.7 Upstream pull request
 Rebase the general-benefit commits onto MGSM2Fix **3.7.2** and offer them
 separately; `UPSTREAM.md` lists them with test status. Port-only commits stay
-on this branch.
+on this branch. Two things to separate when doing it: `SetPatchWatch` goes
+upstream as a mechanism, without the Integral `option`/`abst` ranges `mgs1.h`
+registers; `BrightnessText` covers title 981 (USA) only — other versions need
+their own offsets.
 
 ### 5.8 Still untested, low effort when the moment comes
 - `PreserveConfiguration` catching a real stale write (intermittent race).
@@ -185,7 +212,16 @@ on this branch.
   risk) and adopting the collection's English rename strings. README "The
   collection's RAM patches collide with `en_savemsg`".
 
-### 5.9 Optional, ask first
+### 5.9 Finish the text census (`COVERAGE.md`)
+`audit_text.py` inventories GCL string candidates and address references
+across all three Integral images and USA's, but it is a framing heuristic:
+residual candidates still need verification against their callers, the font
+bank (`0x80xx` is Latin, `0x9001` a space — encoded glyphs are not "Japanese"
+by themselves), the USA path and a reachable screen before anyone declares the
+port complete. `jpsweep.py`'s equal-offset pairing was never a completeness
+proof. Texture lettering and runtime language branches are outside both tools.
+
+### 5.10 Optional, ask first
 - Location-name spellings in `abst` (`Tank Hanger` / `Medi rm` / `Cmnder rm`
   vs USA `Hangar` / `Medi room` / `Cmnder room`): Integral's own English, not
   Japanese — outside the rule as written, so ask.
@@ -228,15 +264,26 @@ on this branch.
 | `items.py`, `menu2.py` | recovered item/menu builders; `menu2.py` excludes the broken historical `menu3` mode |
 | `audit_text.py` | main-disc and VR candidate inventory, save-title encoding; see `COVERAGE.md` |
 | `rebuild.py` | isolated collection build, checks, manifest and ZIP; see `BUILDING.md` |
+| `portio.py` | shared read-only disc access and deterministic PPF/stage serialisation (`stage`, `pack_stage`, `records`, `encode_records`, `changed_runs`, `ppf`, `relocation`) — the module the recovered builders and `rebuild.py` are built on |
+| `iso.py` | raw-sector disc reader (`Disc(path, base)`; mode-2 24-byte headers), used to read the images inside `alldata.bin` / `dlc_japan.bin` |
+| `kcplace.py`, `kcquads.py`, `kcrects.py` | KEY CONFIG port helpers: VRAM/CLUT allocation for USA's eight labels, quad extraction from an option overlay, the per-button-type label rectangles |
+| `quadscan.py`, `rowargs.py` | briefing helpers `brf_widen.py` imports: quad-call arguments and a linear register simulation for the row arithmetic |
+| `measure.py`, `align.py`, `rows.py` | screenshot measurement for the briefing menu (label ink, rows against the divider, right-column bands) |
+| `optbright.py` | **historical** — the font-text brightness build the `sc_text` texture superseded; its wrap-width notes are still the reference for other option entries, its output is no longer an input to anything |
+| `ppfgen.py`, `reloc_ppf.py` | **legacy** PPF emitter and manual DUMMY3M relocation; `rebuild.py` and the builders use `portio.ppf` / `portio.relocation` instead. Still runnable; `reloc_ppf.py` needs disc images in `discs/` |
+| `preope_both.py` | **obsolete** experiment (both recaps re-wrapped, 12/19 pages); `preope_usa.py` supersedes it and needs nothing from it — a candidate for removal |
 | `unlock_title.py` | builds the (parked) unlock PPFs |
 | `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
 | `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
 | `pcx4.py` | encode/decode the 4-plane RLE PCX the texture loader expects (how `sc_text` and the KEY CONFIG art were read and written) |
 
-Rescued from the session scratchpad on 2026-09-04 (they existed nowhere durable): `bridge.py`, `gcldump.py`, `gclprocs.py` and `map_pristine.map` (`pcx4.py` was already in the repo) (the pristine executable's symbol map, now at `D:\mgsbuild\integral-english-work\`).
-
-The scripts that shaped tonight's documentation live only in the session
-scratchpad and are disposable; everything they established is in the README.
+Rescued from the session scratchpad on 2026-09-04, where they existed nowhere
+durable: `bridge.py`, `gcldump.py`, `gclprocs.py` (now in this directory) and
+`map_pristine.map`, the pristine executable's symbol map (now at
+`D:\mgsbuild\integral-english-work\`). `items.py`, `menu2.py` and `optlabel2.py`
+were likewise recovered and rewritten with explicit inputs and no implicit
+deployment. Nothing the build needs lives in a scratchpad any more; the scripts
+that only shaped documentation are disposable.
 
 ---
 
@@ -257,11 +304,35 @@ brightness lines", "Option → SCREEN", "The sc_text texture port" · briefing �
 everything", "Achievements" · tests → "Not tested" (struck-through items are
 done, with dates) · decomp → "Audit against the decomp".
 
-## 9. Documentation and completion follow-up (2026-09-04)
+## 9. The 2026-09-04 late pass: what changed and what it settled
 
-The current collection build is reproducible from retail inputs and an isolated
-decomp export; [BUILDING.md](BUILDING.md) lists prerequisites, hashes, commands
-and packaging checks. The recovered builders no longer need scratchpad scripts
-or old option PPFs. [COVERAGE.md](COVERAGE.md) records the expanded three-disc
-inventory, save-title evidence and the remaining audit limits. These checks do
-not close the gameplay, Mission Log, VR translation or raw-disc tasks above.
+Commits `d988e1d` … `5b8d280`. In one evening the project went from "the
+deployed PPFs work but some were built by scripts that no longer exist" to a
+build anyone can reproduce and check:
+
+- **`rebuild.py` + `BUILDING.md`**: isolated, retail-input build of all eight
+  families for both discs; PPF framing and sector-boundary validation; a
+  cross-set overlap check; a ZIP with `SHA256SUMS.txt` and `build-report.json`
+  (environment, SDK file hashes, every input and output). The clean run matched
+  the deployed set (see §4). It never installs.
+- **Recovered builders** (`items.py`, `menu2.py`, `optlabel2.py`) with explicit
+  inputs; `optsctext.py` builds its caption chain from retail via
+  `optlabel2.py`, so the pinned font-text PPF and the "builder consumes its own
+  output" hazard are gone; `preope_usa.py` builds both recaps from retail with
+  an explicit `--deploy`; `brf_*` read the real USA stage and the row/quad
+  constants were re-verified against it (all 16 row and 53 quad tuples match).
+- **`audit_text.py` + `COVERAGE.md`**: three-disc candidate inventory with its
+  limits stated; the save-slot title is full-width in USA too, so it is
+  branding/encoding, not a port target; one more retained camera caption noted.
+- **Stale guidance corrected**: `f924` stays `[8]` (growing it *causes* the
+  EXIT freeze); `MG2_RECAP_OFFSET` is 22042 for the 13-page build; a silent
+  normal disc swap does not prove the other three disc-text copies unreachable;
+  `UPSTREAM.md` has real hashes and current status; `BrightnessText` is
+  `[Patches]` and USA-only.
+- Verified independently afterwards: the ZIP hash, all 16 `reference_effect_equal`
+  flags, the decomp patch equal to the live decomp diff, deployed mods untouched
+  (`ppfcheck --deployed` clean on all 18 files).
+
+None of this closes the gameplay items (§5.1), the Mission Log (§5.2), the
+disc-text family (§5.3–5.4), the raw-disc variant (§5.5), VR (§5.6) or the
+census (§5.9). It makes them buildable and checkable when they are done.
