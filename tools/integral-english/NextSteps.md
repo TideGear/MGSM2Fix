@@ -166,8 +166,12 @@ save to see a mission-log page from demo.gcx and a count-7 page.
 
 This is also the **first run since achievements were re-enabled** (the last
 log, 2026-09-04 19:15, ran with both Disable flags true), so it is the first
-session that can show the `abst` patch watch, the `_PS5` question and the
-save-message audit — see 5.7.
+session that can show the patch watches — now on `option`, `abst`, `change`,
+`demosel`, `title` and `camera` for both discs — the `_PS5` question and the
+save-message audit. Read the `WATCH` lines afterwards: the collection patches
+all four disc-swap text copies with named files that begin two bytes before
+`en_menu2`'s records (README "Where the collection's own disc patches land");
+the lines show what it writes and whether the port's bytes are overlapped.
 
 ### 5.3 Rebuild `en_menu3` (the `title` copy)
 README "Why `en_menu3` crashes" and "How to test it": shorten the STRING length

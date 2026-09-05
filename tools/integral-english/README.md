@@ -1184,6 +1184,45 @@ letter the command lacks walks past `i` by its bad length byte and spews
 `GCL:WRONG CODE` until a NUL; `portio.read_ppf` takes a path, not bytes;
 `WORK` is already the `work` directory.
 
+## Where the collection's own disc patches land (mapped 2026-09-05)
+
+The 2026-09-04 18:54 log ran with `DisableCDROM = true`, so it names every
+CD-ROM patch the collection tried on Integral disc 1: 233 offset patches and
+132 named files (`disc1_XXXXXXXX_patch`, the name is the image offset). Mapped
+through STAGE.DIR (`stage_lookup` arithmetic, see "Reading disassembly"):
+
+| target | offset patches | named files | relation to the port |
+|---|---|---|---|
+| RADIO.DAT | 125 | 103 | not ported |
+| FACE.DAT | 25 | — | not ported |
+| gameplay stages (`s03er` 11, `s18a` 9, `s10a`, `s07cr`, and 2 each in a dozen more) | ~50 | 2 | not ported |
+| `ending` | 5 | 20 | not ported |
+| `rank` | 5 | — | Integral-only text, not ported |
+| `init` | 2 | — | the stage that holds `font.res` — unknown what they change |
+| `camera` | 6 (+0x9348, +0xD614..+0xD6A8) | — | **en_camsave** patches this stage in place; none of the six falls inside or within 256 bytes before a camsave record |
+| `title` | 2 (+0x165A4, +0x165CC) | 1 (+0x3B1B5 = image 0x1822B55D) | the named file starts **at the title's disc-swap block** (`en_menu3`'s target, disabled); en_menu's `RADAR OFF` record sits 130 bytes after it |
+| `demosel` | — | 2 (+0x18FED, +0x19000) | **both start at en_menu2's disc-swap records** — one 2 bytes before our first record, one exactly on a record |
+| `change` | — | 1 (+0x421F) | **2 bytes before en_menu2's first record** there |
+| `option` | 1 (+0x2B04) | 1 (+0x2538C, the KEY CONFIG doorbell) | stage relocated; the doorbell is reproduced in `opt.c` |
+| `abst` | — | 1 (+0x198BE, the disc-change block) | stage relocated; the block now holds USA's strings |
+
+So the collection patches **all four copies of the disc-swap text** (`change`,
+`demosel`, `title`, `abst`) with named files, and `en_menu2`'s `change` and
+`demosel` records begin two bytes after two of them. What those files contain
+is not known: a named-file patch's bytes are only visible through
+`SetPatchWatch`, and until 2026-09-05 watches existed for `option` and `abst`
+only. **Watches now cover `change`, `demosel`, `title` and `camera` on both
+discs** (`mgs1.h`), so the next run with `DisableCDROM = false` logs their
+content and size.
+
+Which bytes win where a collection patch and a port record overlap is a
+question of the patch table's order: both go through the same
+`entryCdRomPatch` (Ketchup registers its PPF records after the collection's
+`_set_disk_patch`, see the log order), so the port's bytes are the later entry
+and most likely the ones the emulator applies last. Not proven; the disc-swap
+screens have never been seen in the collection, which is also why nobody
+noticed. For a raw disc none of this applies.
+
 ## The disc-swap text: four copies, and why only real play can reach the swap (2026-09-04)
 
 The `Insert DISC 2.` / `Now Checking...` family exists in **four** stages. Their
@@ -1198,7 +1237,8 @@ states, so nobody has to re-derive them:
 
 **None of the four has been seen in the collection.** The open question is
 whether the collection ever shows the game's own swap prompt at all, or swaps
-silently before `change` draws it. A silent normal swap does not prove the
+silently before `change` draws it — and, since 2026-09-05, what the collection's
+own named patches to all four blocks contain (previous section). A silent normal swap does not prove the
 title/wrong-disc, demo-theater or abstract paths unreachable. Those need
 dedicated tests; all four remain relevant to a raw disc patch.
 

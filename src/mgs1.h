@@ -95,15 +95,37 @@ public:
         // The MISSION LOG stage (`abst`, sectors 139..218 on both discs) was
         // ported on 2026-09-05 (en_abst) and relocated into DUMMY3M, so the
         // collection's patch below now lands on a stage the game no longer
-        // reads. The watch stays to show what it wanted to write. It
-        // to be relocated for the English port, and the collection offers one
-        // patch inside it: disc1_132F2716_patch_PS5.bin, stage sector +51, in
-        // the script chunk. Whether a _PS5 patch is applied on Windows at all,
-        // and with what, decides whether relocation orphans anything.
+        // reads. The watch stays to show what it wanted to write: the one
+        // patch the collection offers there is disc1_132F2716_patch_PS5.bin,
+        // stage sector +51 - the disc-change abstract's block in the script
+        // chunk, which the port now fills with USA's eight strings. Whether a
+        // _PS5-suffixed patch is applied on Windows at all is still unseen.
         SQHook<Squirk::Standard>::SetPatchWatch(0x132D51C8ull, 0x133030C8ull,
             "Integral disc 1 abst stage");
         SQHook<Squirk::Standard>::SetPatchWatch(0x0EF3F538ull, 0x0EF6D438ull,
             "Integral disc 2 abst stage");
+        // The collection also patches the three other disc-swap text copies
+        // (`change`, `demosel`, `title` - named files disc1_18345E07,
+        // disc1_18412A95, disc1_18412BD8, disc1_1822B55D) two bytes before the
+        // records en_menu / en_menu2 write there, and six places in `camera`
+        // (en_camsave). Mapped 2026-09-05 from a filtered log; the watches show
+        // what they write and whether the port's records are overlapped.
+        SQHook<Squirk::Standard>::SetPatchWatch(0x18341268ull, 0x18346518ull,
+            "Integral disc 1 change stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x183F6078ull, 0x18416C28ull,
+            "Integral disc 1 demosel stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x181E7788ull, 0x1825C9C8ull,
+            "Integral disc 1 title stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x16F8E5C8ull, 0x16FA42E8ull,
+            "Integral disc 1 camera stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x13CA70A8ull, 0x13CAC358ull,
+            "Integral disc 2 change stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x13D5BEB8ull, 0x13D7CA68ull,
+            "Integral disc 2 demosel stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x13B4D5C8ull, 0x13BC2808ull,
+            "Integral disc 2 title stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x128F4408ull, 0x1290A128ull,
+            "Integral disc 2 camera stage");
 
         if (M2Config::bPatchesDisableFont) {
             for (auto & MGS1_TextureWhitelist_Font : MGS1_TextureWhitelist_Fonts) {
