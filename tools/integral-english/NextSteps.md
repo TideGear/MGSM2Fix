@@ -1,8 +1,9 @@
 # Next steps — MGS Integral English text port
 
 Written 2026-09-04 (evening), updated the same night after the
-reproducible-build pass (§9), and through 2026-09-05 as the MISSION LOG port,
-the item-text fixes and their on-screen checks landed (§10), for whoever picks
+reproducible-build pass (§9), through 2026-09-05 as the MISSION LOG port,
+the item-text fixes and their on-screen checks landed (§10), and on 2026-09-06
+when the **VR disc** was ported (§11), for whoever picks
 this up cold: a later session of
 the same assistant, a different model, or a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
@@ -29,10 +30,11 @@ authoritative**; if they disagree with a memory file, the memory file is stale.
 | remotes | `origin` = `https://github.com/TideGear/MGSM2Fix.git` (push here); `upstream` = nuggslet's MGSM2Fix — **never push to upstream** | |
 | decompilation | `D:\mgsbuild\d`, branch `integral-english-text`, origin `FoxdieTeam/mgs_reversing` — **do not push there** | our source changes are captured as `tools/integral-english/decomp-overlay-changes.patch` (= `git diff 7964de7`); regenerate it after any decomp edit. Local decomp commits exist (e.g. `0534934` for the doorbell in `opt.c`) |
 | working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, the four retail executables, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, `map_pristine.map` (the pristine exe's symbol map), ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `workdir.py` also exports `GAME` (`INTEGRAL_ENGLISH_GAME`, default the Steam folder) and `DECOMP` (`INTEGRAL_ENGLISH_DECOMP`, default `D:\mgsbuild\d`); no tool hardcodes those paths any more. `py workdir.py` prints what it resolved |
+| VR working data | `work\vrint_stage.dir`, `work\vrus_stage.dir` (the two VR STAGE.DIRs), `work\vrint.exe` (rebuilt from the decomp, `build.py --variant vr_exe`, SHA-256 `c370f8e4…`), `work\vrus.exe` (real `SLUS-00957`), `work\INTEGRAL_vr_*.ppf` | `vrlib.py` finds the two VR ISOs inside the containers itself (`0x57592000` and `0xD39B7000`) and computes stage LBAs from STAGE.DIR |
 | retail executables | `work\int1.exe`, `int2.exe` (641,024 bytes each), `us1.exe`, `us2.exe` (651,264) — hashes in `BUILDING.md`; `rebuild.py` rejects any other | **the collection's ISO executable extents are zero-filled**, so extracting an exe from `alldata.bin`/`dlc_japan.bin` yields no code — the first clean-build attempt failed on exactly that. These four files are the only source of executable bytes |
 | reproducible build | `py rebuild.py --output <fresh dir> --game … --decomp … --psyq D:\mgsbuild\psyq --executables …\work --compare-deployed` (see `BUILDING.md`) | never installs anything. Last artefact: `D:\mgsbuild\repro7\Integral-English-collection.zip`, SHA-256 `870a691a…51ca` (2026-09-05 13:06), all 18 PPFs' effective bytes equal to the deployed set (16 byte-identical; `en_menu2` ×2 differ only in record grouping) |
 | game | `D:\Steam\SteamApps\common\MGS1` (Master Collection Vol. 1, Steam app **2131630**) | launch: `Start-Process steam://rungameid/2131630`; process name `METAL GEAR SOLID`; **kill by PID only, never `taskkill /IM`** |
-| Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2) | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually |
+| Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2); the VR disc is `mods\INTEGRAL\VR-DISK\` and the USA VR disc `mods\VR-DISK_US\` | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually. Its `RootPath` adds a version folder only when a title has more than one version and a disk folder only when a version has more than one disk, which is why the two VR folders have no numbered subdirectory |
 | deployed ini | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.ini` is a **Vortex symlink**; edit the target: `%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-5-3-6-0-1774482213\MGSM2Fix.ini` | edit with Python or via `realpath`; `sed -i` on the link would replace the link with a file. The repo's `MGSM2Fix.ini` is the committed default, not what the game reads |
 | deployed ASI | same Vortex folder, `MGSM2Fix64.asi` | |
 | build | `"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe" MGSM2Fix.sln /p:Configuration=Release /p:Platform=x64` → `x64\Release\MGSM2Fix.asi` → copy to the Vortex folder as `MGSM2Fix64.asi`; compare hashes | if MSBuild times out it can leave `cl.exe` processes behind — stop them by PID |
@@ -82,7 +84,7 @@ paraphrase them away.
 
 ---
 
-## 4. State on 2026-09-05: what ships, and how far each is verified
+## 4. State on 2026-09-06: what ships, and how far each is verified
 
 ### PPF patches (all deployed for both discs unless noted)
 
@@ -98,6 +100,25 @@ paraphrase them away.
 | `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built 2026-09-05 and seen on screen the same day**: both pages of the Heliport and Comm Tower A logs, the controls and the slide (the one fault, stale-VRAM fragments during the slide, fixed at 13:05 and confirmed clean at 13:50). Statically, pages re-parse and equal USA's byte for byte and the PPF records rebuild the relocated 88-sector stage exactly on both discs. Stage in DUMMY3M slots 462..549. Not yet seen: a demo.gcx page (disc-2 saves) and a count-7 page |
 | `en_menu3` | the `title` disc-swap copy | **disabled** — crashes the title stage; diagnosed, not rebuilt (§5.3). Its two PPFs sit in `mods\_disabled\` (the top level of the mods folder, not under INTEGRAL), where Ketchup does not read them |
 | unlock PPFs | title-screen extras | **parked**, `unlocks_parked\`, not deployed |
+
+### VR-DISC patches (deployed 2026-09-06 in `mods\INTEGRAL\VR-DISK\`)
+
+Ported from USA's VR Missions (`SLUS-00957`). README "The VR disc (SLPM-86249)"
+is the technical record; `vrlib.py` is the shared library. **None of these has
+been seen on screen yet** — that is the top of §5.
+
+| patch | what | verified |
+|---|---|---|
+| `vr_en_missions` | 1808 of 1813 in-mission windows across 92 stages: titles, briefings, results, hints | statically: every stage re-parses, no stage grew (ten padded back to their sector count), 15 031 records / 3 370 955 bytes, fonts merged and every remaining glyph code proved to exist in the new font |
+| `vr_en_items` | the VR executable's item, weapon and capture-mode pools | statically; the PPF owns every byte of all three arenas, as the main game's does since the SOCOM fault |
+| `vr_en_savemsg` | the VR executable's 12 save and 12 load messages | statically; indices 1 and 9 stay Japanese (USA draws nothing) |
+| `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | statically: quads and per-type rectangles verified against USA's by re-executing the transplanted function; the DAR fits at 120 754 of 120 832 bytes after a lossless re-encode of every texture |
+| `vr_en_title` | the EXTRA menu's four help lines | statically; record 6 (PocketStation) deliberately kept — USA's `See the staff credits.` is a different feature |
+| `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used |
+| `vr_unlock` | every VR mission unlocked (test aid, **not deployed**) | emulating the overlay through all five unlock passes: 46 → 361 of 373 items on Integral, 45 → 357 on USA |
+
+`ppfcheck.py --deployed` is clean over all 26 deployed files and no two of the
+six VR PPFs touch the same disc byte.
 
 **Reproducibility:** every one of the nine shipping families is rebuilt from
 retail inputs in an isolated directory by `rebuild.py` — stage files extracted
@@ -120,7 +141,7 @@ equivalence, not a new gameplay test.
 | `[Game] UnlockBriefing` | `= false` | tested; seeds new-game `var_buf` |
 | `[Patches] BrightnessText` (tri-state `fixed` / `original` / `collection`) | `= fixed` | USA only; fixed and original verified on disc 1. Integral's paragraph is built into its PPF independently of this setting |
 | Ketchup built-in disc patches + `SetPatchRangeBlacklist` | — | shipping (the USA four-line brightness fix) |
-| `SQHook::SetPatchWatch` (logs collection patches landing in a region) | — | in use; watches on `option`, `abst`, `change`, `demosel`, `title` and `camera` spans, both discs (ASI rebuilt and deployed 2026-09-05 12:49) |
+| `SQHook::SetPatchWatch` (logs collection patches landing in a region) | — | in use; watches on `option`, `abst`, `change`, `demosel`, `title` and `camera` spans on both main discs, and since 2026-09-06 on the VR disc's `option`, `camera`, `vrtitle`, `movie` and `vrsave` spans (ASI rebuilt and deployed 2026-09-06 00:25) |
 | `Ketchup::Audit` (every byte of every RAM run, read-only, every ~5 s) | — | in use; it caught two of the three item faults on 2026-09-05. Since both exe PPFs own whole regions it now sees every byte of both pools |
 | `[Game] GiveItems` (test aid) | `GiveItems =` (empty) | built; **never exercised** — the developer menu grants everything anyway |
 | `[Game] StageSelect` = `true` / menu name / stage name | `StageSelect = false` | works; see README "The disc-swap text" for what it can and cannot reach |
@@ -184,12 +205,31 @@ validation on a real PSX image, where the disc-swap text (5.3, and the
 disc-change abstract now inside `en_abst`) is reachable. README "The sc_text
 texture port" and "The collection's KEY CONFIG interception".
 
-### 5.5 The VR disc (SLPM-86249)
-Not started. USA's `SLUS-00957` exists in `windata\alldata.bin` (base
-`0xD39B7000`), so it is portable in principle. `audit_text.py` counts 4,449
-flagged Integral candidates against USA's 200 across its 105 stages, and its
-reference scan is disabled because the VR overlay load bases are unknown — a
-port on the scale of the main game. README "Not ported at all: the VR disc".
+### 5.5 The VR disc: see it on screen, then finish the edges
+Ported 2026-09-06 and deployed; **nothing has been seen running yet.** In
+rough order:
+
+1. **Look at it.** Boot the VR disc and check, in this order: the EXTRA menu's
+   four help lines (`vrtitle`), the option screen's seven, a mission's title /
+   briefing / result windows, an item and a weapon description, a save and a
+   load message, and the PHOTOGRAPHING mode's card messages. If something is
+   wrong, bisect the same way as the main game: move that one PPF out of
+   `mods\INTEGRAL\VR-DISK\` and confirm the Japanese comes back.
+2. **KEY CONFIG needs the collection out of the way.** VR Missions still
+   intercepts the screen to show the Master Collection's own key config, so set
+   `DisableRAM = true` and `DisableCDROM = true` (achievements off) to see
+   Integral's own. Check `key_syukan`'s +11 shift while there.
+3. **Unlock, for coverage.** Most missions are locked on a fresh save, so most
+   of the ported windows are unreachable. `vr_unlock.py --deploy` opens them
+   (README "Unlock every VR mission"). The standing rule: achievements **off**
+   first, unlock, test, delete the unlock PPF, achievements back on.
+4. **The number substitutions** in §6 need the user's word.
+5. **Deferred edges**, each a small piece of work: the `movie` stage's `-t`
+   titles (USA has two records where Integral has one — an overlay change), the
+   camera's EXORCISE textures, and whether anything in the mission windows
+   overflows a line at 240 px the way the main game's could.
+6. **`rebuild.py` does not build the VR patches.** They are built by hand
+   (`BUILDING.md`, "The VR disc"). Folding them in is the reproducibility gap.
 
 ### 5.6 Upstream pull request — a re-port, not a rebase
 Upstream 3.7 (tagged 2026-09-01 .. 09-04) moved `src/mgs1.{cpp,h}` to
@@ -254,6 +294,18 @@ Texture lettering and runtime language branches are outside both tools.
   ALBUM reachable without earning it and has never affected the PPFs.
 - Anything that touches Integral's own English (5.9), the `abst` location
   spellings first.
+- **The VR disc's three number substitutions.** Where Integral and USA state
+  different values, USA's sentence was taken with **Integral's** numbers put
+  into it, so the text matches the disc it runs on: SNEAKING MODE / NO WEAPON
+  LEVEL 10 25 not 35; SNEAKING MODE / SOCOM LEVEL 03 40 not 43; WEAPON MODE /
+  GRENADE LEVEL 02 5 not 4. Flip `SUBSTITUTE_NUMBERS_OFF = True` in
+  `vr_windows.py` to take USA's numbers verbatim instead.
+- **The VR KEY CONFIG's `key_syukan` +11 shift**, carried over from the main
+  game's 2026-09-03 approval rather than asked again.
+- **VR EXTRA menu record 6.** Integral's fifth item is PocketStation where
+  USA's is STAFF CREDIT, so `See the staff credits.` was **not** used. If the
+  user would rather see English there, it needs new text, which the rule
+  forbids without authorisation.
 
 ---
 
@@ -286,7 +338,15 @@ Texture lettering and runtime language branches are outside both tools.
 | `optbright.py` | **historical** — the font-text brightness build the `sc_text` texture superseded; its wrap-width notes are still the reference for other option entries, its output is no longer an input to anything |
 | `ppfgen.py`, `reloc_ppf.py` | **legacy** PPF emitter and manual DUMMY3M relocation; `rebuild.py` and the builders use `portio.ppf` / `portio.relocation` instead. Still runnable; `reloc_ppf.py` needs disc images in `discs/` |
 | `preope_both.py` | **obsolete** experiment (both recaps re-wrapped, 12/19 pages); `preope_usa.py` supersedes it and needs nothing from it — a candidate for removal |
-| `unlock_title.py` | builds the (parked) unlock PPFs |
+| `unlock_title.py` | builds the (parked) main-game unlock PPFs |
+| `vrlib.py` | **the VR disc's shared library**: both VR ISOs and stage dirs, the GCL parser/emitter used for VR scripts (`parse_arg`/`emit_arg`, options, expressions, the language variable), `Gcx` script/proc/font container, in-place stage repacking with sector padding, PPF records with gap merging, deploy |
+| `vr_windows.py [--build] [--deploy]` | the mission-window port: pools USA's windows by title, matches by content, merges the script-local fonts, substitutes Integral's numbers, rebuilds 92 stages in place |
+| `vr_exe.py [--deploy]` | the VR executable's item/weapon/capture pools and its save and load messages |
+| `vr_option.py [--deploy]` | the VR option stage: help-line chain, the KEY CONFIG label transplant (per-type function, 21 call sites, `key_syukan` +11) and the re-encoded texture archive |
+| `vr_menus.py [--deploy]` | the VR EXTRA menu's help lines |
+| `vr_camera.py [--deploy]` | the VR camera overlay's memory-card messages |
+| `vr_kcgeom.py` | VR KEY CONFIG geometry read from an overlay: `Init_Res` quads and the per-button-type rectangles (imported by `vr_option.py`) |
+| `vr_unlock.py [--deploy]` | the removable VR unlock test aid — three words, never deploy with achievements live |
 | `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
 | `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
 | `pcx4.py` | encode/decode the 4-plane RLE PCX the texture loader expects (how `sc_text` and the KEY CONFIG art were read and written) |
@@ -315,7 +375,8 @@ copies" · scope → "Scope", "What stays
 Japanese, and why" · brightness → "The collection shows only four of USA's six
 brightness lines", "Option → SCREEN", "The sc_text texture port" · briefing →
 "Briefing menu (`brf` stage)" · unlocks → "Unlocks", "Give items", "Unlock
-everything", "Achievements" · tests → "Not tested" (struck-through items are
+everything", "Unlock every VR mission", "Achievements" · VR → "The VR disc
+(SLPM-86249)" · tests → "Not tested" (struck-through items are
 done, with dates) · decomp → "Audit against the decomp".
 
 ## 9. The 2026-09-04 late pass: what changed and what it settled
@@ -396,3 +457,41 @@ forget to use the decomp files for reference where it helps." In order:
   build paragraph, `discs/`, the pinned chain input, the What ships row, the
   mission-log cross-reference, the ini snapshot path), and the "items proven
   intact" conclusion, which held only for bytes a record named.
+
+---
+
+## 11. The 2026-09-06 pass: the VR disc
+
+The whole of §5.5 as it used to read ("not started") is done. What the pass
+established, beyond the patches themselves:
+
+- **The VR disc is its own game.** Its own executable, overlays and containers;
+  the only thing the main-game port supplied was the file formats and the
+  discipline (own every byte of a pool; never relocate a stage; run
+  `ppfcheck.py`). Every address in the README's VR section was read from the VR
+  binaries, not assumed from disc 1.
+- **USA's VR executable ships five languages.** English is first in the
+  tables-of-tables and GCL variable `0x11` selects; the port reads the English
+  pool and `vrlib.language_of()` recognises the same variable in scripts.
+- **Windows are matched by content, not position.** The user's warning that the
+  shots were not taken in the same order was right about the data too: the two
+  discs do not lay their stages out alike. Titles reduced to uppercase
+  alphanumerics key a pool; same-stage matches win, then pool-unique matches,
+  then position for the few windows with no ASCII title.
+- **Script-local fonts had to be merged, not chosen.** Codes ≥ `0x9A00` index a
+  font inside each script. Integral's holds the Japanese glyphs, USA's the
+  typographic quotes; keeping either alone produces mojibake, so USA's glyphs
+  are appended and the ported strings' codes rewritten.
+- **Nothing grew.** Ten stages shrank by a sector and were padded back, so no
+  stage moved and no collection patch was orphaned.
+- **Progress on the VR disc lives in VRAM.** The clear bitmap is a 12×16
+  rectangle at (160, 224) that every mission stage's overlay knows; the save
+  file is built from it. That is why `vr_unlock.py` can unlock everything
+  without ever writing progress, and why deleting it restores the real state.
+- **The KEY CONFIG textures did not fit** until every texture in the option
+  stage's archive was re-encoded losslessly, which is why `pcx4.py` gained an
+  8-bit codec.
+
+Left where it was: the collection still intercepts VR's KEY CONFIG, so seeing
+Integral's own needs `DisableRAM` and `DisableCDROM`. The ASI was rebuilt with
+five VR patch watches and deployed at 00:25.

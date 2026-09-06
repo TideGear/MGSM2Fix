@@ -1,9 +1,10 @@
-# Text coverage evidence (2026-09-04)
+# Text coverage evidence (2026-09-04, VR section added 2026-09-06)
 
 The current patch is not a complete English port. The title's disc-swap copy
-(`en_menu3`) and VR remain open in [NextSteps.md](NextSteps.md); the Mission
+(`en_menu3`) remains open in [NextSteps.md](NextSteps.md); the Mission
 Log and the disc-change abstract (both in `abst`) were ported on 2026-09-05
-(`en_abst`, seen on screen the same day).
+(`en_abst`, seen on screen the same day), and the VR disc on 2026-09-06
+(six PPFs; see "The VR disc" below and the README section of the same name).
 The expanded scan closes the old tool's disc-1-only coverage gap for stage
 inventory; it does not establish that every visible string has been audited.
 
@@ -47,6 +48,9 @@ one more than the 105 named entries actually enumerated; use 105 for inventory.
   not a Japanese-language classification. USA also contains non-ASCII glyphs.
 - VR overlay load bases are not established by this tool, so its VR reference
   scan is explicitly disabled. VR GCL candidates and stage inventory are read.
+  The VR port established them separately — `0x800C11A0` for Integral and
+  `0x800C4350` for USA, both `_bss_objend` — but `audit_text.py` has not been
+  taught them, so its VR numbers below come from the port's own tools.
 - Texture lettering, executable UI beyond the save-title probes, runtime
   language branches, collection-provided replacements and screen reachability
   still need targeted inspection. Zero extraction errors is not zero gaps.
@@ -85,3 +89,30 @@ The retained recap bytes and ranking/location glyphs must also be interpreted
 through their callers. In particular, the rebuilt preope keeps unread retail
 recap bytes while its MG2 renderer uses the appended English blob. Counting
 encoded strings in the file overstates what remains visible in Japanese.
+
+## The VR disc (inventoried and ported 2026-09-06)
+
+Read from the VR binaries by `vrlib.py` and the five `vr_*.py` builders, not by
+`audit_text.py`. Every figure is what the builders report on a clean run.
+
+| where the text is | how it is stored | Integral | ported |
+|---|---|---|---|
+| in-mission windows | `chara 0xD44E` (`vrwindow`) commands in each stage's `scenerio.gcx` | 1813 windows in 94 stages | **1808 in 92 stages** |
+| item / weapon / capture-mode pools | executable string arenas behind tables at `0x8009C11C`, `0x8009C304` and `0x80011F0C` | 3 pools | all, minus MP5 and frozen items (no USA text) |
+| save and load messages | executable tables at `0x8009C884` / `0x8009C8B4` | 12 + 12 | 20; indices 1 and 9 stay Japanese (USA draws nothing) |
+| option help lines | `chara 0x976C` option `-e` in the `option` stage | 31 records | 7 (1, 2, 3, 5, 6, 12, 26); the rest are Integral-only rows |
+| KEY CONFIG | eight label textures in the option stage's DAR, plus quad geometry in the overlay | 8 labels | all 8, with USA's rectangles and `key_syukan` +11 |
+| EXTRA menu help lines | `chara 0x5667` option `-t` in `vrtitle` | 11 records | 4 (records 2–5) |
+| PHOTOGRAPHING memory-card messages | string table in the `camera` overlay at `+0x608` / `+0x638` / `+0x668` / `+0x708` | 4 groups | all but the two Japanese prompts and the two USA-empty slots |
+
+Known to remain Japanese on the VR disc, each because USA has no counterpart:
+the PocketStation help line, prompt and はい/いいえ (USA's fifth EXTRA item is
+STAFF CREDIT, a different feature); save/load indices 1 and 9; two camera
+prompts; `vrtitle`'s four and `vrsave`'s one debug window, where USA carries the
+identical Japanese; MP5, the frozen items and the mine-detector line.
+
+Not yet inventoried on the VR disc: texture lettering outside the eight KEY
+CONFIG labels (the camera's EXORCISE textures are known and deferred), the
+`movie` stage's `-t` titles (USA has two records where Integral has one), and
+any string reached only through the five-language selection in USA's executable
+other than the English pool the port reads.

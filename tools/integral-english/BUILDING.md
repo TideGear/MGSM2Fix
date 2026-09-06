@@ -117,3 +117,51 @@ again matched all 18 deployed PPFs by effect (16 byte-identical). ZIP SHA-256
 The collection option builder deliberately uses four brightness lines. Changing
 that constant to six alone does not finish the raw-disc release: disc-change
 text, runtime behavior and raw-image packaging still require work.
+
+## The VR disc (not yet in `rebuild.py`)
+
+The six VR PPFs are built by their own tools, run from this directory. They are
+**not** part of `rebuild.py` and not in the collection ZIP; integrating them is
+open work (NextSteps §5).
+
+### Inputs
+
+- The same Master Collection installation. Integral's VR ISO is inside
+  `windata/dlc/dlc_japan.bin` at image base `0x57592000`; USA's VR Missions ISO
+  is inside `windata/alldata.bin` at `0xD39B7000`.
+- Two VR executables in the work directory, because the collection's copies are
+  zero-filled:
+  - `work/vrint.exe` — Integral's, rebuilt byte-exact from the decomp with
+    `py build/build.py --variant vr_exe`, SHA-256 `c370f8e4…`.
+  - `work/vrus.exe` — USA's `SLUS-00957`, from a real disc image. It is a
+    five-language build: Spanish, Italian, French, German and English pools
+    behind tables-of-tables, English first, selected by GCL variable `0x11`
+    (0 = English).
+- Two stage directories extracted from the two VR ISOs, `work/vrint_stage.dir`
+  and `work/vrus_stage.dir` (`/MGS/STAGE.DIR;1`). `vrlib.py` locates the ISOs,
+  reads STAGE.DIR and computes the LBA of every named stage itself.
+
+### Commands
+
+```powershell
+py vr_windows.py --build --deploy     # en_missions  (slow: 92 stages rebuilt)
+py vr_exe.py --deploy                 # en_items and en_savemsg
+py vr_option.py --deploy              # en_option (help lines + KEY CONFIG)
+py vr_menus.py --deploy               # en_title
+py vr_camera.py --deploy              # en_camsave
+py ppfcheck.py --deployed             # always, before the game sees a PPF
+```
+
+Without `--deploy` each tool writes only to `work/`. `--deploy` copies into
+`mods/INTEGRAL/VR-DISK/`.
+
+Expected output on a clean run: 1808 of 1813 windows ported, 15 031 records and
+3 370 955 bytes for `en_missions` with **no stage grown** (ten padded back to
+their original sector count); 63 records for `en_items`; 36 records / 431 bytes
+for `en_savemsg`; 546 records / 121 471 bytes for `en_option` with the DAR at
+120 754 of 120 832 bytes; 7 records / 915 bytes for `en_title`; 4 records /
+617 bytes for `en_camsave`.
+
+`py vr_unlock.py` builds the removable test aid that unlocks every mission
+(README "Unlock every VR mission"). It is deliberately *not* deployed by
+default, and must never be deployed with achievements enabled.
