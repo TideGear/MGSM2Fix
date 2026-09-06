@@ -23,6 +23,18 @@ record; `NextSteps.md` is the map.
 | `en_camsave` | the PHOTO ALBUM's own copy of those messages, inside the `camera` overlay |
 | `en_abst` | the MISSION LOG: 122 pages in USA's two-screen layout with its page counter, arrows and EXIT, and the disc-change abstract's eight strings — `abst_build.py`, 2026-09-05 |
 
+And on the **VR disc** (`mods/INTEGRAL/VR-DISK/`, ported 2026-09-06 from USA's
+VR Missions `SLUS-00957`; see "The VR disc (SLPM-86249)"):
+
+| Patch | Contents |
+|---|---|
+| `vr_en_missions` | 1808 of 1813 in-mission windows across 92 stages — titles, briefings, results, hints |
+| `vr_en_items` | the VR executable's item, weapon and capture-mode pools |
+| `vr_en_savemsg` | the VR executable's save and load messages |
+| `vr_en_option` | the option screen's help lines and the whole KEY CONFIG screen (labels, geometry, retiled texture archive) |
+| `vr_en_title` | the EXTRA menu's four help lines |
+| `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages |
+
 `en_menu3` is disabled — it crashes the title stage with `GCL:WRONG CODE`. See
 "Why `en_menu3` crashes" below; diagnosed 2026-09-03, not yet rebuilt.
 
@@ -1329,29 +1341,223 @@ see [COVERAGE.md](COVERAGE.md) for the expanded inventory and its limits.
 | the save-slot title (full-width Latin) | USA also uses full-width Shift-JIS; Integral has its own product suffix. No ASCII conversion is warranted | [COVERAGE.md](COVERAGE.md#save-slot-title-encoding) |
 | record 3, the vibration-test row's label (`振動テスト`) | **kept blank, not Japanese** — the user's decision 2026-09-02: Integral's line is the row name plus a sentence USA's own line already covers | the scope table |
 | `rank`'s 36 ranking-commentary sentences | Integral-only; USA's `rank` has the shared location names and none of these sentences, so there is nothing to port unless a USA counterpart turns up elsewhere | "`rank` is Integral-only text" |
-| the whole VR disc | not started; USA's `SLUS-00957` does exist, so this one **is** portable | below |
+| the VR disc's PocketStation help line and prompt, `vrtitle`/`vrsave` debug windows, MP5 and frozen items | Integral-only, or USA carries the identical Japanese | "The VR disc (SLPM-86249)" |
 
 Two of these are worth revisiting only with authorisation: the 1P MODE pages
 (the largest body of untranslated text in the game) and the KEY CONFIG help
-lines. The VR port remains separate work; the save title is an encoding/branding case.
+lines. The save title is an encoding/branding case.
 
-## Not ported at all: the VR disc (SLPM-86249)
+## The VR disc (SLPM-86249), ported 2026-09-06
 
-Integral's third disc — VR training — is untouched. `mods/INTEGRAL/VR-DISK/` is
-empty, so Ketchup applies nothing to it. `audit_text.py` inventories its GCL
-candidates; no patch builder targets it. What is
-known so far, for whoever starts it:
+Integral's third disc — VR training — now has USA's English from VR Missions
+(`SLUS-00957`). Six PPFs in `mods/INTEGRAL/VR-DISK/`, built by five tools that
+share `vrlib.py`:
 
-- USA's counterpart is `SLUS-00957` (VR Missions), inside `alldata.bin` at image
-  base `0xD39B7000`; its STAGE.DIR has 105 named stage entries, as does Integral's
-  VR disc, so stage-by-stage comparison is possible.
-- Its option/text chain is **not** at `+0x1B8` like the main game's `option`
-  stage — the offsets in `optscan.py` do not apply unchanged.
-- MGSM2Fix's Ketchup table lists it as title 99, version `VR-DISK` (disk 0, exe
-  range `0x99800`); `EnglishText` and `UnlockBriefing` deliberately skip that
-  version (no option language toggle to hold; no briefing menu).
-- The VR disc has its own overlays and executable, so nothing from the main-game
-  port (overlay patches, stage relocations, chain edits) carries over.
+| PPF | tool | what | size |
+|---|---|---|---|
+| `INTEGRAL_vr_en_missions.ppf` | `vr_windows.py` | every in-mission window in 92 stages: titles, briefings, results, hints | 15 031 records, 3 370 955 bytes |
+| `INTEGRAL_vr_en_items.ppf` | `vr_exe.py` | the executable's item, weapon and capture-mode name/description pools | 63 records |
+| `INTEGRAL_vr_en_savemsg.ppf` | `vr_exe.py` | the executable's twelve save and twelve load messages | 36 records, 431 bytes |
+| `INTEGRAL_vr_en_option.ppf` | `vr_option.py` | the option screen's help lines **and** the whole KEY CONFIG screen | 546 records, 121 471 bytes |
+| `INTEGRAL_vr_en_title.ppf` | `vr_menus.py` | the EXTRA menu's four help lines | 7 records, 915 bytes |
+| `INTEGRAL_vr_en_camsave.ppf` | `vr_camera.py` | the PHOTOGRAPHING mode's memory-card messages | 4 records, 617 bytes |
+
+`ppfcheck.py --deployed` passes and no two of the six touch the same disc byte.
+
+**Do not assume the VR disc works like the main game.** It has its own
+executable, its own overlays and its own text containers; the only thing that
+carries over from the disc-1/2 port is the file formats. Everything below was
+established from the VR binaries themselves.
+
+### Where the two discs live
+
+| | Integral VR-DISC | USA VR Missions |
+|---|---|---|
+| disc id | `SLPM-86249` | `SLUS-00957` |
+| container | `windata/dlc/dlc_japan.bin` | `windata/alldata.bin` |
+| image base | `0x57592000` | `0xD39B7000` |
+| Ketchup | title 99, version `VR-DISK`, disk 0 | title 101 `VR-DISK_US`, version `USA` |
+| exe image offset | `0x000865F8` | `0x0000E5C8` |
+| exe range | `0x99800` | `0x9C800` |
+| menu overlay load address | `0x800C11A0` (`_bss_objend`) | `0x800C4350` |
+| named stage entries | 105 | 105 |
+
+Both executables are **zero-filled inside the collection** — the collection
+loads them some other way — so neither can be read from the container. Integral's
+is rebuilt byte-exact from the decompilation (`build.py --variant vr_exe`,
+SHA-256 `c370f8e4…`) and USA's comes from a real disc image (`work/vrus.exe`).
+
+**USA's VR executable is a five-language build.** Spanish, Italian, French,
+German and English pools sit behind tables-of-tables with English first, and
+GCL variable `0x11` selects the language (0 = English). `vr_exe.py` reads the
+English pool; `vrlib.language_of()` recognises the same variable in the scripts,
+masking with `0x00FFFFFF` because the encoded form is `0x02000011`.
+
+### The mission windows (`en_missions`)
+
+Every piece of in-mission text is a `chara 0xD44E` (`vrwindow`, `koba/vr/vrwindow.c`)
+command inside a stage's `scenerio.gcx`. Its options are `-w` width, `-m` mode,
+`-f` flags, `-i` indent, `-b` the text records, `-p`, `-s`; the overlay's
+`vrwindow` draws `i_num` lines of `b_text[16]` at 18 px each and centres a
+window of `i_num * 18 + 18`.
+
+USA does not lay its stages out identically, and the shots were not taken in the
+same order, so windows are matched by **content, not position**:
+
+1. every USA window in every stage becomes a pool entry keyed by `norm_title` —
+   the window's ASCII title lines reduced to uppercase alphanumerics;
+2. a window is served from the **same stage** first, then from a pool-wide
+   unique match, then — only for windows with no ASCII title at all — by
+   position within the stage;
+3. the taken bytes replace exactly `-w -m -i -b`; Integral keeps `-f`, `-p`
+   and `-s`, so its own colours, flags and timing survive.
+
+Result: **1808 of 1813 windows ported across 92 stages.** The five left alone
+are `vrsave`'s one debug window and `vrtitle`'s four; USA carries the identical
+Japanese there, so there is nothing to port.
+
+### Script-local fonts, and why they had to be merged
+
+Codes at or above `0x9A00` (after stripping the `0x6000` style flags) are not
+Shift-JIS: they index a font stored **inside the script**, 36-byte 12×12 2 bpp
+glyphs, at `index = a - a // 256` where `a = code - 0x9A00`. Integral's font
+holds the glyphs its Japanese descriptions need; USA's holds the typographic
+quotes its English uses. Blindly keeping either one produces mojibake.
+
+`vr_windows.py` therefore merges: Integral glyphs still referenced by strings
+that are *not* ported text keep the original font, USA glyphs referenced by
+ported text are appended, and the ported strings' codes are rewritten to the
+appended indices. Because pooled text can come from a different stage, each
+ported record records which USA stage it came from so the right font is read.
+26 stages end up with appended USA glyphs (5, 18 or 20 of them), 64 need no
+local font at all, and `movie` keeps Integral's plus two.
+
+### No stage is ever relocated
+
+Relocating a stage orphans the collection's own patches to it — the KEY CONFIG
+"doorbell" lesson from the main game. Every VR stage is therefore rebuilt **in
+place**: `repack_stage` 4-aligns the chunk, and where the new script is shorter
+the stage is padded back to its original sector count (`fit_in_place`). Ten
+stages shrank by one sector and were padded; **none grew**. PPF records are
+merged when they are within 64 bytes of each other (`merge_gap`).
+
+### The executable's pools (`en_items`, `en_savemsg`)
+
+`vr_exe.py` owns every byte of five arenas and rewrites them whole, so no
+string can overrun its neighbour:
+
+| pool | Integral table | arena |
+|---|---|---|
+| items | `0x8009C11C` | `0x80010EA0`–`0x80011668` |
+| weapons | `0x8009C304` | `0x800116DC`–`0x80011B60` |
+| capture modes | — | `0x80011F0C`–`0x800120C0` (indices 1 and 9 kept) |
+| save messages | `0x8009C884` | rewritten in place |
+| load messages | `0x8009C8B4` | rewritten in place |
+
+USA's tables are at `0x8009F0DC`, `0x8009F300`, `0x8009FA0C` and `0x8009FA3C`.
+Two traps: the weapon arena runs on into debug strings (`HERE %d` and friends),
+so it ends at `0x80011B60`; and a USA item header is `\xB0\x14`, not `\x90\x14`,
+because of a style flag — `titled()` masks with `0x9F`. `frozen` items and the
+MP5 pointer (`0x8009C17C`, `0x800A9220`) have no USA counterpart and are left.
+
+Save and load indices 1 and 9 stay Japanese: USA draws nothing there, the same
+rule as the main game's `savemsg`.
+
+### The option screen and KEY CONFIG (`en_option`)
+
+One PPF for one stage, because both live in it.
+
+*Help lines.* `chara 0x976C` option `-e`, 31 records, index for index with USA.
+Records 1, 2, 3, 5, 6, 12 and 26 take USA's English (`Sound setting.`,
+`Vibration setting.`, `Use directional buttons to test.`, `Key configuration
+setting.`, `Return to the title screen.`). Everything USA leaves empty — the
+colon at 7, `オン`/`オフ`/`ステレオ`/`モノラル` at 8–11, the unused brightness
+paragraph at 13–16, the KEY CONFIG rows' lines 17–25, the language rows 28–30 —
+stays Integral's. The chain grows 49 bytes inside its existing sector, so the
+stage keeps its 73 sectors.
+
+*KEY CONFIG.* Same program as the main game's `opt.c`, so the same two authorities
+apply and `vr_kcgeom.py` reads both from the binaries rather than measuring
+screenshots:
+
+- `Init_Res(work, strcode, poly, x0, sp+16 y0, sp+20 x1, sp+24 y1, sp+28 abe,
+  sp+32 orient)` sets every label's first quad. The delay-slot `sw` to the stack
+  is an argument too, and missing it loses `orient`.
+- A per-button-type function — entered through `lw rX, 9760(a0)` — rewrites the
+  four movable labels' rectangles every frame, and *that* is the authority for
+  `key_action`, `key_buki`, `key_hohuku` and `key_syukan`. It ends where the
+  next function's `lw rX, 9764(a0)` begins; stopping at the first `jr ra` cuts
+  it short, because it has three early returns.
+- POLY base is `work + 1612`, 40 bytes per poly (`x0 +8`, `y0 +10`, `x1 +16`,
+  `y1 +18`, `x2 +24`, `y2 +26`, `x3 +32`, `y3 +34`); the labels are polys 10–13.
+
+The port transplants USA's per-type function (`+0x15B4`–`+0x181C`) over
+Integral's (`+0x1528`), retargeting its two `j` instructions and nopping the
+slack, and rewrites 21 call-site words. `key_syukan` carries the same **+11**
+horizontal shift the user approved for the main game on 2026-09-03, applied at
+both the type-1 block and the common tail (the constants `49` and `137` each
+appear twice; an immediate search masked `0xFFE0FFFF` finds both, and
+`type_rects` verifies the result).
+
+*The texture archive.* USA's eight labels are larger than Integral's and did not
+fit: +824 bytes against 484 bytes of slack. `pcx4.py` gained a lossless
+8-bit codec (`decode8`/`encode8` around `PcxInflate8`: one RLE stream, tail
+`0x0C` plus palette) and every texture in the archive is re-encoded, which
+recovers 263 bytes from the 4 bpp images and 163 from the 8 bpp ones. The DAR
+goes 120 348 → 120 754 bytes inside its 120 832-byte slot, and `kcplace.py`
+allocates the new VRAM and CLUT positions.
+
+### The EXTRA menu (`en_title`) and the camera (`en_camsave`)
+
+`vrtitle`'s `chara 0x5667` option `-t` holds 11 records. Records 2–5 are the
+help lines for EXIT, MOVIE, PHOTOGRAPHING and ALBUM and take USA's English.
+**Record 6 is not USA's `See the staff credits.`** — Integral's fifth item is
+PocketStation (its texture `0x29A8` reads "PocketStation" where USA's reads
+"STAFF CREDIT"), so USA's line is not its translation and record 6, the
+PocketStation prompt and its はい/いいえ (7–9) all stay Japanese.
+
+The camera overlay's message table sits at overlay `+0x608` (save), `+0x638`
+(load), `+0x668` (prompts) and `+0x708` (photo) on Integral, and `+0x7A8`,
+`+0x7D8`, `+0x808`, `+0x8E4` on USA. Strings are packed into the pool
+`0x0CB1C`–`0x0CD08`; 429 of its 492 bytes are used. The empty string must be
+placed at the **start** of the pool — writing it later lets a following string
+overwrite it.
+
+### Numbers that differ between the two versions
+
+Three windows state different values in the two versions. Where the count of
+numbers matches, the USA sentence is taken and **Integral's numbers are
+substituted into it**, so the text never contradicts the disc it runs on:
+
+| window | Integral | USA |
+|---|---|---|
+| SNEAKING MODE / NO WEAPON LEVEL 10 | 25 | 35 |
+| SNEAKING MODE / SOCOM LEVEL 03 | 40 | 43 |
+| WEAPON MODE / GRENADE LEVEL 02 | 5 | 4 |
+
+Three more differ in *count* and are left as USA wrote them, because a count
+mismatch means the digits are not the same quantity. Number matching ignores
+glyph codes (`<XXXX>`), skips the two title lines, and requires the digit to
+have no letter beside it — otherwise `C4` and `E3` are read as numbers.
+
+### Deferred, with reasons
+
+| item | why |
+|---|---|
+| the `movie` stage's `-t` titles | USA has 2 records where Integral has 1; matching them needs an overlay change, not a text swap |
+| the camera's EXORCISE textures | image work, not text |
+| the staff-credit roll | a USA-only feature; Integral has PocketStation there |
+| the PocketStation help line and prompt | Integral-only, no USA counterpart |
+| `vrtitle`'s four debug windows, `vrsave`'s one | USA carries the identical Japanese |
+| MP5, frozen items, the mine-detector line | no USA text exists |
+
+### The collection's own patches to the VR disc
+
+Five `SetPatchWatch` ranges are registered in `src/mgs1.h` so the log names any
+collection patch that lands in a VR stage we rewrite: the option stage
+(`0x5E7EB0`–`0x611D60`), camera (`0x611D60`–`0x627A80`), `vrtitle`
+(`0x315B1C0`–`0x31B5430`), `movie` (`0x4C26BA0`–`0x4C6D5B0`) and `vrsave`
+(`0xCFA6E0`–`0xD5D320`).
 
 ## How the KEY CONFIG port was built (2026-09-03)
 
@@ -2965,6 +3171,92 @@ GCL_InitVar has just zeroed while the scene is still `title`, so a game started
 from the title (NEW GAME or 1P MODE) begins with all sixteen briefing flags set
 in its var_buf. That is the option doing its job, but it is state a stock game
 would not carry into a new save; keep UnlockBriefing off when saves matter.
+
+## Unlock every VR mission (test aid): `vr_unlock.py`
+
+The VR discs gate their missions on something the main game never uses: a
+**bitmap held in VRAM**. `selectvr`'s window manager (`nobu/vr_slct/winmngr.c`,
+chara `0xAE06`) owns a 384-byte buffer — 16 rows of 6 words, 192 bits per row —
+and copies it to and from the video RAM rectangle **(160, 224) 12×16** with
+`LoadImage` / `StoreImage`. Every one of the ninety mission stages carries the
+same rectangle in its own overlay, so a mission sets its bit in VRAM as it is
+cleared and the bit is still there when `selectvr` reloads: **VRAM is what
+survives a stage load.** The memory-card save is built from that buffer (plus
+0x226 record shorts and one flag word), so the bitmap, not the menu's item
+flags, is the progress.
+
+Two static byte tables turn (group, item) into a bit:
+
+    row = A[group] - 1     A at INT 0x800CE944 / USA 0x800D1DF0
+                           A == 0 means the group has no missions
+    bit = B[group] + item  B at INT 0x800CE98C / USA 0x800D1E38
+
+and the menu itself is 70 groups of 28 bytes (INT `0x800CDB54`, USA
+`0x800D0E08`; count at +4, item array at +8, items 60 bytes each). An item's
+first word is its flags:
+
+| bit | meaning |
+|---|---|
+| `0x80000000` | drawn |
+| `0x40000000` | **unlocked** — selectable, and drawn bright instead of grey |
+| `0x20000000` | gated: consult the clear bitmap for this item |
+| `0x10000000` | a menu entry rather than a mission |
+| `0x00080000` | cleared (set every frame, never stored) |
+
+Once per frame the manager walks all 70 groups. Each item with `0x20000000`
+asks the bitmap; a set bit marks it cleared and **unlocks the next item in the
+group** (INT `0x800DBE2C`). A separate pass derives, per group, whether *every*
+item is cleared into a 70-bit array (INT `0x800C12AC`), and a long cascade then
+hands `0x40000000` to items of other groups — the ladder that opens the harder
+modes. A third gate scores the bitmap (`count / 3` against 80 / 70 / 60 / 50)
+and opens the last four categories' first items.
+
+All three questions go through one instruction each, so the test aid is three
+words:
+
+| | Integral | USA |
+|---|---|---|
+| group fully cleared? | `0x800DBDA0` | `0x800DF32C` |
+| mission cleared? | `0x800DBE28` | `0x800DF3B4` |
+| progress score | `0x800DC528` | `0x800DFA30` |
+
+The first two are the `and` in a predicate's `jr ra` delay slot, replaced by
+`addiu v0, zero, 1`; the third is the `subu` that computes the score, replaced
+by `addiu v1, zero, 0x100`. The mission-cleared predicate keeps its
+`A[group] == 0` early return, so groups with no missions are not falsely marked.
+
+Emulating the real overlay image through all five unlock passes to a fixpoint
+(`scratchpad/vr/emu.py`) gives:
+
+| | items unlocked, stock | patched |
+|---|---|---|
+| Integral VR-DISC | 46 of 373 | **361** |
+| USA VR Missions | 45 of 372 | **357** (cascade pass only) |
+
+The twelve that never open are group 67, whose menu id is `0xFFFF` and whose
+item count table reads 0 — a placeholder, not a reachable menu.
+
+**Nothing here writes progress.** The save file is made from the VRAM bitmap,
+which only a genuinely cleared mission ever touches, so a save written while the
+patch is deployed still records real progress only. Deleting the PPF restores
+the original gating exactly — the "relock, not permanently" the test rule wants.
+
+`vr_unlock.py` writes `INTEGRAL_vr_unlock_missions.ppf` (3 records, 99 bytes)
+and `VRUS_unlock_missions.ppf`, and with `--deploy` puts them in
+`mods/INTEGRAL/VR-DISK/` and `mods/VR-DISK_US/`. Ketchup's `RootPath` adds a
+version folder only when a title has more than one version and a disk folder
+only when a version has more than one disk, which is why the USA VR disc's
+folder has no subdirectory. Named `_unlock_`, not `en_`.
+
+**Test procedure** — the standing rule is never to unlock with achievements live:
+
+1. `MGSM2Fix.ini` `[Patches]`: `DisableRAM = true`, `DisableCDROM = true`.
+   This is also what makes Integral's own KEY CONFIG visible, because the
+   collection stops intercepting the screen.
+2. `py vr_unlock.py --deploy`
+3. test
+4. delete the deployed `*_unlock_missions.ppf`
+5. `DisableRAM = false`, `DisableCDROM = false`
 
 ## Achievements
 
