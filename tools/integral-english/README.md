@@ -1551,6 +1551,42 @@ have no letter beside it — otherwise `C4` and `E3` are read as numbers.
 | `vrtitle`'s four debug windows, `vrsave`'s one | USA carries the identical Japanese |
 | MP5, frozen items, the mine-detector line | no USA text exists |
 
+### Sweep: is any VR text still Japanese? (`vr_sweep.py`, 2026-09-06)
+
+`vr_sweep.py` rebuilds every VR stage as the game will see it — retail bytes
+with all six deployed PPFs applied — and groups every remaining game-encoded
+GCL STRING record by the command that owns it, beside the same tally for USA's
+disc. Over all 105 stages:
+
+| | game-encoded records | plain English |
+|---|---:|---:|
+| Integral, patched | 222 | 10 809 |
+| USA VR Missions | 940 | 10 344 |
+
+The ported disc carries **fewer** undecoded records than USA's own, because
+USA's 940 include the four other languages' accented text. Integral's 222 break
+down as:
+
+| owner | count | what |
+|---|---:|---|
+| `chara D44E` (`vrwindow`) | 192 | **181 are English with local-font glyphs** — typographic quotes around `lock-on`, `THE TRUTH IS OVER THERE`, `Tokyo Game Show, Spring '98`. Codes at or above 0x9A00 index the script's own font, which the decoder cannot read, so they only look Japanese. The other 11 are `vrsave`'s one debug window and `vrtitle`'s four, identical in USA |
+| `chara 976C` (option) | 22 | the Integral-only option rows USA leaves empty; the 9 English beside them are the 7 ported lines and the colon |
+| `chara 5667` (`vrtitle`) | 4 | PocketStation's help line and prompt and its はい/いいえ, beside the 4 ported EXTRA lines |
+| `chara FAA8` (movie) | 3 | the `movie` stage's titles — deferred, USA has two records where Integral has one |
+| `chara 81C7` (camera) | 1 | the camera caption at script `+0x1B8`; USA's record is empty |
+
+So every VR string that has a USA English counterpart now has it, and what
+remains is exactly the list under "Deferred, with reasons".
+
+**The trap this tool had to survive: the disc image has raw 2352-byte sectors.**
+A PPF offset is `(lba + off // 2048) * 2352 + 24 + off % 2048`
+(`portio.image_offset`), so reconstructing a patched stage means inverting that,
+not dividing by 2048. A first version of the sweep used `lba * 2048`, applied
+every record at a nonsense offset, and reported a finished port as almost
+entirely unported — including "0 records applied" for two stages whose PPFs were
+demonstrably correct. Anything that reads a deployed PPF back has to use
+`image_offset`'s geometry.
+
 ### The collection's own patches to the VR disc
 
 Five `SetPatchWatch` ranges are registered in `src/mgs1.h` so the log names any
