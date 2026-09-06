@@ -126,6 +126,22 @@ public:
             "Integral disc 2 title stage");
         SQHook<Squirk::Standard>::SetPatchWatch(0x128F4408ull, 0x1290A128ull,
             "Integral disc 2 camera stage");
+        // Integral's VR-DISC (title 99, version VR-DISK; a separate image, so
+        // these offsets are small). The English port (tools/integral-english/
+        // vr_*.py, 2026-09-06) patches these stages IN PLACE; the option stage
+        // in particular keeps its sectors so the collection's KEY CONFIG
+        // interception keeps landing - these watches show where that patch is
+        // and whether any collection patch overlaps the port's records.
+        SQHook<Squirk::Standard>::SetPatchWatch(0x0005E7EB0ull, 0x000611D60ull,
+            "Integral VR-DISK option stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x000611D60ull, 0x000627A80ull,
+            "Integral VR-DISK camera stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x00315B1C0ull, 0x0031B5430ull,
+            "Integral VR-DISK vrtitle stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x004C26BA0ull, 0x004C6D5B0ull,
+            "Integral VR-DISK movie stage");
+        SQHook<Squirk::Standard>::SetPatchWatch(0x000CFA6E0ull, 0x000D5D320ull,
+            "Integral VR-DISK vrsave stage");
 
         if (M2Config::bPatchesDisableFont) {
             for (auto & MGS1_TextureWhitelist_Font : MGS1_TextureWhitelist_Fonts) {
