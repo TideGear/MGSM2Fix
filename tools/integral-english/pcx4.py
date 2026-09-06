@@ -71,3 +71,29 @@ def encode(template, w, h, pal, rows):
                 if (v >> pl) & 1: planes[pl][byte] |= 1 << bit
         body += _rle(b''.join(bytes(p) for p in planes))
     return bytes(hdr) + bytes(body)
+
+
+# ------------------------------------------------------------------ 8bpp (PcxInflate8)
+# An 8bpp texture (PCXINFO flag bit 0) is one RLE stream over w*h bytes followed by
+# the standard PCX 256-colour palette block (0x0C marker + 768 bytes), which the
+# loader reads from `PcxInflate8(...) + 1`.
+
+def decode8(blob):
+    """-> (w, h, pixels[w*h], tail bytes after the RLE data)"""
+    maxx, maxy = struct.unpack('<HH', blob[8:12])
+    minx, miny = struct.unpack('<HH', blob[4:8])
+    w, h = maxx - minx + 1, maxy - miny + 1
+    size = w * h
+    out = bytearray(); p = 128
+    while len(out) < size:
+        c = blob[p]; p += 1
+        if c <= RLE: out.append(c)
+        else:
+            n = c - RLE; d = blob[p]; p += 1
+            out.extend([d]*n)
+    return w, h, bytes(out), blob[p:]
+
+
+def encode8(template, pixels, tail):
+    """the same texture with its RLE stream re-emitted (header and palette block kept)"""
+    return bytes(template[:128]) + bytes(_rle(pixels)) + bytes(tail)
