@@ -118,7 +118,12 @@ been seen on screen yet** — that is the top of §5.
 | `vr_unlock` | every VR mission unlocked (test aid, **not deployed**) | emulating the overlay through all five unlock passes: 46 → 361 of 373 items on Integral, 45 → 357 on USA |
 
 `ppfcheck.py --deployed` is clean over all 26 deployed files and no two of the
-six VR PPFs touch the same disc byte.
+six VR PPFs touch the same disc byte. `vr_sweep.py` rebuilds every stage as the
+game will see it and finds **222 game-encoded records against 10 809 English**
+(USA's own disc: 940 against 10 344); 181 of the 222 are English with
+local-font glyphs, and the rest are exactly the list the README calls
+"Deferred, with reasons". Nothing with a USA English counterpart is still
+Japanese.
 
 **Reproducibility:** every one of the nine shipping families is rebuilt from
 retail inputs in an isolated directory by `rebuild.py` — stage files extracted
@@ -347,6 +352,7 @@ Texture lettering and runtime language branches are outside both tools.
 | `vr_camera.py [--deploy]` | the VR camera overlay's memory-card messages |
 | `vr_kcgeom.py` | VR KEY CONFIG geometry read from an overlay: `Init_Res` quads and the per-button-type rectangles (imported by `vr_option.py`) |
 | `vr_unlock.py [--deploy]` | the removable VR unlock test aid — three words, never deploy with achievements live |
+| `vr_sweep.py [--samples]` | rebuilds every VR stage from the deployed PPFs and reports what is still game-encoded, beside USA's own tally — the VR equivalent of `jpsweep.py`, and the only tool here that inverts `portio.image_offset`'s 2352-byte sector geometry |
 | `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
 | `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
 | `pcx4.py` | encode/decode the 4-plane RLE PCX the texture loader expects (how `sc_text` and the KEY CONFIG art were read and written) |
@@ -491,6 +497,13 @@ established, beyond the patches themselves:
 - **The KEY CONFIG textures did not fit** until every texture in the option
   stage's archive was re-encoded losslessly, which is why `pcx4.py` gained an
   8-bit codec.
+- **The disc image has raw 2352-byte sectors.** A PPF offset is
+  `(lba + off // 2048) * 2352 + 24 + off % 2048`. The first version of
+  `vr_sweep.py` divided by 2048 instead, applied every record at a nonsense
+  offset, and made a finished port look unported — for about twenty minutes it
+  looked like a serious gap. Anything that reads a deployed PPF back must use
+  `portio.image_offset`'s geometry. The port itself was always correct; only
+  the checker was wrong.
 
 Left where it was: the collection still intercepts VR's KEY CONFIG, so seeing
 Integral's own needs `DisableRAM` and `DisableCDROM`. The ASI was rebuilt with
