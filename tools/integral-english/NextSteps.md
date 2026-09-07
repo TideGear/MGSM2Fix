@@ -112,7 +112,7 @@ been seen on screen yet** — that is the top of §5.
 | `vr_en_missions` | 1808 of 1813 in-mission windows across 92 stages: titles, briefings, results, hints | statically: every stage re-parses, no stage grew (ten padded back to their sector count), 15 031 records / 3 370 955 bytes, fonts merged and every remaining glyph code proved to exist in the new font |
 | `vr_en_items` | the VR executable's item, weapon and capture-mode pools | statically; the PPF owns every byte of all three arenas, as the main game's does since the SOCOM fault |
 | `vr_en_savemsg` | the VR executable's 12 save and 12 load messages | statically; indices 1 and 9 stay Japanese (USA draws nothing) |
-| `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | statically: quads and per-type rectangles verified against USA's by re-executing the transplanted function; the DAR fits at 120 754 of 120 832 bytes after a lossless re-encode of every texture |
+| `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | **the option screen is verified on screen 2026-09-06** after three faults, all found by bisecting the PPF: the DAR's entry sizes were not 4-aligned and crashed the stage at `load option`; record 3 doubled the vibration-test sentence; and Integral's colon/values were lit beside the English while the lines sat off-centre. Fixed by padding every DAR payload to 4 (paid for with `pcx4`'s real 63-byte run cap), blanking record 3 as the main game does, unlighting the colon/values via the state switch, and giving each ported entry USA's `{num 1, x 160, y 196}`. All five rows now read as one centred English line, measured within 0.3 game px of centre. **KEY CONFIG itself is still unseen** — the collection intercepts it on the VR disc too, exactly as on the main discs, so its transplanted geometry and eight label textures can only be validated on a raw disc |
 | `vr_en_title` | the EXTRA menu's four help lines | statically; record 6 (PocketStation) deliberately kept — USA's `See the staff credits.` is a different feature |
 | `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used |
 | `vr_unlock` | every VR mission unlocked (test aid, **not deployed**) | emulating the overlay through all five unlock passes: 46 → 361 of 373 items on Integral, 45 → 357 on USA |
@@ -209,6 +209,28 @@ package the raw variant too. The raw variant then needs its own runtime
 validation on a real PSX image, where the disc-swap text (5.3, and the
 disc-change abstract now inside `en_abst`) is reachable. README "The sc_text
 texture port" and "The collection's KEY CONFIG interception".
+
+### 5.4a TO DO: the VR movie selection captions
+Found 2026-09-06. The MOVIE screen's description text (shown when a clip opens)
+**is** English already — it comes from `vr_en_missions`' window text. What is
+still Japanese is the one-line caption under the thumbnail on the *selection*
+screen, in the `movie` stage's own script, and it is not a 1:1 swap:
+
+| | Integral | USA |
+|---|---|---|
+| TGS clip A | one 35-byte record (`東京ゲームショウ'98春 出展映像A`) | **two** records: `Exhibition clip "A" for` + `the Tokyo Game Show, Spring '98.` |
+| TGS clip B | one 35-byte record | two records |
+| E3 clip | one 22-byte record (`E3(97/6)…`) | one: `Video clip from E3 (6/97)` |
+
+USA draws those captions as **two lines** where Integral uses one — the same
+one-vs-two shape problem `abst` had. Concatenating gives a 56-character line,
+over the 240 px limit, which wraps into the CLUT row and smashes the heap
+(README "Font and text rendering"). The two stages are not structurally
+parallel either: USA's `movie` carries an extra `cr` tag and ~100 KB more cache
+data than Integral's. So this needs the caption's KCB line count and record
+structure worked out before any bytes move. **I corrected myself here:** I first
+guessed these captions were Integral-only content with no USA counterpart, which
+was wrong.
 
 ### 5.5 The VR disc: see it on screen, then finish the edges
 Ported 2026-09-06 and deployed; **nothing has been seen running yet.** In

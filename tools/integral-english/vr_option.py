@@ -57,9 +57,18 @@ from vrlib import (INT_STAGE, USA_STAGE, int_disc, stage_lba, stage_bytes, stage
 
 PPF_NAME = 'INTEGRAL_vr_en_option.ppf'
 DESC = 'MGS Integral VR-DISC: English option text'
-CHAIN = {1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 12: 12, 26: 26}
+CHAIN = {1: 1, 2: 2, 5: 5, 6: 6, 12: 12, 26: 26}
+# Record 3 is NOT ported, and this is the main game's decision of 2026-09-02
+# repeated: USA holds `Use directional buttons to test.` at 3, 12 and 26, but
+# Integral draws 3 at the row-LABEL position and 12/26 at the sentence position,
+# so giving 3 USA's sentence draws a second copy over the first (seen in game
+# 2026-09-06).  Integral's own record 3 is 振動テスト - the row's name plus a
+# sentence USA's line already covers - so it is blanked, exactly as
+# `optlabel2.py` does for the main game.
+BLANK = {3: b' '}
 SYUKAN_SHIFT = 11                 # game px, the 2026-09-03 decision for the same art
 SLOT_SECTORS = 59                 # the DAR's sectors in the retail stage
+RUN_CAP = 63                      # pcx4's real maximum run; pays for the 4-alignment pad
 
 # --- Init_Res call-site rewrites in Integral's overlay: (offset, old word, new word)
 def addiu(rt, rs, imm): return (9 << 26) | (rs << 21) | (rt << 16) | (imm & 0xFFFF)
@@ -93,6 +102,49 @@ CALL_SITE_PATCHES = [
     (0x54C8, sw(ZERO, 28), sw(S1, 28)),
     (0x551C, sw(ZERO, 28), sw(S1, 28)),
 ]
+# --- the per-state colour switch: stop lighting Integral's colon and value on
+# the rows that now carry USA's English help line (2026-09-06, from the shots).
+# See this module's docstring for the whole switch; the reset loop at +F44 sets
+# every entry to colour 0, so an entry the switch skips is invisible - the same
+# lever the main game used to unlight entry 27 (README, "The sc_text texture
+# port"). No text changes: Integral's records 7, 8-11 and 27 stay as they are.
+JAL_HELPER = 0x0C0306B5           # jal +934, the colour helper
+J_1218     = 0x080308EE           # j +1218, the shared helper call in the tail
+J_1220     = 0x080308F0           # j +1220, the instruction after it
+LIT_PATCHES = [
+    # SOUND {1, 7, 10|11} -> {1}
+    (0x1004, JAL_HELPER, 0),          # entry 7, the colon
+    (0x102C, J_1218, J_1220),         # value 10 (ステレオ)
+    (0x1034, J_1218, J_1220),         # value 11 (モノラル)
+    # VIBRATION {2, 7, 8|9} -> {2}
+    (0x1054, JAL_HELPER, 0),          # entry 7, the colon
+    (0x107C, J_1218, J_1220),         # value 8 (オン)
+    (0x1084, J_1218, J_1220),         # value 9 (オフ)
+    # VIBRATION TEST {3, 27, 12|26} -> {3 (blank), 12|26}
+    (0x10A4, JAL_HELPER, 0),          # entry 27, the colon; the sentence stays lit
+]
+
+# --- the KCB position table: give every ported help line USA's own placement.
+# opt.c: num 0 = draw at (x, y); num 1 = centre on it (x - max_width/2,
+# y - max_height/2). Retail Integral VR is num 0 with an x hand-set for each
+# JAPANESE string's width, so an English line of a different width sits
+# off-centre (seen in game 2026-09-06); USA VR is {1, 160, 196} for all 31.
+# This is the same substitution the main game's table already carries
+# ({1, 160, 200} for its four ported lines) - see opt.c's own comment.
+POS_TABLE = 0x10                  # overlay offset; 31 x {int num; short x; short y; int color}
+POS_STRIDE = 12
+USA_POS = (1, 160, 196)           # USA VR's entry, identical for every index
+# every record the port replaces with USA English, and retail's value we expect
+POS_PATCHES = {
+    1:  (0,  76, 190),            # Sound setting.
+    2:  (0, 100, 190),            # Vibration setting.
+    3:  (0,  42, 190),            # (blanked, but keep it consistent with USA)
+    5:  (0,  88, 190),            # Key configuration setting.
+    6:  (0,  94, 190),            # Return to the title screen.
+    12: (0, 122, 190),            # Use directional buttons to test.
+    26: (0, 122, 190),            # Use directional buttons to test.
+}
+
 EXPECT_QUADS = {                  # USA's Init_Res quads (x0, y0, x1, y1, abe, orient)
     'key_button': (-148, -70, -60, -57, 1, 0), 'key_sykan': (-148, 38, -36, 51, 1, 0),
     'key_reverse': (40, 42, 84, 48, 1, 0), 'key_normal': (-18, 39, 22, 49, 1, 0),
@@ -138,6 +190,20 @@ def overlay_patch(iov, uov):
         got = struct.unpack_from('<I', new, off)[0]
         assert got == old, 'overlay +%X holds %08X, expected %08X' % (off, got, old)
         struct.pack_into('<I', new, off, repl)
+    # 3. the colour switch: unlight the colon and the values where USA's English
+    # help line now says it all
+    for off, old, repl in LIT_PATCHES:
+        got = struct.unpack_from('<I', new, off)[0]
+        assert got == old, 'overlay +%X holds %08X, expected %08X (colour switch moved?)' % (off, got, old)
+        struct.pack_into('<I', new, off, repl)
+    # 4. the position table: USA's placement for every ported line
+    for k, expect in sorted(POS_PATCHES.items()):
+        off = POS_TABLE + POS_STRIDE * k
+        got = struct.unpack_from('<ihh', new, off)
+        assert got == expect, 'position entry %d is %s, expected %s (table moved?)' % (k, got, expect)
+        struct.pack_into('<ihh', new, off, *USA_POS)
+        # the USA overlay must actually say this, so the values follow the disc
+        assert struct.unpack_from('<ihh', uov, off) == USA_POS, 'USA entry %d is not %s' % (k, USA_POS)
     new = bytes(new)
     # verify against the simulators
     q = K.label_quads(new, K.INT_BASE)
@@ -183,14 +249,23 @@ def build_dar(ipay, upay, alloc):
         g = geo(src)
         if g['bpp'] == 4:
             w, h, pal, rows = pcx4.decode(src)
-            enc = pcx4.encode(src, w, h, pal, rows)
+            enc = pcx4.encode(src, w, h, pal, rows, maxrun=RUN_CAP)
             w2, h2, pal2, rows2 = pcx4.decode(enc)
             assert (w2, h2, pal2, rows2) == (w, h, pal, rows)
         else:
             w, h, px, tail = pcx4.decode8(src)
-            enc = pcx4.encode8(src, px, tail)
+            enc = pcx4.encode8(src, px, tail, maxrun=RUN_CAP)
             assert pcx4.decode8(enc) == (w, h, px, tail)
         assert enc[:128] == src[:128], 'header changed'
+        # Every DAR entry's size must be a multiple of 4: an entry header is
+        # {u16 id, s16 ext, u32 size} immediately after the previous payload, so
+        # an odd size leaves the next header - and its u32 - misaligned. Retail
+        # Integral and USA both hold this for all 51/57 entries; our first build
+        # left 39 sizes odd, 41 starts misaligned, and the option stage crashed
+        # the CPU at `load option` (2026-09-06). The pad sits inside `size` and
+        # PcxInflate stops on its own byte count, so it is never decoded.
+        enc = bytes(enc) + bytes(-len(enc) % 4)
+        assert len(enc) % 4 == 0
         out += struct.pack('<HhI', tid, ext, len(enc)) + enc
         report.append((tid, name, size, len(enc)))
     out += irest
@@ -244,11 +319,20 @@ def port_chain(igcx, ugcx):
         assert t and not jp and new != b'\0'
         replace[id(irecs[i])] = bytes((7, len(new))) + new
         print('  chain %2d <- %s' % (i, t))
+    for i, text in BLANK.items():
+        new = text + b'\0'
+        replace[id(irecs[i])] = bytes((7, len(new))) + new
+        print('  chain %2d <- (blank, the main game\'s 2026-09-02 decision)' % i)
     igcx.script = emit_arg(ibody, iblock, replace)
     new_gcx = igcx.build()
     b2, _, r2 = chain(Gcx(new_gcx, 0))
     for i in range(31):
-        exp = ubody[urecs[CHAIN[i]].pos+2:urecs[CHAIN[i]].end] if i in CHAIN else ibody[irecs[i].pos+2:irecs[i].end]
+        if i in CHAIN:
+            exp = ubody[urecs[CHAIN[i]].pos+2:urecs[CHAIN[i]].end]
+        elif i in BLANK:
+            exp = BLANK[i] + b'\0'
+        else:
+            exp = ibody[irecs[i].pos+2:irecs[i].end]
         assert b2[r2[i].pos+2:r2[i].end] == exp
     return new_gcx
 

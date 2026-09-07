@@ -230,6 +230,45 @@ detail; this is the index.
 
 ### Textures and quads
 
+**EVERY DAR ENTRY'S SIZE MUST BE A MULTIPLE OF 4.** An entry header is
+`{u16 id, s16 ext, u32 size}` sitting immediately after the previous payload, so
+an odd size leaves the *next* header — and its `u32` — misaligned, and the
+loader reads it off-alignment. Retail holds the invariant everywhere it was
+checked: Integral's main `option` DAR (51 entries), USA's (57), Integral's VR
+`option` (51), USA's VR (57) — **zero** unaligned sizes in all four. The VR
+option port's lossless PCX re-encode left **39 sizes odd and 41 of 51 entry
+starts misaligned**, and the stage crashed the emulated CPU the moment it
+loaded (2026-09-06):
+
+    > load option
+    r3000: illegal instruction 0xffffffff (pc=0x10600007)
+
+`pc` and `r2` both holding `0x10600007` — a `beq` instruction word used as an
+address — is the signature: the walk derailed, a texture pointer came back as
+code, and something jumped through it. **Pad every payload to 4 and put the pad
+inside `size`**; `PcxInflate4`/`PcxInflate8` stop on their own byte count, so
+the pad is never decoded. Add it to any DAR check: walk it the loader's way and
+assert both that the walk lands on exactly 0 *and* that no size is odd.
+
+**`pcx4`'s run cap was 62; the format allows 63.** `code = PCX_RLE_CODE + run`
+with `PCX_RLE_CODE = 0xC0`, so `0xFF` is a 63-byte run and both inflaters decode
+it. The encoder stopped at 62, which costs a byte on every long run. `_rle`,
+`encode` and `encode8` now take `maxrun`, **defaulting to 62** so every
+already-shipped patch still builds byte-for-byte identical (verified: the main
+game's `en_option` rebuilds identical on both discs). The VR option builder
+passes 63, which is what paid for its 82 bytes of alignment padding inside a
+DAR slot with only 78 bytes spare.
+
+**`PcxInflate4` decodes each row into a 128-byte static buffer**
+(`pcx_temp_buf`, `libdg/loader.c`) with no bound check, so `stride * 4` must be
+≤ 128 and a run must not overshoot the row. 8bpp goes through `PcxInflate8`
+instead — one continuous stream of `w * h` into `tex->data`, no per-row buffer —
+so do not apply the 4-plane rule to it. Checked against retail and USA as
+controls, all four DARs are clean on both counts; this was investigated as a
+crash cause and ruled out, and the controls are the reason it could be ruled
+out quickly.
+
+
 - **The texture is stretched to a hardcoded quad**, and `SetPacketTexture`'s UVs
   span the whole texture, so changing texture size alone does nothing. The
   selection highlight follows the same quad.
@@ -1475,6 +1514,51 @@ colon at 7, `オン`/`オフ`/`ステレオ`/`モノラル` at 8–11, the unuse
 paragraph at 13–16, the KEY CONFIG rows' lines 17–25, the language rows 28–30 —
 stays Integral's. The chain grows 49 bytes inside its existing sector, so the
 stage keeps its 73 sectors.
+
+**Seen on screen 2026-09-06, and it took three faults to get right.** The first
+build crashed the stage outright (the DAR alignment invariant above). With that
+fixed, the help lines showed but were wrong in two more ways, and both were the
+main game's problems recurring:
+
+- **A doubled sentence.** USA holds `Use directional buttons to test.` at
+  records **3, 12 and 26**, but Integral draws record 3 at the row-*label*
+  position and 12/26 at the sentence position, so porting 3 drew a second full
+  sentence over the first. This is the main game's 2026-09-02 decision exactly:
+  record 3 (`振動テスト`, the row's own name plus a sentence USA's line already
+  covers) **stays blank**. `optlabel2.py` writes `b' '` for the main game;
+  `vr_option.py` now has `BLANK = {3: b' '}` for the same reason.
+- **Integral's colon and value drawn beside the English.** Records 7/27 (a
+  colon) and 8–11 (`オン`/`オフ`/`ステレオ`/`モノラル`) are Integral's own and USA
+  leaves them empty, so they stay Japanese — but Integral *lit* them next to the
+  ported line, giving `Sound setting.：ステレオ`. The lever is the one the main
+  game used for entry 27: the state switch calls a colour helper per entry and a
+  reset loop sets **every** entry to colour 0 first, so an entry the switch skips
+  is invisible. No text changes. `LIT_PATCHES` NOPs the helper `jal` for the
+  colon and retargets each conditional value's `j` past the shared call, on the
+  three rows that now carry USA's English — and leaves it alone on the
+  Integral-only row and the two KEY CONFIG sub-rows, whose lines are still
+  Japanese. The switch is at overlay `+EE0..+1240` (reset loop `+F44`, helper
+  `+934`, dispatch `jr v0` at `+F94`); `vr_option.py`'s docstring maps every
+  state.
+- **Off-centre text.** `opt.c`'s placement: `num == 0` draws at `(x, y)`;
+  `num == 1` centres (`x - max_width/2`, `y - max_height/2`). Retail Integral VR
+  is `num 0` with an x hand-set per **Japanese** string (76, 100, 42, 88, 94,
+  122 …) at y 190; **USA VR is `{1, 160, 196}` for all 31 entries.** An English
+  line of a different width in a Japanese slot therefore sits off-centre.
+  `POS_PATCHES` gives each ported entry USA's own `num`/`x`/`y` — the same
+  substitution the main game's table already carries (`{1, 160, 200}`, and
+  `opt.c` comments it). Table at overlay `+0x10`, 31 × `{int num; short x;
+  short y; int color}`. Measured on the five shots afterwards: every caption's
+  ink centre is within **0.3 game px** of screen centre.
+
+**What this says about the verification.** All three faults shipped past static
+checks that could not see them: the quads and per-type rectangles were confirmed
+by *re-executing the transplanted function with a simulator that reads the same
+offsets the code writes* — which proves the arithmetic, not that the result is
+right for Integral's screen — and the DAR was checked for **fit** but not for
+alignment. Screen-visible properties need a screenshot or a retail control, and
+the retail control is what made the alignment fault obvious the moment it was
+measured.
 
 *KEY CONFIG.* Same program as the main game's `opt.c`, so the same two authorities
 apply and `vr_kcgeom.py` reads both from the binaries rather than measuring
