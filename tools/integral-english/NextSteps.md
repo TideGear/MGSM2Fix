@@ -116,7 +116,7 @@ at; the rest are statically verified only, and §5.5 lists what is still unseen.
 | `vr_en_missions` | 1808 of 1813 in-mission windows across 92 stages: titles, briefings, results, hints | statically: every stage re-parses, no stage grew (ten padded back to their sector count), 15 031 records / 3 370 955 bytes, fonts merged and every remaining glyph code proved to exist in the new font |
 | `vr_en_items` | the VR executable's item, weapon and capture-mode pools | statically; the PPF owns every byte of all three arenas, as the main game's does since the SOCOM fault |
 | `vr_en_savemsg` | the VR executable's 12 save and 12 load messages | statically; indices 1 and 9 stay Japanese (USA draws nothing) |
-| `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | **the option screen is verified on screen 2026-09-06** after three faults, all found by bisecting the PPF: the DAR's entry sizes were not 4-aligned and crashed the stage at `load option`; record 3 doubled the vibration-test sentence; and Integral's colon/values were lit beside the English while the lines sat off-centre. Fixed by padding every DAR payload to 4 (paid for with `pcx4`'s real 63-byte run cap), blanking record 3 as the main game does, unlighting the colon/values via the state switch, and giving each ported entry USA's `{num 1, x 160, y 196}`. All five rows now read as one centred English line, measured within 0.3 game px of centre. **KEY CONFIG itself is still unseen** — the collection intercepts it on the VR disc too, exactly as on the main discs, so its transplanted geometry and eight label textures can only be validated on a raw disc |
+| `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | **the option screen is verified on screen 2026-09-06** after three faults, all found by bisecting the PPF: the DAR's entry sizes were not 4-aligned and crashed the stage at `load option`; record 3 doubled the vibration-test sentence; and Integral's colon/values were lit beside the English while the lines sat off-centre. Fixed by padding every DAR payload to 4 (paid for with `pcx4`'s real 63-byte run cap), blanking record 3 as the main game does, unlighting the colon/values via the state switch, and giving each ported entry USA's `{num 1, x 160, y 196}`. All five rows now read as one centred English line, measured within 0.3 game px of centre. **KEY CONFIG verified on screen 2026-09-07** with `DisableRAM`/`DisableCDROM` on: Integral's own screen draws, all eight labels English through all three button types, and `key_syukan`'s +11 clears the curve. One fault found and fixed the same day — the selection highlight on the `first person view` row was 24 px short (88 against USA's 112) because it is drawn by hardcoded `glow(work, x, y, w, h, ...)` calls rather than an `Init_Res` quad, so the transplant never touched it; measured 113 px against USA's 114 after the fix |
 | `vr_en_title` | the EXTRA menu's four help lines | statically; record 6 (PocketStation) deliberately kept — USA's `See the staff credits.` is a different feature |
 | `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used. Never seen on screen |
 | `vr_en_movie` | the MOVIE selection captions | **all three ported 2026-09-07**, the two TGS ones as USA's two lines. The line count was never data: USA calls the actor's own `highlight(work, i)` twice — for `clip*2` and `clip*2+1` — where Integral calls it once, so the port retargets that one `jal` at a 16-word stub in the overlay's own sector padding. **Verified on screen 2026-09-07**, all three clips: both TGS captions on two rows with correct attribution and real typographic quotes, E3 on one. Line 1's ink then overlapped the EXIT box by 2 rows, because Integral's caption face is taller than USA's; the box moved up 4 px to USA's own y with the user's approval (§5.4a, §6), and **that part is not yet seen on screen** |
@@ -387,13 +387,17 @@ is taller). What is left, in rough order:
    message, and the PHOTOGRAPHING mode's card messages (the ALBUM path). If
    something is wrong, bisect the same way as the main game: move that one PPF
    out of `mods\INTEGRAL\VR-DISK\` and confirm the Japanese comes back.
-2. **KEY CONFIG needs the collection out of the way.** VR Missions still
-   intercepts the screen to show the Master Collection's own key config — the
-   user hit it again in play on 2026-09-06 — so seeing Integral's own needs
-   `DisableRAM = true` and `DisableCDROM = true` (achievements off). Check
-   `key_syukan`'s +11 shift while there. The user's rule stands: **in the
-   collection they prefer the interception**, and the transplant is for the raw
-   disc.
+2. **KEY CONFIG — DONE 2026-09-07.** Seen with `DisableRAM = true` and
+   `DisableCDROM = true`: Integral's own screen, all eight labels English in
+   all three button types, `key_syukan`'s +11 shift clearing the connector
+   curve. The user spotted the one fault — the row's selection highlight was
+   24 px short, because it is drawn by hardcoded `glow()` arguments rather than
+   an `Init_Res` quad and the transplant only knew about quads. Fixed, redeployed
+   and re-measured within a px of USA (README, "The VR KEY CONFIG on screen").
+   The help line under the controller stays Japanese by rule: USA leaves records
+   17..25 empty. **The flags are only for looking at it** — the user's rule
+   stands that in the collection they prefer the interception, and the
+   transplant is for the raw disc.
 3. **Both unlock aids may stay for testing and must come out after.**
    `vr_unlock.py` (missions) and `vr_unlock_movies.py` (the EXTRA clips) each
    write no progress, so saving with them in place is safe; the standing rule is

@@ -73,7 +73,7 @@ RUN_CAP = 63                      # pcx4's real maximum run; pays for the 4-alig
 # --- Init_Res call-site rewrites in Integral's overlay: (offset, old word, new word)
 def addiu(rt, rs, imm): return (9 << 26) | (rs << 21) | (rt << 16) | (imm & 0xFFFF)
 def sw(rt, imm, rs=29): return (0x2B << 26) | (rs << 21) | (rt << 16) | (imm & 0xFFFF)
-A3, V0, T0, S0, S1, S2, ZERO = 7, 2, 8, 16, 17, 18, 0
+A1, A3, V0, T0, S0, S1, S2, ZERO = 5, 7, 2, 8, 16, 17, 18, 0
 CALL_SITE_PATCHES = [
     # key_button (-149,-70,-61,-58) -> (-148,-70,-60,-57)
     (0x50B0, addiu(A3, ZERO, -149), addiu(A3, ZERO, -148)),
@@ -96,6 +96,27 @@ CALL_SITE_PATCHES = [
     (0x51CC, sw(S0, 24), addiu(S0, S0, 1)),
     (0x51D0, sw(S1, 28), sw(S0, 24)),                   # abe stays 1 from the reverse call
     (0x51D8, sw(ZERO, 32), sw(S2, 16)),                 # delay slot; orient stays 0
+    # --- the SELECTION HIGHLIGHT behind the key_sykan row, found on screen
+    # 2026-09-07 with the collection's patches off (the first look at Integral's
+    # own VR KEY CONFIG). The row's label is now USA's 112-wide `first person
+    # view`, but the lit box behind it was still retail's 88, so the hexagon's
+    # right chevron hung outside the glow. Measured off paired shots: USA's glow
+    # ends at game x 125, ours at 101 - 24 px short, exactly 112 - 88.
+    #
+    # The box is not an Init_Res quad. Integral draws it with hardcoded
+    # arguments, `glow(work, x, y, w, h, 255, ...)` at 0x800C23E4, and the
+    # key_sykan row has two such call sites (the two selection states). Only the
+    # x and the width move, to the label quad's own -148 and 112; the height
+    # stays Integral's 12 against USA's 13-tall art, which is Integral's own and
+    # not what was wrong. The key_button row's pair (y -70) is left alone - that
+    # label is 88 wide on both discs.
+    #
+    # Rule 3 names this case outright: "the chrome that positions text (rules,
+    # connectors, highlight boxes, row spacing)".
+    (0x2234, addiu(A1, ZERO, -149), addiu(A1, ZERO, -148)),
+    (0x223C, addiu(A3, ZERO, 88), addiu(A3, ZERO, 112)),
+    (0x2424, addiu(A1, ZERO, -149), addiu(A1, ZERO, -148)),
+    (0x242C, addiu(A3, ZERO, 88), addiu(A3, ZERO, 112)),
     # abe = 1 on key_action / key_buki / key_hohuku / key_syukan
     (0x5418, sw(ZERO, 28), sw(S1, 28)),
     (0x5470, sw(ZERO, 28), sw(S1, 28)),
