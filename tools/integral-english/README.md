@@ -1501,10 +1501,14 @@ is `GetOption('t')` then `NextStr`/`GetString` **until NULL**, a while-loop and
 not a fixed count, so extra records are read. Diffing a 0x1200-byte window at
 that alignment found 38 differences, every one a data-address displacement.
 
-**What is NOT proven: how a clip's line(s) are selected.** With identical code,
-four records give lines `[A][B][E3][]` and six give `[A1][A2][B1][B2][E3][]`, so
-something maps clip -> line(s) and it is not in the compared code. The
-candidates are the caption command's two other options, which *do* differ:
+**SETTLED IN GAME 2026-09-06: the actor shows ONE record per clip.** The full
+six-record build was deployed and clip A rendered just its first record. So
+Integral's caption is `line = clip`, USA's is not, and the two lines USA draws
+cannot be reproduced by the chain edit alone. The full build therefore stays
+**wrong for Integral** - clip B would take `the Tokyo Game Show, Spring '98.`
+and E3 would take clip B's line - and it is staged, not shipped. The mechanism
+to find is whatever makes USA show two: the caption command's two other
+options, which *do* differ:
 
     OPTION 'f'   Integral  VAR 11 00 04 80      USA  VAR 11 00 04 82
     OPTION 'm'   Integral  VAR 12 00 04 82      USA  VAR 12 00 04 81
@@ -1522,13 +1526,27 @@ answer it either.
   whatever maps a clip to record 2, record 2 is still the E3 caption, now in
   USA's English. Correct under *any* mapping, so it needs no knowledge of the
   selection and cannot misattribute a caption.
-- **`INTEGRAL_vr_en_movie.ppf` - the full port, STAGED, not deployed.** Correct
-  if the actor walks a clip's records; if it indexes `line = clip`, clips B and
-  E3 would show the wrong English line, which is worse than leaving them
-  Japanese - misattributed text, against the port's rule. **One launch decides
-  it**: deploy it, open EXTRA -> MOVIE with `vr_unlock` in place and check all
-  three clips. If clip B is wrong the answer is the `f`/`m` variables above, not
-  the chain edit.
+- **`INTEGRAL_vr_en_movie.ppf` - the full port, STAGED, and now known to be
+  incomplete.** `line = clip` was confirmed on screen, so it gives each clip
+  only its first record: clip A would read `Exhibition clip "A" for` with no
+  second line, and the gated clips would be misattributed. Held back until the
+  two-line mechanism is solved. Its text and glyph codes are now correct, so
+  only the line count is left.
+
+**THE LOCAL-FONT TRAP, caught on screen.** The first deployment of the full
+build rendered `Exhibition clip` followed by two kanji instead of the quotes.
+USA's records reference script-local font glyphs `{q01}`/`{q02}` - its
+typographic quotes - and at those indices **Integral's** font holds different
+glyphs, exactly the mojibake this README already warned about under
+"Script-local fonts". Copying a USA record verbatim is never safe.
+`vr_movie.font_remap` fixes it by matching glyph **bitmaps** between the two
+fonts: USA's two quotes turn out to be already present in Integral's merged font
+at indices 14 and 15 (codes `9A0E`/`9A0F`, appended by `vr_en_missions` - the
+"movie keeps Integral's plus two" note), so no font surgery is needed, only a
+code rewrite. Matching bitmaps rather than hardcoding those indices keeps it
+correct if the merge ever changes. After the remap the `-t` payload matches
+USA's length and differs in exactly 4 bytes: the two codes in each TGS first
+line. `verify()` compares against the remapped expectation, not raw USA bytes.
 
 **THE COMPOSITE TRAP, for the third time.** `vr_en_missions` already rebuilds the
 `movie` stage - 2,219 bytes of it, including the clips' English descriptions and
