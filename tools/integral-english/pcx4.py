@@ -36,11 +36,16 @@ def decode(blob):
         rows.append(row)
     return w, h, pal, rows
 
-def _rle(data):
+def _rle(data, maxrun=62):
+    """RLE the stream. `code = RLE + run`, so a run may be up to 63 bytes and
+    PcxInflate4/8 decode that; the original call site here used 62 and every
+    shipped patch was built with it, so 62 stays the default and a caller that
+    wants the last byte back passes maxrun=63 explicitly."""
+    assert 1 <= maxrun <= 63, maxrun
     out = bytearray(); i = 0; n = len(data)
     while i < n:
         v = data[i]; run = 1
-        while i + run < n and data[i+run] == v and run < 62: run += 1
+        while i + run < n and data[i+run] == v and run < maxrun: run += 1
         if run > 1 or v > RLE:
             out.append(RLE + run); out.append(v)
         else:
@@ -48,7 +53,7 @@ def _rle(data):
         i += run
     return out
 
-def encode(template, w, h, pal, rows):
+def encode(template, w, h, pal, rows, maxrun=62):
     """Rebuild a texture using `template`'s 128-byte header, with new size/pixels.
     px/py/cx/cy in the PCXINFO block at offset 74 are preserved from template."""
     hdr = bytearray(template[:128])
@@ -69,7 +74,7 @@ def encode(template, w, h, pal, rows):
             byte, bit = x >> 3, 7 - (x & 7)
             for pl in range(nplanes):
                 if (v >> pl) & 1: planes[pl][byte] |= 1 << bit
-        body += _rle(b''.join(bytes(p) for p in planes))
+        body += _rle(b''.join(bytes(p) for p in planes), maxrun)
     return bytes(hdr) + bytes(body)
 
 
@@ -94,6 +99,6 @@ def decode8(blob):
     return w, h, bytes(out), blob[p:]
 
 
-def encode8(template, pixels, tail):
+def encode8(template, pixels, tail, maxrun=62):
     """the same texture with its RLE stream re-emitted (header and palette block kept)"""
-    return bytes(template[:128]) + bytes(_rle(pixels)) + bytes(tail)
+    return bytes(template[:128]) + bytes(_rle(pixels, maxrun)) + bytes(tail)
