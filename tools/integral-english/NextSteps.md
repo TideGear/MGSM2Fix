@@ -233,18 +233,30 @@ so the caption actor's read count almost certainly differs too - that has to
 come out of the `movie` overlay (Integral's `sb` is 122,808 bytes and is not
 decompiled), the same way `abst.c` had to before the mission log could move.
 
-**Status 2026-09-06.** `vr_movie.py` builds both variants; README "The MOVIE
-selection captions" has the full analysis. The **E3 caption is ported and
-deployed** - one record for one record, structure untouched, so it is correct
-under any clip->line mapping. The **two TGS captions are staged, not deployed**
-(`work/INTEGRAL_vr_en_movie.ppf`): they need one Integral record to become USA's
-two lines, the `-t` payload comes out byte-identical to USA's, but how the actor
-selects a clip's lines is unproven, and if it indexes `line = clip` then clips B
-and E3 would show the wrong English line - misattributed text, worse than
-Japanese. **One launch decides it**: deploy that PPF, open EXTRA -> MOVIE with
-`vr_unlock` in place, check all three clips. If clip B is wrong, the answer is
-the caption command's `f`/`m` GCL variable references, which differ between the
-versions, not the chain edit.
+**Status 2026-09-06, after testing on screen.** `vr_movie.py` builds both
+variants; README "The MOVIE selection captions" has the analysis. The **E3
+caption is ported and deployed** - one record for one record, so it is correct
+under any mapping - but it is the clip behind `???`, so it cannot be seen until
+the movie gate is solved. Shipping the caption nobody can reach was a delivery
+mistake: visibility should be checked before safety.
+
+The **two TGS captions are blocked on one thing.** The full build was deployed
+and clip A showed only its first record, so **Integral's actor is `line = clip`**
+while USA's shows two lines. The chain edit alone cannot reproduce USA's
+caption, so the full PPF stays staged. Two defects were found, one fixed:
+
+- **Fixed** - the local-font mojibake. It first rendered `Exhibition clip` with
+  two kanji where the quotes belong, because USA's `{q01}`/`{q02}` glyphs are
+  different characters at those indices in Integral's font. `font_remap` matches
+  glyph bitmaps and finds them already merged into Integral's font at
+  `9A0E`/`9A0F`, so only a code rewrite is needed; `-t` now matches USA's length
+  differing in exactly those 4 bytes.
+- **Open** - the line count. USA draws two records per clip, Integral one. The
+  candidates are the caption command's `f`/`m` GCL variable references, which
+  differ between the versions. Concatenating is not a way out: the combined line
+  is ~56 characters, about 325 game px against the 240 px limit, so it would
+  wrap into the CLUT row (README "Font and text rendering"). Until this is
+  solved the TGS captions stay Japanese, which is rule-correct.
 
 **Seeing the other two on screen needs the movie gate, which is not the mission
 unlock.** With `vr_unlock` deployed and applied the list still showed `???`, and

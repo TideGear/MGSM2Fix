@@ -111,6 +111,51 @@ def captions(gcx):
     raise AssertionError('caption command (chara %04X) not found' % CAPTION_CHARA)
 
 
+def font_remap(igcx, ugcx):
+    """USA local-font code -> the code for the same glyph in Integral's font.
+
+    Codes at or above 0x9A00 index a font stored INSIDE the script (36-byte
+    12x12 2bpp glyphs, `index = code - 0x9A00`), and the two discs' fonts hold
+    different glyphs, so copying a USA record verbatim renders mojibake - the
+    README's own warning, and it happened: `Exhibition clip {q01}A{q02}for` came
+    out on screen as `Exhibition clip 年A月for`, because USA's typographic quotes
+    at indices 1 and 2 are 年 and 月 in Integral's font.
+
+    No font surgery is needed here, because `vr_en_missions` has already merged
+    USA's two quote glyphs into this stage's font: they sit at Integral indices
+    14 and 15 (codes 9A0E / 9A0F). This matches glyph BITMAPS rather than
+    trusting that, so it stays correct if the merge ever changes.
+    """
+    I = [igcx.font[k * 36:(k + 1) * 36] for k in range(len(igcx.font) // 36)]
+    U = [ugcx.font[k * 36:(k + 1) * 36] for k in range(len(ugcx.font) // 36)]
+    out = {}
+    for j, g in enumerate(U):
+        hits = [k for k, h in enumerate(I) if h == g]
+        assert hits, ('USA local glyph %d (code %04X) is not in Integral\'s font; it would have to be '
+                      'appended and the font grown' % (j + 1, 0x9A00 + j + 1))
+        out[0x9A00 + j + 1] = 0x9A00 + hits[0] + 1
+    print('local-font remap: %s' % ', '.join('%04X->%04X' % kv for kv in sorted(out.items())))
+    return out
+
+
+def apply_remap(rec, remap):
+    """rewrite a record's local-font codes; `rec` is a whole 07 <len> <bytes> record"""
+    body = bytearray(rec[2:])
+    i, n = 0, 0
+    while i + 1 < len(body):
+        code = (body[i] << 8) | body[i + 1]
+        # style flags live in 0x6000 (font.c: code &= ~0x6000); keep them
+        bare = code & ~0x6000
+        if bare in remap:
+            new = remap[bare] | (code & 0x6000)
+            body[i], body[i + 1] = new >> 8, new & 0xFF
+            n += 1
+            i += 2
+            continue
+        i += 2 if body[i] >= 0x80 else 1
+    return bytes(rec[:2]) + bytes(body), n
+
+
 def composite(isd):
     """The `movie` stage as the game actually sees it: retail plus every DEPLOYED
     VR PPF's writes to it.
@@ -159,16 +204,20 @@ def build(pairing=PAIRING, expect_delta=EXPECT_DELTA, check_usa=True):
     print('caption option -%s: Integral %d records / %d bytes, USA %d records / %d bytes'
           % (LETTER, len(irecs), iopt.u8, len(urecs), uopt.u8))
 
+    remap = font_remap(igcx, ugcx)
     replace, delta = {}, 0
     for i, sources in sorted(pairing.items()):
         blob = b''
         for j in sources:
             rec = ubody[urecs[j].pos:urecs[j].end]
             assert rec[0] == 7 and rec[1] == len(rec) - 2, 'USA record %d is malformed' % j
+            rec, nfix = apply_remap(rec, remap)
+            assert rec[1] == len(rec) - 2, 'remap changed the length of record %d' % j
             blob += rec
             txt = rec[2:-1]
-            print('  record %d <- USA %d (%2d B) %r' % (i, j, len(txt),
-                  ''.join(chr(b) if 32 <= b < 127 else '#' for b in txt)[:46]))
+            print('  record %d <- USA %d (%2d B, %d glyph code%s remapped) %r'
+                  % (i, j, len(txt), nfix, '' if nfix == 1 else 's',
+                     ''.join(chr(b) if 32 <= b < 127 else '#' for b in txt)[:44]))
         old = ibody[irecs[i].pos:irecs[i].end]
         replace[id(irecs[i])] = blob
         delta += len(blob) - len(old)
@@ -181,11 +230,11 @@ def build(pairing=PAIRING, expect_delta=EXPECT_DELTA, check_usa=True):
     payloads[ici] += bytes(-len(payloads[ici]) % 4)
     stage = portio.pack_stage(itags, payloads)
     assert len(stage) == len(idata), 'stage changed size: %d -> %d' % (len(idata), len(stage))
-    verify(stage, ibody, irecs, ubody, uopt, urecs, pairing, check_usa)
+    verify(stage, ibody, irecs, ubody, uopt, urecs, pairing, check_usa, remap)
     return idata, stage
 
 
-def verify(stage, ibody, irecs, ubody, uopt, urecs, pairing, check_usa):
+def verify(stage, ibody, irecs, ubody, uopt, urecs, pairing, check_usa, remap):
     """Every ported record must equal USA's byte for byte, every record the
     pairing does not name must still equal Integral's, and the script must
     round-trip. For the full port the whole -t payload equals USA's."""
@@ -197,8 +246,9 @@ def verify(stage, ibody, irecs, ubody, uopt, urecs, pairing, check_usa):
     for i in range(len(irecs)):
         if i in pairing:
             for j in pairing[i]:
-                assert body[recs[k].pos:recs[k].end] == ubody[urecs[j].pos:urecs[j].end], \
-                    'record %d is not USA record %d' % (k, j)
+                want, _n = apply_remap(ubody[urecs[j].pos:urecs[j].end], remap)
+                assert body[recs[k].pos:recs[k].end] == want, \
+                    'record %d is not USA record %d (after the local-font remap)' % (k, j)
                 k += 1
         else:
             assert body[recs[k].pos:recs[k].end] == ibody[irecs[i].pos:irecs[i].end], \
@@ -206,9 +256,14 @@ def verify(stage, ibody, irecs, ubody, uopt, urecs, pairing, check_usa):
             k += 1
     if check_usa:
         got, wanted = body[opt.pos:opt.end], ubody[uopt.pos:uopt.end]
-        assert got == wanted, 'the -t option is not byte-identical to USA'
-        print('verified: -t byte-identical to USA (%d bytes, %d records); script round-trips; '
-              'stage stays %d bytes' % (len(wanted), len(recs), len(stage)))
+        # identical in LENGTH and in every byte except the remapped local-font
+        # codes, which must differ - USA's quote indices are other glyphs in
+        # Integral's font (see font_remap)
+        assert len(got) == len(wanted), 'the -t option is %d bytes, USA has %d' % (len(got), len(wanted))
+        differ = [k for k in range(len(got)) if got[k] != wanted[k]]
+        print('verified: -t matches USA in length (%d bytes, %d records), differing in %d byte(s) - the '
+              'remapped glyph codes; script round-trips; stage stays %d bytes'
+              % (len(wanted), len(recs), len(differ), len(stage)))
     else:
         print('verified: %d record(s) taken from USA, the rest still Integral\'s; %d records total; '
               'script round-trips; stage stays %d bytes'
