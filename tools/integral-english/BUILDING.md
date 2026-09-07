@@ -120,7 +120,7 @@ text, runtime behavior and raw-image packaging still require work.
 
 ## The VR disc (not yet in `rebuild.py`)
 
-The six VR PPFs are built by their own tools, run from this directory. They are
+The seven VR PPFs are built by their own tools, run from this directory. They are
 **not** part of `rebuild.py` and not in the collection ZIP; integrating them is
 open work (NextSteps §5).
 
@@ -149,6 +149,8 @@ py vr_exe.py --deploy                 # en_items and en_savemsg
 py vr_option.py --deploy              # en_option (help lines + KEY CONFIG)
 py vr_menus.py --deploy               # en_title
 py vr_camera.py --deploy              # en_camsave
+py vr_movie.py --deploy               # en_movie (MOVIE captions; needs the
+                                      #   deployed en_missions to build on)
 py ppfcheck.py --deployed             # always, before the game sees a PPF
 ```
 
@@ -160,7 +162,14 @@ Expected output on a clean run: 1808 of 1813 windows ported, 15 031 records and
 their original sector count); 63 records for `en_items`; 36 records / 431 bytes
 for `en_savemsg`; 546 records / 121 471 bytes for `en_option` with the DAR at
 120 754 of 120 832 bytes; 7 records / 915 bytes for `en_title`; 4 records /
-617 bytes for `en_camsave`.
+617 bytes for `en_camsave`; 69 records / 753 bytes for `en_movie`.
+
+`vr_movie.py` is the one that must run **after** `vr_windows.py` is deployed: it
+builds on the composite (retail plus every deployed VR PPF that writes the
+`movie` stage), so a fresh sequence has to deploy `en_missions` first. It writes
+two PPFs and `--deploy` installs the full one, moving the older E3-only file out
+of `mods/` - the two overlap and only one may be present (README "The MOVIE
+selection captions").
 
 `py vr_unlock.py` builds the removable test aid that unlocks every mission
 (README "Unlock every VR mission"). It is deliberately *not* deployed by
