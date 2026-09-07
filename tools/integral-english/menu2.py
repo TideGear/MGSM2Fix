@@ -7,7 +7,7 @@ builder, `menu3.py`. It is raw-disc only - the collection patches the same block
 and the two layouts do not mix (README, "Why `en_menu3` is raw-disc only").
 """
 from pathlib import Path
-from workdir import WORK, GAME
+from workdir import WORK, GAME, RAW
 from iso import Disc
 from portio import records, changed_runs, map_runs, ppf, INTEGRAL_IMAGES
 
@@ -24,9 +24,17 @@ def slots(data, base):
 
 def build(original):
     first = bytearray(original)
-    for base, index, text in ((TITLE, 4, b'RADAR OFF'),
-                             (0x035251B8, 4, b'screen brightness setup'),
-                             (0x035251B8, 5, b'key configuration setup')):
+    # TITLE index 4 is `RADAR OFF`, in the same block as the title's disc-swap
+    # copy. For a RAW disc `menu3.py` rewrites that whole block and shifts every
+    # record in it, so en_menu must not also write this one at retail's offset -
+    # the two would land on the same bytes with different layouts. menu3 ports it
+    # instead. (Caught 2026-09-07 by rebuild.py's packaged-set overlap check, on
+    # the first raw build.)
+    edits = [(0x035251B8, 4, b'screen brightness setup'),
+             (0x035251B8, 5, b'key configuration setup')]
+    if not RAW:
+        edits.insert(0, (TITLE, 4, b'RADAR OFF'))
+    for base, index, text in edits:
         off, value = list(slots(original, base))[index]
         assert len(text) <= len(value)-1
         assert len(text)+1 <= len(value)-1

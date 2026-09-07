@@ -154,6 +154,13 @@ PORT = {
     1: ('demosel', 1, 0, b'after inserting DISC 1.'),
     2: ('change',  1, 0, b'Press the Start Button'),
     3: ('change',  3, 0, b'Now Checking...'),
+    # Record 4 is `RADAR OFF`, and it is here only because this builder shifts
+    # the records around it. `en_menu` writes it for the collection build; in the
+    # raw variant menu2.py skips it (see the comment there) and this builder owns
+    # it, so the two never write the same bytes with different layouts. It has no
+    # counterpart in the change/demosel chains, hence None for the cross-check.
+    # Caught 2026-09-07 by rebuild.py's packaged-set overlap check.
+    4: (None,      0, 0, b'RADAR OFF'),
     5: ('change',  5, 2, b'The correct DISC was not inserted.'),
 }
 
@@ -249,9 +256,10 @@ def build(stage_dir, shorten):
     for i, (off, payload) in enumerate(recs):
         if i in PORT:
             where, j, skip, english = PORT[i]
-            want = src[where][j][skip:-1]
-            assert payload[skip:-1] == want, \
-                'record %d is not %s[%d] - the block moved (have %r)' % (i, where, j, payload[:16])
+            if where is not None:
+                want = src[where][j][skip:-1]
+                assert payload[skip:-1] == want, \
+                    'record %d is not %s[%d] - the block moved (have %r)' % (i, where, j, payload[:16])
             assert len(english) + 1 <= len(payload), 'English is longer than the slot'
             if shorten:
                 new = english + b'\x00'

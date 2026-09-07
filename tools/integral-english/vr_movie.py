@@ -449,7 +449,11 @@ def composite(isd):
     lba = stage_lba(int_disc(), isd, 'movie')
     lo, hi = lba * 2352, (lba + len(base) // 2048) * 2352
     applied = {}
-    d = _os.path.join(GAME, 'mods/INTEGRAL/VR-DISK')
+    # Normally the deployed folder, because that is what the game will see. An
+    # isolated build has no deployed folder and must compose on the PPFs it just
+    # made instead, so `rebuild.py` points this at its own work directory.
+    d = _os.environ.get('INTEGRAL_ENGLISH_VR_PPF_DIR') or _os.path.join(GAME, 'mods/INTEGRAL/VR-DISK')
+    assert _os.path.isdir(d), 'no PPF directory to compose on: %s' % d
     for name in sorted(_os.listdir(d)):
         if not name.endswith('.ppf') or name == PPF_NAME or name == SAFE_NAME:
             continue

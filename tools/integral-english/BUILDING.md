@@ -1,10 +1,29 @@
 # Rebuilding and packaging the current collection patch
 
-`rebuild.py` builds all nine enabled patch families for both main discs in a
-fresh directory (the ninth, `en_abst`, since 2026-09-05). It never installs patches or changes game files. This is the
-collection variant; raw-disc packaging remains open, and `en_menu3` is built by
-`menu3.py` for that variant only (it must never enter `mods/`).
-M2Package packages the ASI separately and is not the Integral asset packager.
+`rebuild.py` builds the whole port in a fresh directory - nine patch families
+for both main discs, and since 2026-09-07 the VR disc's seven as well - and it
+never installs patches or changes game files. M2Package packages the ASI
+separately and is not the Integral asset packager.
+
+**Two variants, one switch** (also 2026-09-07; before that both constants were
+edited by hand):
+
+    py rebuild.py --output <dir>                    # collection: what mods/ gets
+    py rebuild.py --output <dir> --variant raw      # for a real PSX disc image
+
+| | collection | raw |
+|---|---|---|
+| `SC_KEEP_LINES` (`optsctext.py`) | 4 - the collection drops USA's two ○-button lines | 6 - USA's own text |
+| `OPTION_MC_CONTROL_SETTINGS` (`opt.c`) | 1 - reproduce the KEY CONFIG doorbell | 0 - nothing to intercept, and no RAM at 0x80200000 |
+| `en_menu3` (the `title` disc-swap copy) | **excluded** - the collection patches that block itself and the two layouts kill the title stage | included |
+
+The switch is `INTEGRAL_ENGLISH_VARIANT`, resolved in `workdir.py` next to
+`WORK`/`GAME`/`DECOMP`, so a tool run by hand honours it too:
+`INTEGRAL_ENGLISH_VARIANT=raw py optsctext.py`. `rebuild.py` sets it for every
+tool it runs, edits the `opt.c` constant in its isolated decomp export before
+compiling, records both values in the report, and names the ZIP for the variant.
+`--compare-deployed` is refused with `--variant raw`, because what is deployed
+is the collection build.
 
 ## Inputs
 
@@ -60,7 +79,7 @@ A failed comparison retains the report and does not create a ZIP.
 
 ## Outputs
 
-- `Integral-English-collection.zip`: 18 PPFs in installation paths, README,
+- `Integral-English-<variant>.zip`: the PPFs in installation paths (collection: 18 main + 7 VR; raw adds `en_menu3` × 2), README,
   `build-report.json` and `SHA256SUMS.txt`.
 - `package/`: the same unpacked files for review.
 - `work/`, `decomp/`, `build.log`: extracted inputs, intermediate assets and
@@ -119,11 +138,31 @@ The collection option builder deliberately uses four brightness lines. Changing
 that constant to six alone does not finish the raw-disc release: disc-change
 text, runtime behavior and raw-image packaging still require work.
 
-## The VR disc (not yet in `rebuild.py`)
+## The VR disc (in `rebuild.py` since 2026-09-07)
 
-The seven VR PPFs are built by their own tools, run from this directory. They are
-**not** part of `rebuild.py` and not in the collection ZIP; integrating them is
-open work (NextSteps §5).
+`rebuild.py` builds the seven VR PPFs in the same isolated run as the main
+discs and packages them under `mods/INTEGRAL/VR-DISK/`. The tools below are what
+it runs, and they still work standalone for iterating on one patch.
+
+Three things are particular to the VR half of a clean build:
+
+- **Integral's VR executable is built, not copied.** The collection's copy is
+  unusable, so `rebuild.py` runs the decomp's generator a second time for the
+  `vr_exe` variant, ninjas `obj_vr/_mgsi.exe`, and checks it against
+  SHA-256 `c370f8e4…` before the tools see it. USA's `SLUS-00957` is a supplied
+  input, hashed like the four main executables.
+- **`vr_movie` composes on the run's own output.** It builds on top of
+  `vr_en_missions`, which already owns the `movie` stage, and normally reads the
+  deployed folder to do it. `rebuild.py` sets `INTEGRAL_ENGLISH_VR_PPF_DIR` to
+  its own work directory so an isolated build never depends on what is installed.
+- **The VR set has one deliberate overlap.** `vr_en_movie` shares bytes with
+  `vr_en_missions` by construction and must land last, which Ketchup's name
+  order gives. The packaged-set overlap check allows exactly that pair and no
+  other, on top of the main discs' own check.
+
+The two unlock aids (`vr_unlock.py`, `vr_unlock_movies.py`) are **not** built or
+packaged: they are test aids, they must never ship, and they are documented
+under "Unlock every VR mission" and "Unlocking the EXTRA movies".
 
 ### Inputs
 
@@ -143,6 +182,9 @@ open work (NextSteps §5).
   reads STAGE.DIR and computes the LBA of every named stage itself.
 
 ### Commands
+
+A clean build needs none of these - `py rebuild.py --output <dir>` runs them all
+in isolation. They are for iterating on one patch against the installed game:
 
 ```powershell
 py vr_windows.py --build --deploy     # en_missions  (slow: 92 stages rebuilt)
@@ -165,9 +207,10 @@ for `en_savemsg`; 546 records / 121 471 bytes for `en_option` with the DAR at
 120 754 of 120 832 bytes; 7 records / 915 bytes for `en_title`; 4 records /
 617 bytes for `en_camsave`; 69 records / 753 bytes for `en_movie`.
 
-`vr_movie.py` is the one that must run **after** `vr_windows.py` is deployed: it
-builds on the composite (retail plus every deployed VR PPF that writes the
-`movie` stage), so a fresh sequence has to deploy `en_missions` first. It writes
+`vr_movie.py` is the one with an ordering constraint: it builds on the composite
+(retail plus every VR PPF that writes the `movie` stage), so by hand a fresh
+sequence has to deploy `en_missions` first, and inside `rebuild.py` it runs last
+against `INTEGRAL_ENGLISH_VR_PPF_DIR`, that run's own work directory. It writes
 two PPFs and `--deploy` installs the full one, moving the older E3-only file out
 of `mods/` - the two overlap and only one may be present (README "The MOVIE
 selection captions").
