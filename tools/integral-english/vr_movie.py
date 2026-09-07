@@ -41,27 +41,33 @@ while-loop, **not a fixed count**, so extra records are read. Diffing a whole
 0x1200-byte window at that alignment found 38 differences and every one is a
 data-address displacement, no logic difference at all.
 
-**Unresolved: how one clip's line(s) are selected.** With identical code,
-Integral's four records give KCB lines [A][B][E3][] and USA's six give
-[A1][A2][B1][B2][E3][], so something must map clip -> line(s) and it is not in
-the code that was compared. The candidates are the caption command's other two
-options, which DO differ:
+SETTLED IN GAME, TWICE
+----------------------
+**The mapping is `record = clip`, one line per clip** (2026-09-06). Deployed with
+all six records and the movies unlocked, the three clips read records 0, 1 and 2:
+clip A got `Exhibition clip "A" for` alone, TGS B got clip A's *second* line, and
+E3 got clip B's first. The index is the clip **id in the retail record order**
+(TGS A = 0, TGS B = 1, E3 = 2), not the carousel slot - Integral lists the clips
+E3, TGS A, TGS B on screen and the captions still came out 2, 0, 1.
+
+**And the layout is not data-driven** (2026-09-07). The position table below was
+the last data candidate; writing USA's y values moved the rows on screen exactly
+as predicted and still gave one line per clip. So the full build is NOT
+shippable, and the remaining difference is code: the draw at `+D2B4` against
+USA's, the five per-record helpers the builder calls, the KCB geometry the
+builder allocates, and whatever fills the `captions[]` table at `~0x800AF838`,
+none of which have been read. The `f`/`m` options are the weakest lead - `-m` is
+consumed by the unlock *gate* at `+FF58`, not by the caption path - and they are
+left alone anyway, being GCL variable *references* that would point Integral at
+slots its own scripts never write:
 
     OPTION 'f'   Integral  VAR 11 00 04 80      USA  VAR 11 00 04 82
     OPTION 'm'   Integral  VAR 12 00 04 82      USA  VAR 12 00 04 81
 
-Those are GCL variable *references*, and copying USA's ids would make Integral
-read slots its own scripts never write, so they are deliberately left alone.
+THEREFORE THIS SCRIPT NEVER DEPLOYS. It writes two builds and only the E3 one is
+shippable; `INTEGRAL_vr_en_movie_e3.ppf` is what belongs in `mods/`.
 
-THEREFORE THIS SCRIPT ONLY STAGES ITS PPF; it never deploys.
-If the selection is record-count driven the captions come out right; if it is
-`clip -> line` arithmetic, clips B and E3 will show the wrong English line,
-which is worse than leaving them Japanese (misattributed text, against the
-port's rule). One launch decides it. Deploy by hand after checking all three
-clips - the `vr_unlock` aid opens them - and if clip B is wrong, the answer is
-the 'f'/'m' variables above, not this chain edit.
-
-    py vr_movie.py            # stages work/INTEGRAL_vr_en_movie.ppf, never deploys
+    py vr_movie.py            # stages both builds into work/, deploys neither
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
@@ -92,6 +98,43 @@ EXPECT_DELTA = 51
 # USA lines, and those wait for the mapping to be settled in game.
 SAFE_PAIRING = {2: (4,)}
 SAFE_NAME = 'INTEGRAL_vr_en_movie_e3.ppf'
+
+# --- the caption LINE POSITION table: the last data candidate, and it FAILED.
+#
+# helper2 (overlay +D170) places each caption from a 12-byte table at
+# `0x800C9454` (overlay +82B4), entry per index, with exactly opt.c's model:
+# `{int num; short x; short y; int color}`, num 0 = draw at (x, y), num 1 =
+# centre on it. helper1 (+CFFC) reads the same entry's colour at offset 8. No
+# other code references the table, so it belongs to this actor alone.
+#
+# Every function in this actor had been diffed against USA's - Act, the builder,
+# helper1, helper2, the draw, and the five functions Act calls - and they are
+# logically identical but for data addresses and one immediate (the font VRAM
+# column, 832 against 768). The tables differ in y alone, and it read like the
+# giveaway: USA alternates two rows because each of its captions is two lines,
+# Integral repeats one row.
+#
+#     entry        0    1    2    3    4    5
+#     Integral   208  208  208  196  196  196
+#     USA        196  208  196  208  196  208
+#
+# TESTED IN GAME 2026-09-07 with USA's y values written in - four halfwords, num
+# (1), x (160) and the colour (0x6739) being identical already. The result
+# disproves the theory it was meant to confirm:
+#
+#   * the table is real and indexed per record - TGS B drew a row lower than the
+#     other two clips, exactly as [196, 208, 196, ...] predicts for record 1;
+#   * every clip still drew ONE line.
+#
+# So identical code plus USA's data does NOT give USA's behaviour, and the
+# two-line layout lives in code this port has not read (see the docstring). The
+# patch is kept because the full build exists to be USA's data byte for byte; it
+# is applied only there, and that build is not shipped.
+POS_TABLE = 0x82B4                 # overlay offset of the table (RAM 0x800C9454)
+POS_STRIDE = 12
+POS_Y = [196, 208, 196, 208, 196, 208]      # USA's, entry for entry
+POS_Y_RETAIL = [208, 208, 208, 196, 196, 196]
+POS_NUM, POS_X, POS_COLOR = 1, 160, 0x6739
 
 
 def captions(gcx):
@@ -228,6 +271,20 @@ def build(pairing=PAIRING, expect_delta=EXPECT_DELTA, check_usa=True):
     payloads = dict(ipay)
     payloads[ici] = ipay[ici][:igcx.start] + new_gcx
     payloads[ici] += bytes(-len(payloads[ici]) % 4)
+    # the line position table, in the OVERLAY (payload 0). Only needed by the
+    # full port: with one record per clip the retail single row is correct.
+    if len(pairing.get(0, ())) > 1:
+        ov = bytearray(payloads[0])
+        _t, upay0, _o = portio.stage(stage_bytes(usd, 'movie'))
+        changed = 0
+        for k, y in enumerate(POS_Y):
+            off = POS_TABLE + POS_STRIDE * k
+            num, x, oy, col = struct.unpack_from('<ihhi', ov, off)
+            assert (num, x, oy, col & 0xFFFFFFFF) == (POS_NUM, POS_X, POS_Y_RETAIL[k], POS_COLOR),                 'position entry %d is %r, not retail (table moved?)' % (k, (num, x, oy, hex(col & 0xFFFFFFFF)))
+            struct.pack_into('<h', ov, off + 6, y)
+            changed += (oy != y)
+        payloads[0] = bytes(ov)
+        print('  line positions: %d of %d y values set to the USA layout %s' % (changed, len(POS_Y), POS_Y))
     stage = portio.pack_stage(itags, payloads)
     assert len(stage) == len(idata), 'stage changed size: %d -> %d' % (len(idata), len(stage))
     verify(stage, ibody, irecs, ubody, uopt, urecs, pairing, check_usa, remap)
@@ -305,7 +362,7 @@ def main():
     s = emit(SAFE_NAME, SAFE_PAIRING, safe_delta, False, '<- SAFE, deployable')
     open(_os.path.join(WORK, 'vr_movie_e3_stage.bin'), 'wb').write(s)
     # the full port: both TGS captions become two lines each
-    s = emit(PPF_NAME, PAIRING, EXPECT_DELTA, True, '<- FULL, needs one in-game check')
+    s = emit(PPF_NAME, PAIRING, EXPECT_DELTA, True, '<- FULL, disproved, DO NOT SHIP')
     open(_os.path.join(WORK, 'vr_movie_stage.bin'), 'wb').write(s)
     print("""
 Two builds, and only the first is safe to ship blind:
@@ -315,13 +372,14 @@ Two builds, and only the first is safe to ship blind:
       order stay exactly retail's. Correct under ANY clip->line mapping.
 
   %s
-      Both TGS captions become USA's two lines each, -t byte-identical to USA.
-      Correct IF the actor selects a clip's lines by walking the records; if it
-      indexes line = clip, clips B and E3 show the wrong English line, which is
-      worse than leaving them Japanese. ONE LAUNCH DECIDES IT: deploy it, open
-      EXTRA -> MOVIE with vr_unlock in place and check ALL THREE clips.
-      If clip B is wrong, the answer is the 'f'/'m' option variables, not this
-      chain edit - see this module's docstring.""" % (SAFE_NAME, PPF_NAME))
+      Both TGS captions become USA's two lines each, -t byte-identical to USA,
+      plus USA's caption position table. DO NOT SHIP IT. Tested in game on
+      2026-09-06 and again on 2026-09-07: the actor draws record = clip, one
+      line, and USA's position data does not change that - so this build gives
+      clip A a fragment and hands the other two clips someone else's line. It is
+      kept as the reference artifact for whenever the actor's line count is
+      solved, and what remains there is code, not data - see this module's
+      docstring.""" % (SAFE_NAME, PPF_NAME))
 
 
 if __name__ == '__main__':

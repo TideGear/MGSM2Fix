@@ -2,8 +2,9 @@
 
 Written 2026-09-04 (evening), updated the same night after the
 reproducible-build pass (§9), through 2026-09-05 as the MISSION LOG port,
-the item-text fixes and their on-screen checks landed (§10), and on 2026-09-06
-when the **VR disc** was ported (§11), for whoever picks
+the item-text fixes and their on-screen checks landed (§10), on 2026-09-06
+when the **VR disc** was ported (§11), and on 2026-09-07 when it was tested on
+screen (§12), for whoever picks
 this up cold: a later session of
 the same assistant, a different model, or a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
@@ -104,8 +105,9 @@ paraphrase them away.
 ### VR-DISC patches (deployed 2026-09-06 in `mods\INTEGRAL\VR-DISK\`)
 
 Ported from USA's VR Missions (`SLUS-00957`). README "The VR disc (SLPM-86249)"
-is the technical record; `vrlib.py` is the shared library. **None of these has
-been seen on screen yet** — that is the top of §5.
+is the technical record; `vrlib.py` is the shared library. **Four have now been
+seen on screen** — the option screen, both unlock aids and the E3 movie caption;
+the rest are statically verified only, and §5.5 lists what is still unseen.
 
 | patch | what | verified |
 |---|---|---|
@@ -115,12 +117,16 @@ been seen on screen yet** — that is the top of §5.
 | `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | **the option screen is verified on screen 2026-09-06** after three faults, all found by bisecting the PPF: the DAR's entry sizes were not 4-aligned and crashed the stage at `load option`; record 3 doubled the vibration-test sentence; and Integral's colon/values were lit beside the English while the lines sat off-centre. Fixed by padding every DAR payload to 4 (paid for with `pcx4`'s real 63-byte run cap), blanking record 3 as the main game does, unlighting the colon/values via the state switch, and giving each ported entry USA's `{num 1, x 160, y 196}`. All five rows now read as one centred English line, measured within 0.3 game px of centre. **KEY CONFIG itself is still unseen** — the collection intercepts it on the VR disc too, exactly as on the main discs, so its transplanted geometry and eight label textures can only be validated on a raw disc |
 | `vr_en_title` | the EXTRA menu's four help lines | statically; record 6 (PocketStation) deliberately kept — USA's `See the staff credits.` is a different feature |
 | `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used. Never seen on screen |
-| `vr_en_movie` | the MOVIE selection captions | **the E3 caption is deployed and now visible** (1:1 record, correct under the confirmed `record = clip` mapping); the two TGS captions need USA's two lines and are **not shippable** as a chain edit - see §5.4a. Built on the composite, because `vr_en_missions` already owns this stage |
+| `vr_en_movie` | the MOVIE selection captions | **the E3 caption is deployed and verified on screen** as `INTEGRAL_vr_en_movie_e3.ppf` (1:1 record, correct under the confirmed `record = clip` mapping); the two TGS captions need USA's two lines, and neither the record count nor USA's position table produces them - **not shippable** as a data edit - see §5.4a. Built on the composite, because `vr_en_missions` already owns this stage |
 | `vr_unlock_movies` | the EXTRA movies unlocked (test aid) | **verified in game 2026-09-06: all three thumbnails appear.** One instruction in the `movie` overlay: its own `count / 3` score gate, separate from the mission one. Writes no progress; delete the PPF to relock |
 | `vr_unlock` | the **mission menu** unlocked (test aid) | **verified in game 2026-09-06: every mission unlocked.** Emulation predicted 46 → 361 of 373 items on Integral (45 → 357 on USA) and its three words were verified in place against the deployed PPF. It does **not** open the EXTRA movies — that is a separate retail gate, `???` in USA's VR disc too. Safe to leave in and safe to save with (it writes no progress); delete the PPF to relock |
 
-`ppfcheck.py --deployed` is clean over all 26 deployed files and no two of the
-six VR PPFs touch the same disc byte. `vr_sweep.py` rebuilds every stage as the
+`ppfcheck.py --deployed` is clean over all 29 deployed files. The nine VR PPFs
+are disjoint but for **one deliberate overlap**: `vr_en_movie_e3` shares 519 of
+its 521 bytes with `vr_en_missions`, which already owns the `movie` stage, so it
+is built on top of it and must land last — Ketchup applies a folder in name
+order and `...missions` sorts before `...movie_e3` (README "The composite
+trap"). `vr_sweep.py` rebuilds every stage as the
 game will see it and finds **222 game-encoded records against 10 809 English**
 (USA's own disc: 940 against 10 344); 181 of the 222 are English with
 local-font glyphs, and the rest are exactly the list the README calls
@@ -212,7 +218,7 @@ validation on a real PSX image, where the disc-swap text (5.3, and the
 disc-change abstract now inside `en_abst`) is reachable. README "The sc_text
 texture port" and "The collection's KEY CONFIG interception".
 
-### 5.4a The VR movie captions: E3 shipped, the two TGS ones staged
+### 5.4a The VR movie captions: E3 shipped, the two TGS ones blocked in code
 Found 2026-09-06. The MOVIE screen's description text (shown when a clip opens)
 **is** English already — it comes from `vr_en_missions`' window text. What is
 still Japanese is the one-line caption under the thumbnail on the *selection*
@@ -237,8 +243,8 @@ decompiled), the same way `abst.c` had to before the mission log could move.
 **Status 2026-09-06, after testing on screen.** `vr_movie.py` builds both
 variants; README "The MOVIE selection captions" has the analysis. The **E3
 caption is ported and deployed** - one record for one record, so it is correct
-under any mapping - but it is the clip behind `???`, so it cannot be seen until
-the movie gate is solved. Shipping the caption nobody can reach was a delivery
+under any mapping - but it was the clip behind `???`, so it could not be seen until
+the movie gate was solved the same night (below). Shipping the caption nobody can reach was a delivery
 mistake: visibility should be checked before safety.
 
 The **two TGS captions are blocked on one thing.** The full build was deployed
@@ -252,72 +258,91 @@ caption, so the full PPF stays staged. Two defects were found, one fixed:
   glyph bitmaps and finds them already merged into Integral's font at
   `9A0E`/`9A0F`, so only a code rewrite is needed; `-t` now matches USA's length
   differing in exactly those 4 bytes.
-- **Open** - the line count, and it is now fully scoped. With the movies
-  unlocked all three clips were checked: `record = clip` confirmed, clip B
-  showing clip A's second line. A single combined record is ruled out by
-  measurement too - the caption KCB is allocated font `(832,256)` / CLUT
-  `(832,276)`, a 20-row band holding one line, so ~56 characters (about 325 game
-  px against the 240 px limit) would wrap onto the CLUT row, the main game's
-  documented corruption. So this needs the actor's **line count and KCB
-  geometry** changed together, on an overlay that is not decompiled: the
-  `abst.c` class of job, and the honest next step is to read that overlay's
-  caption geometry the way `vr_kcgeom.py` reads the option one. Until then the
-  TGS captions stay Japanese, which is rule-correct. The `f`/`m` GCL variable
-  references remain the lead for the count.
+- **Open, and no longer where it looked** - the line count. **Two data theories
+  have now been tested in game and both failed.** First the record count: with
+  all six records deployed and the movies unlocked, the clips read records 0, 1
+  and 2 - clip A got `Exhibition clip "A" for` alone, TGS B got clip A's
+  *second* line, E3 got clip B's first. Then the caption **position table**,
+  found at `0x800C9454` (movie overlay `+82B4`): 12-byte entries in `opt.c`'s
+  `{num, x, y, color}` model, differing from USA's in y alone, USA alternating
+  196/208 where Integral repeats one row. Writing USA's y values moved the rows
+  on screen exactly as predicted - TGS B a row lower than the other two - **and
+  still gave one line per clip**. So the table is real and per-record, but the
+  two-line layout is *not* data-driven, which refutes by experiment the argument
+  that identical code plus USA's data must give USA's behaviour.
+
+  The mapping is pinned harder as a side effect: the index is the **clip id in
+  the retail record order** (TGS A = 0, TGS B = 1, E3 = 2), not the carousel
+  slot - Integral lists the clips E3, TGS A, TGS B on screen and the captions
+  still came out 2, 0, 1.
+
+  Concatenating is ruled out separately, by measurement: the caption KCB is font
+  `(832,256)` / CLUT `(832,276)`, a 20-row band holding one line, so ~56
+  characters (about 325 game px against the 240 px limit) would wrap onto the
+  CLUT row, the main game's documented corruption. **What is left is code**:
+  Integral's draw at `+D2B4` against USA's, the five per-record helpers the
+  builder calls, the KCB geometry the builder allocates, and whatever fills the
+  `captions[]` table at `~0x800AF838` - none of them read yet. The `abst.c`
+  class of job. Until then the TGS captions stay Japanese, which is
+  rule-correct, and the full PPF stays out of `mods/`.
 
 **VERIFIED ON SCREEN 2026-09-06, all three clips:** clip A
 `東京ゲームショウ'98春 出展映像A` and clip B the same with B - Japanese and
 untouched, as intended - and the E3 clip **`Video clip from E3 (6/97)`** in
 English. So the shipped state is exactly right: the one caption that can be
 ported faithfully is ported and visible, and the two that cannot are left
-Japanese rather than misattributed.
+Japanese rather than misattributed. **Restored 2026-09-07** after the
+position-table experiment briefly put the full build in `mods/`: the deployed
+file is `INTEGRAL_vr_en_movie_e3.ppf` again and `ppfcheck --deployed` is clean
+over 29 files.
 
 **The movies are unlocked now** (`vr_unlock_movies.py`, deployed): the gate was
 the `movie` overlay's own `count / 3` score against 45 and 75, a separate copy
 of the pattern `vr_unlock` handles for missions. All three thumbnails appear, so
 the E3 caption this port already ships is finally visible.
 
-**Seeing the other two on screen needs the movie gate, which is not the mission
-unlock.** With `vr_unlock` deployed and applied the list still showed `???`, and
-so did USA's VR disc with an empty mods folder — so the gate is retail in both
-games and separate from the mission bitmap (README "What `vr_unlock` does and
-does not open"). Either find it (candidates: the flag word beside the save's
-bitmap, or a save-name scan) or verify the captions statically from the discs;
-the script holds all three either way.
+**One structural note worth keeping:** the two `movie` stages are not parallel.
+USA's carries an extra `cr` tag and ~100 KB more cache data than Integral's, so
+nothing here can be done by wholesale stage substitution.
 
-USA draws those captions as **two lines** where Integral uses one — the same
-one-vs-two shape problem `abst` had. Concatenating gives a 56-character line,
-over the 240 px limit, which wraps into the CLUT row and smashes the heap
-(README "Font and text rendering"). The two stages are not structurally
-parallel either: USA's `movie` carries an extra `cr` tag and ~100 KB more cache
-data than Integral's. So this needs the caption's KCB line count and record
-structure worked out before any bytes move. **I corrected myself here:** I first
-guessed these captions were Integral-only content with no USA counterpart, which
-was wrong.
+**I corrected myself twice in this section.** First I guessed these captions
+were Integral-only content with no USA counterpart, which was wrong - USA has
+all three. Then I argued from a whole-actor code diff that the two-line layout
+*had* to be data, and shipped a build on that reasoning; the position table was
+that data, writing USA's values proved the write took effect, and the layout
+still did not change. Reasoning from "the code is identical" was worth one
+experiment and no more than that.
 
-### 5.5 The VR disc: see it on screen, then finish the edges
-Ported 2026-09-06 and deployed; **nothing has been seen running yet.** In
-rough order:
+### 5.5 The VR disc: what has been seen, and the edges left
+Ported 2026-09-06, deployed, and **first run on screen 2026-09-06/07**. Seen and
+correct: the option screen's seven help lines, centred, after the three faults
+§4 records; the mission menu with every mission unlocked; a clip's description
+window in English when a TGS video opens; and EXTRA -> MOVIE with all three
+thumbnails and the E3 caption in English. What is left, in rough order:
 
-1. **Look at it.** Boot the VR disc and check, in this order: the EXTRA menu's
-   four help lines (`vrtitle`), the option screen's seven, a mission's title /
-   briefing / result windows, an item and a weapon description, a save and a
-   load message, and the PHOTOGRAPHING mode's card messages. If something is
-   wrong, bisect the same way as the main game: move that one PPF out of
-   `mods\INTEGRAL\VR-DISK\` and confirm the Japanese comes back.
+1. **Still unseen, and each needs only the user at the controller**: the EXTRA
+   menu's four help lines (`vrtitle`), a mission's title / briefing / result
+   windows read in play, an item and a weapon description, a save and a load
+   message, and the PHOTOGRAPHING mode's card messages (the ALBUM path). If
+   something is wrong, bisect the same way as the main game: move that one PPF
+   out of `mods\INTEGRAL\VR-DISK\` and confirm the Japanese comes back.
 2. **KEY CONFIG needs the collection out of the way.** VR Missions still
-   intercepts the screen to show the Master Collection's own key config, so set
-   `DisableRAM = true` and `DisableCDROM = true` (achievements off) to see
-   Integral's own. Check `key_syukan`'s +11 shift while there.
-3. **Unlock, for coverage.** Most missions are locked on a fresh save, so most
-   of the ported windows are unreachable. `vr_unlock.py --deploy` opens them
-   (README "Unlock every VR mission"). The standing rule: achievements **off**
-   first, unlock, test, delete the unlock PPF, achievements back on.
+   intercepts the screen to show the Master Collection's own key config — the
+   user hit it again in play on 2026-09-06 — so seeing Integral's own needs
+   `DisableRAM = true` and `DisableCDROM = true` (achievements off). Check
+   `key_syukan`'s +11 shift while there. The user's rule stands: **in the
+   collection they prefer the interception**, and the transplant is for the raw
+   disc.
+3. **Both unlock aids may stay for testing and must come out after.**
+   `vr_unlock.py` (missions) and `vr_unlock_movies.py` (the EXTRA clips) each
+   write no progress, so saving with them in place is safe; the standing rule is
+   achievements **off** first, unlock, test, delete the unlock PPFs,
+   achievements back on.
 4. **The number substitutions** in §6 need the user's word.
-5. **Deferred edges**, each a small piece of work: the `movie` stage's `-t`
-   titles (USA has two records where Integral has one — an overlay change), the
-   camera's EXORCISE textures, and whether anything in the mission windows
-   overflows a line at 240 px the way the main game's could.
+5. **Deferred edges**, each a small piece of work: the two TGS MOVIE captions
+   (§5.4a — blocked in overlay code, not in data), the camera's EXORCISE
+   textures, and whether anything in the mission windows overflows a line at
+   240 px the way the main game's could.
 6. **`rebuild.py` does not build the VR patches.** They are built by hand
    (`BUILDING.md`, "The VR disc"). Folding them in is the reproducibility gap.
 
@@ -435,8 +460,10 @@ Texture lettering and runtime language branches are outside both tools.
 | `vr_option.py [--deploy]` | the VR option stage: help-line chain, the KEY CONFIG label transplant (per-type function, 21 call sites, `key_syukan` +11) and the re-encoded texture archive |
 | `vr_menus.py [--deploy]` | the VR EXTRA menu's help lines |
 | `vr_camera.py [--deploy]` | the VR camera overlay's memory-card messages |
+| `vr_movie.py` | the MOVIE selection captions. Builds **two** PPFs into `work\` and deploys **neither**: `..._movie_e3.ppf` (the E3 caption alone, the shippable one, what sits in `mods\`) and `..._movie.ppf` (all six USA records plus USA's position table — disproved in game, kept as the reference artifact). Built on the composite, since `vr_en_missions` already owns the stage |
 | `vr_kcgeom.py` | VR KEY CONFIG geometry read from an overlay: `Init_Res` quads and the per-button-type rectangles (imported by `vr_option.py`) |
-| `vr_unlock.py [--deploy]` | the removable VR unlock test aid — three words, never deploy with achievements live |
+| `vr_unlock.py [--deploy]` | the removable VR **mission** unlock test aid — three words, never deploy with achievements live |
+| `vr_unlock_movies.py [--deploy]` | the removable VR **movie** unlock test aid — one instruction in the `movie` overlay's own `count / 3` score gate, which `vr_unlock` does not touch. Writes no progress; delete the PPF to relock |
 | `vr_sweep.py [--samples]` | rebuilds every VR stage from the deployed PPFs and reports what is still game-encoded, beside USA's own tally — the VR equivalent of `jpsweep.py`, and the only tool here that inverts `portio.image_offset`'s 2352-byte sector geometry |
 | `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
 | `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
@@ -466,8 +493,10 @@ copies" · scope → "Scope", "What stays
 Japanese, and why" · brightness → "The collection shows only four of USA's six
 brightness lines", "Option → SCREEN", "The sc_text texture port" · briefing →
 "Briefing menu (`brf` stage)" · unlocks → "Unlocks", "Give items", "Unlock
-everything", "Unlock every VR mission", "Achievements" · VR → "The VR disc
-(SLPM-86249)" · tests → "Not tested" (struck-through items are
+everything", "Unlock every VR mission", "Unlocking the EXTRA movies",
+"Achievements" · VR → "The VR disc (SLPM-86249)", "The MOVIE selection
+captions", "The white caption font differs between the two VR discs",
+"Sweep: is any VR text still Japanese?" · tests → "Not tested" (struck-through items are
 done, with dates) · decomp → "Audit against the decomp".
 
 ## 9. The 2026-09-04 late pass: what changed and what it settled
@@ -593,3 +622,50 @@ established, beyond the patches themselves:
 Left where it was: the collection still intercepts VR's KEY CONFIG, so seeing
 Integral's own needs `DisableRAM` and `DisableCDROM`. The ASI was rebuilt with
 five VR patch watches and deployed at 00:25.
+
+## 12. The 2026-09-07 pass: the VR disc on screen
+
+The first play test of the VR port. Three things were fixed and one was proved
+impossible as a data edit.
+
+- **The option screen crashed the stage, and the cause is a general invariant.**
+  `load option` died with `r3000: illegal instruction`. A DAR entry header is
+  `{u16 id, s16 ext, u32 size}` written immediately after the previous payload,
+  so an **odd payload size misaligns the next header's `u32`**. Our rebuilt
+  archive had 39 odd sizes and 41 of 51 entry starts misaligned; all four retail
+  DARs checked (Integral and USA, main and VR) have zero. Padding every payload
+  to 4 fixed it. It cost run length: `pcx4._rle` had capped runs at 62 when
+  `PCX_RLE_CODE(0xC0) + run` allows **63**, so `maxrun` became a parameter (it
+  still defaults to 62, and the main game's `en_option` rebuilds byte-identical).
+- **Then the option rows overlapped.** Record 3 held the vibration-test sentence
+  that Integral draws at the row-label position, so the sentence appeared twice
+  — blanked, the same decision the main game took on 2026-09-02. Integral's
+  colon and values were still lit beside the English — unlit through the
+  per-state colour switch, which sets every entry it skips to colour 0. And the
+  lines sat off-centre — each ported entry got USA's `{num 1, x 160, y 196}`,
+  measured afterwards within 0.3 game px of centre.
+- **The EXTRA movies were gated separately from the missions.** `vr_unlock`
+  patches `selectvr`; the clips are gated in the `movie` overlay's own
+  `count / 3` score against 45 and 75, which is why they stayed `???` with the
+  mission aid in place — and why USA's unpatched VR disc showed `???` too.
+  `vr_unlock_movies.py` replaces one instruction. All three thumbnails appear.
+- **The MOVIE captions are code, not data, and two experiments say so.** USA
+  draws each TGS caption as two lines where Integral draws one per clip. Adding
+  USA's records gives `record = clip` (clip A a fragment, the other two clips
+  someone else's line). Writing USA's caption **position table** moved the rows
+  on screen exactly as predicted and *still* gave one line each. So the actor's
+  line count is in overlay code nobody has read — and the shipped state is the
+  E3 caption alone, which is faithful under any mapping. §5.4a and README "The
+  MOVIE selection captions" carry the whole argument.
+
+Two process notes worth keeping:
+
+- **Ship what can be seen, not just what is safe.** The E3-only caption build
+  was deployed first because it was provably safe under any mapping — but it is
+  the clip behind `???`, so the user's next look showed Japanese captions and
+  nothing else. Visibility should be checked before safety.
+- **"The code is identical, so it must be data" is worth one experiment.** Every
+  function in the caption actor was diffed against USA's and found logically
+  identical, which made a data explanation feel forced rather than chosen. The
+  position table was the data; the write demonstrably landed; the behaviour did
+  not change. Reasoning of that shape earns a test, not a build.
