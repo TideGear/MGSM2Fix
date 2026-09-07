@@ -1501,14 +1501,25 @@ is `GetOption('t')` then `NextStr`/`GetString` **until NULL**, a while-loop and
 not a fixed count, so extra records are read. Diffing a 0x1200-byte window at
 that alignment found 38 differences, every one a data-address displacement.
 
-**SETTLED IN GAME 2026-09-06: the actor shows ONE record per clip.** The full
-six-record build was deployed and clip A rendered just its first record. So
-Integral's caption is `line = clip`, USA's is not, and the two lines USA draws
-cannot be reproduced by the chain edit alone. The full build therefore stays
-**wrong for Integral** - clip B would take `the Tokyo Game Show, Spring '98.`
-and E3 would take clip B's line - and it is staged, not shipped. The mechanism
-to find is whatever makes USA show two: the caption command's two other
-options, which *do* differ:
+**SETTLED IN GAME 2026-09-06: the actor shows ONE record per clip, `record =
+clip`.** With the movies unlocked and the full six-record build deployed, all
+three clips were checked: clip A read `Exhibition clip "A" for` (record 0) and
+**clip B read `the Tokyo Game Show, Spring '98.`** (record 1) - clip A's *second*
+line, misattributed exactly as predicted. So Integral's caption is one record
+per clip, USA's is two, and the chain edit alone cannot reproduce USA's caption.
+The full build stays **wrong for Integral** and is not shipped.
+
+**And a single combined record is ruled out by measurement, not by guesswork.**
+The caption builder allocates its KCB at font `(832, 256)` with the CLUT at
+`(832, 276)` - a **20-row band, one line** - so USA's two lines concatenated
+(~56 characters, about 325 game px against the 240 px limit) would wrap and draw
+its continuation ~18 rows down, onto the CLUT row: the same corruption the main
+game hit (README "Font and text rendering"). Porting these two captions
+therefore needs the actor's line count *and* its KCB geometry changed, on an
+overlay that is not decompiled - the `abst.c` class of job.
+
+The mechanism to find is whatever makes USA show two: the caption command's two
+other options, which *do* differ:
 
     OPTION 'f'   Integral  VAR 11 00 04 80      USA  VAR 11 00 04 82
     OPTION 'm'   Integral  VAR 12 00 04 82      USA  VAR 12 00 04 81
@@ -1582,22 +1593,41 @@ cleared-predicates' `and v0, …` become `addiu v0, zero, 1` (stage `+1B400`,
 (`+1BB88`), exactly as the module documents; by emulation that is 46 → 361 of
 373 menu items.
 
-**It does not open the EXTRA movies, and nothing of ours could.** With the aid
-deployed and applied (confirmed in the log) the MOVIE list still showed `???`
-either side of the one available clip — and so did **USA's VR disc, whose
-`mods\VR-DISK_US\` is empty**. That control is what settles it: the movie gate
-is retail behaviour in both games, separate from the mission bitmap, and every
-patch here is irrelevant to it. Where it does live is unknown; the candidates
-are the "one flag word" the save carries beside the bitmap, or a save-name scan
-like the main game's SPECIAL gate (README "Unlocks"). Needed only to see the
-second and third movie captions on screen — the `movie` script has all three
-regardless (§ "TO DO: the VR movie selection captions" in `NextSteps.md`).
+**It does not open the EXTRA movies** - those are gated in the `movie` overlay
+instead, which is why the mission aid never touched them and why USA's
+unpatched VR disc showed `???` there too. **Found and solved 2026-09-06**, see
+"Unlocking the EXTRA movies" below.
 
 **Saving with the aid deployed is safe** — corrected 2026-09-06, having first
 told the user otherwise. Nothing in it writes progress: the save is built from
 the VRAM bitmap, which only a genuinely cleared mission ever touches, so a save
 written while it is deployed still records real progress only. Deleting the PPF
 relocks exactly as before.
+
+### Unlocking the EXTRA movies (`vr_unlock_movies`, 2026-09-06)
+
+The MOVIE clips are gated by the `movie` overlay's own progress score, not by
+the mission bitmap `vr_unlock` patches - which is exactly why that aid left them
+`???`, and why USA's unpatched VR disc did too. Found by disassembling around
+the caption command's `-m` read, at Integral movie overlay `+FFA0`:
+
+    lw    s1, 6608(s1)       ; a progress count
+    ori   v1, v1, 0x5556     ; v1 = 0x55555556
+    mult  s1, v1             ; the standard signed divide-by-3 ...
+    sra   v0, s1, 31
+    mfhi  t0
+    subu  v1, t0, v0         ; ... so v1 = count / 3      <-- the score
+    slti  v0, v1, 45         ; gate 1
+    slti  v0, v1, 75         ; gate 2   -> bits in work+30
+
+`count / 3` against thresholds is the same scoring pattern `vr_unlock.py`
+documents for the mission menu, so the fix is the same single instruction:
+`vr_unlock_movies.py` replaces the `subu` with `addiu v1, zero, 0x100`, above
+both thresholds. **Verified in game: all three thumbnails appear.** It writes no
+progress - the score is recomputed from the count every run - so deleting the
+PPF relocks. It patches the `movie` **overlay**, which `vr_en_missions` does not
+touch (that patch only rewrites the script chunk), and the builder asserts both
+that and that no deployed PPF writes those 4 bytes.
 
 ### The white caption font differs between the two VR discs — and it is not ours
 

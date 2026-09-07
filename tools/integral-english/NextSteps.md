@@ -115,7 +115,8 @@ been seen on screen yet** — that is the top of §5.
 | `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | **the option screen is verified on screen 2026-09-06** after three faults, all found by bisecting the PPF: the DAR's entry sizes were not 4-aligned and crashed the stage at `load option`; record 3 doubled the vibration-test sentence; and Integral's colon/values were lit beside the English while the lines sat off-centre. Fixed by padding every DAR payload to 4 (paid for with `pcx4`'s real 63-byte run cap), blanking record 3 as the main game does, unlighting the colon/values via the state switch, and giving each ported entry USA's `{num 1, x 160, y 196}`. All five rows now read as one centred English line, measured within 0.3 game px of centre. **KEY CONFIG itself is still unseen** — the collection intercepts it on the VR disc too, exactly as on the main discs, so its transplanted geometry and eight label textures can only be validated on a raw disc |
 | `vr_en_title` | the EXTRA menu's four help lines | statically; record 6 (PocketStation) deliberately kept — USA's `See the staff credits.` is a different feature |
 | `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used. Never seen on screen |
-| `vr_en_movie` | the MOVIE selection captions | **the E3 caption is deployed** (1:1 record, safe under any mapping); the two TGS captions are **staged only** pending one in-game check - see §5.4a. Built on the composite, because `vr_en_missions` already owns this stage |
+| `vr_en_movie` | the MOVIE selection captions | **the E3 caption is deployed and now visible** (1:1 record, correct under the confirmed `record = clip` mapping); the two TGS captions need USA's two lines and are **not shippable** as a chain edit - see §5.4a. Built on the composite, because `vr_en_missions` already owns this stage |
+| `vr_unlock_movies` | the EXTRA movies unlocked (test aid) | **verified in game 2026-09-06: all three thumbnails appear.** One instruction in the `movie` overlay: its own `count / 3` score gate, separate from the mission one. Writes no progress; delete the PPF to relock |
 | `vr_unlock` | the **mission menu** unlocked (test aid) | **verified in game 2026-09-06: every mission unlocked.** Emulation predicted 46 → 361 of 373 items on Integral (45 → 357 on USA) and its three words were verified in place against the deployed PPF. It does **not** open the EXTRA movies — that is a separate retail gate, `???` in USA's VR disc too. Safe to leave in and safe to save with (it writes no progress); delete the PPF to relock |
 
 `ppfcheck.py --deployed` is clean over all 26 deployed files and no two of the
@@ -251,12 +252,23 @@ caption, so the full PPF stays staged. Two defects were found, one fixed:
   glyph bitmaps and finds them already merged into Integral's font at
   `9A0E`/`9A0F`, so only a code rewrite is needed; `-t` now matches USA's length
   differing in exactly those 4 bytes.
-- **Open** - the line count. USA draws two records per clip, Integral one. The
-  candidates are the caption command's `f`/`m` GCL variable references, which
-  differ between the versions. Concatenating is not a way out: the combined line
-  is ~56 characters, about 325 game px against the 240 px limit, so it would
-  wrap into the CLUT row (README "Font and text rendering"). Until this is
-  solved the TGS captions stay Japanese, which is rule-correct.
+- **Open** - the line count, and it is now fully scoped. With the movies
+  unlocked all three clips were checked: `record = clip` confirmed, clip B
+  showing clip A's second line. A single combined record is ruled out by
+  measurement too - the caption KCB is allocated font `(832,256)` / CLUT
+  `(832,276)`, a 20-row band holding one line, so ~56 characters (about 325 game
+  px against the 240 px limit) would wrap onto the CLUT row, the main game's
+  documented corruption. So this needs the actor's **line count and KCB
+  geometry** changed together, on an overlay that is not decompiled: the
+  `abst.c` class of job, and the honest next step is to read that overlay's
+  caption geometry the way `vr_kcgeom.py` reads the option one. Until then the
+  TGS captions stay Japanese, which is rule-correct. The `f`/`m` GCL variable
+  references remain the lead for the count.
+
+**The movies are unlocked now** (`vr_unlock_movies.py`, deployed): the gate was
+the `movie` overlay's own `count / 3` score against 45 and 75, a separate copy
+of the pattern `vr_unlock` handles for missions. All three thumbnails appear, so
+the E3 caption this port already ships is finally visible.
 
 **Seeing the other two on screen needs the movie gate, which is not the mission
 unlock.** With `vr_unlock` deployed and applied the list still showed `???`, and
