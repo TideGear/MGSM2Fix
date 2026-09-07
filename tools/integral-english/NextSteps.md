@@ -3,11 +3,11 @@
 Written 2026-09-04 (evening), updated the same night after the
 reproducible-build pass (§9), through 2026-09-05 as the MISSION LOG port,
 the item-text fixes and their on-screen checks landed (§10), on 2026-09-06
-when the **VR disc** was ported (§11), and on 2026-09-07 when it was tested on
-screen and the last blocked item - the MOVIE captions - was solved (§12), for
-whoever picks
-this up cold: a later session of
-the same assistant, a different model, or a person. It says where everything
+when the **VR disc** was ported (§11), and through 2026-09-07, the day the VR
+disc was tested on screen and the three items that were still open all closed:
+the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12). Written for whoever
+picks this up cold: a later session of the same assistant, a different model, or
+a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
 remains and in what order, and which decisions are the user's to make. The
 technical record — byte formats, mechanisms, every gotcha with its evidence —
@@ -86,7 +86,7 @@ paraphrase them away.
 
 ---
 
-## 4. State on 2026-09-06: what ships, and how far each is verified
+## 4. State on 2026-09-07: what ships, and how far each is verified
 
 ### PPF patches (all deployed for both discs unless noted)
 
@@ -171,6 +171,19 @@ equivalence, not a new gameplay test.
 ---
 
 ## 5. What remains — in the order I would do it
+
+**State of play, end of 2026-09-07.** Three items in this section are now DONE
+and kept only for their reasoning: 5.3 (`en_menu3`, raw-disc only), 5.4a (the
+MOVIE captions) and 5.5's KEY CONFIG. **Nothing with a USA counterpart is known
+to be Japanese any more, on any of the three discs.** What is left is of four
+kinds:
+
+| kind | items |
+|---|---|
+| **needs you at the controller**, nothing to build | 5.1, 5.2, and 5.5's list 1 |
+| **real engineering** | 5.4 the raw-disc build switch, 5.5's item 6 (`rebuild.py` does not build the VR patches), 5.6 the upstream sync |
+| **your call** | §6, and 5.9 |
+| **loose ends** | 5.7 untested runtime features, 5.8 the text census, 5.5's item 5 |
 
 ### 5.1 Still to be seen (needs the user; nothing to build)
 Everything built so far has been seen on screen except: a mission-log page from
@@ -411,18 +424,58 @@ is taller). What is left, in rough order:
 6. **`rebuild.py` does not build the VR patches.** They are built by hand
    (`BUILDING.md`, "The VR disc"). Folding them in is the reproducibility gap.
 
-### 5.6 Upstream pull request — a re-port, not a rebase
-Upstream 3.7 (tagged 2026-09-01 .. 09-04) moved `src/mgs1.{cpp,h}` to
-`src/games/`, `src/sqhook.{cpp,h}` to `src/modules/`, `src/psx.*` to
-`src/machines/`, cut ~130 lines of mgs1.cpp (54% similarity) and added MGS
-Vol. 2 / MGS1in4. This branch's base is `8fb944d` (v3.6 + 5 commits) and it
-adds ~870 lines over 10 files, the biggest three in the moved or rewritten
-files (244 in mgs1.cpp, 193 in mgs1.h, 166 in ketchup.cpp). `UPSTREAM.md`
-lists the commits; its two omissions are right (789f4a2 is superseded by the
-BrightnessText tri-state, fbb170c is the port-only abst watch comment). Two
-things to separate when doing it: `SetPatchWatch` goes upstream as a mechanism
-without the Integral `option`/`abst` ranges `mgs1.h` registers; `BrightnessText`
-covers title 981 (USA) only.
+### 5.6 Sync with upstream, and the pull request — one job, done once
+**Measured 2026-09-07, and the decision was to defer it deliberately.** A
+fast-forward is impossible: that needs a branch with no commits of its own, and
+this one has 133.
+
+| | |
+|---|---|
+| merge base | `8fb944d` (v3.6 + 5 commits) |
+| upstream commits we lack | **10**, through `48fe165` "Complete Wamsoft port" (2026-09-07) |
+| our commits they lack | **133** |
+| our `src/` footprint | 854 lines across **9 files** |
+
+**Every file the port touches has moved upstream**, so any route has to follow
+renames:
+
+| ours | upstream | similarity | our lines |
+|---|---|---|---|
+| `src/mgs1.cpp` | `src/games/mgs1.cpp` | **54%** | +242 |
+| `src/mgs1.h` | `src/games/mgs1.h` | 98% | +234 |
+| `src/ketchup.{cpp,h}` | `src/m2fix/…` | 100% | +152 / +39 |
+| `src/m2config.{cpp,h}` | `src/m2fix/…` | 100% | +62 / +20 |
+| `src/m2game.h` | `src/m2fix/m2game.h` | 98% | +11 |
+| `src/sqhook.{cpp,h}` | `src/modules/…` | 96 / 97% | +79 / +15 |
+
+Eight of the nine are near-pure moves that git's rename detection will carry;
+the work concentrates in `mgs1.cpp`, the one file upstream rewrote and the one
+holding most of our lines.
+
+**Why it is deferred rather than done: those ten commits give MGS1 Integral
+nothing.** They are Vol. 2 support, MGS1in4 fixes, the Wamsoft port, PATRIOTS
+text and the restructure. Upstream's own diff to `mgs1.cpp` is **0 insertions,
+130 deletions** - code moved out, no MGS1 behaviour changed - and nothing in
+them touches `MGS1_Ketchup`, Integral, the brightness text, the Ketchup
+deferral or the patch watches. Against that, merging costs a conflict
+resolution in our most-changed file plus a rebuild and a re-test of everything
+runtime the ASI carries (`EnglishText`, `BrightnessText`,
+`PreserveConfiguration`, the deferral, six patch watches).
+
+**So it is one job, and the right moment is the pull request**, because the PR
+needs our changes in upstream's new layout anyway - doing it now would mean
+doing it twice. When it happens:
+
+- try `git merge upstream/master` on a throwaway branch first and read the true
+  conflict set before touching `integral-english-text`;
+- `UPSTREAM.md` lists what goes up; its two omissions are right (789f4a2 is
+  superseded by the BrightnessText tri-state, fbb170c is the port-only abst
+  watch comment);
+- separate two things when submitting: `SetPatchWatch` goes upstream as a
+  mechanism *without* the Integral `option`/`abst` ranges `mgs1.h` registers,
+  and `BrightnessText` covers title 981 (USA) only;
+- re-test the runtime list above afterwards - the port's behaviour in the
+  collection depends on all of it.
 
 ### 5.7 Still untested, low effort when the moment comes
 - **The patch watch is blind while `DisableCDROM = true`**: the early return
@@ -700,11 +753,14 @@ Left where it was: the collection still intercepts VR's KEY CONFIG, so seeing
 Integral's own needs `DisableRAM` and `DisableCDROM`. The ASI was rebuilt with
 five VR patch watches and deployed at 00:25.
 
-## 12. The 2026-09-07 pass: the VR disc on screen, then the MOVIE captions
+## 12. The 2026-09-07 pass: the VR disc on screen, and the last three items
 
-The first play test of the VR port: three things fixed. Then the last blocked
-item on the disc — the two-line MOVIE captions — was solved in the overlay and
-deployed, which also corrected two earlier conclusions recorded here.
+A long day. The VR port's first play test fixed three faults; then the three
+items that had been open longest all closed - the two-line MOVIE captions,
+`en_menu3`, and the VR KEY CONFIG behind the collection's interception. Two
+earlier conclusions recorded here were corrected in the process, and one
+recorded diagnosis turned out to describe an artefact it had never been tested
+against.
 
 - **The option screen crashed the stage, and the cause is a general invariant.**
   `load option` died with `r3000: illegal instruction`. A DAR entry header is
@@ -759,6 +815,21 @@ deployed, which also corrected two earlier conclusions recorded here.
   (container sizes) turned out to describe nothing that was wrong with the file,
   and the shape that crashed is the one that leaves retail's layout untouched.
   The user chose raw-only over blacklisting the collection's patch. §5.3.
+
+- **The VR KEY CONFIG was seen for the first time, and the highlight box was
+  wrong.** With `DisableRAM`/`DisableCDROM` on, Integral's own screen draws with
+  all eight labels English in all three button types and `key_syukan`'s +11
+  clearing the curve. The user spotted what the measurements had not: the
+  selection highlight on the `first person view` row stopped 24 px short, which
+  is exactly USA's 112-wide art against Integral's 88. It is drawn by hardcoded
+  `glow(work, x, y, w, h, ...)` calls, not by an `Init_Res` quad, so the geometry
+  transplant never saw it - four immediates fixed it, re-measured at 113 px
+  against USA's 114. §5.5, and README "The VR KEY CONFIG on screen".
+- **Upstream was measured and deliberately not merged.** A fast-forward is
+  impossible (133 commits of our own), every file the port touches has moved,
+  and the ten upstream commits change no MGS1 behaviour at all - their `mgs1.cpp`
+  diff is 0 insertions and 130 deletions. Deferred to the pull request, which
+  needs the same work anyway. §5.6.
 
 Three process notes worth keeping:
 
