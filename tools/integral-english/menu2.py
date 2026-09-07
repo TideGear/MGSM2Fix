@@ -1,8 +1,10 @@
 """Rebuild en_menu and en_menu2 from retail, preserving shipped payloads.
 
 Recovered from menufinal.py/menu2.py on 2026-09-04, with explicit inputs and no
-deployment. The old menu3 mode emitted a broken inline script and is excluded:
-its replacement must resize every enclosing container (README).
+deployment. The `title` copy of the disc-swap text is NOT built here: it lives
+inline in that stage's script and needs container arithmetic, so it has its own
+builder, `menu3.py`. It is raw-disc only - the collection patches the same block
+and the two layouts do not mix (README, "Why `en_menu3` is raw-disc only").
 """
 from pathlib import Path
 from workdir import WORK, GAME

@@ -1,7 +1,9 @@
 # Text coverage evidence (2026-09-04, VR section added 2026-09-06)
 
 The current patch is not a complete English port. The title's disc-swap copy
-(`en_menu3`) remains open in [NextSteps.md](NextSteps.md); the Mission
+(`en_menu3`) is ported but raw-disc only - the collection patches that block
+itself, so it is not deployed here (README, "Why `en_menu3` is raw-disc only");
+the Mission
 Log and the disc-change abstract (both in `abst`) were ported on 2026-09-05
 (`en_abst`, seen on screen the same day), and the VR disc on 2026-09-06
 (six PPFs; see "The VR disc" below and the README section of the same name).

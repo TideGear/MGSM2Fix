@@ -100,7 +100,7 @@ paraphrase them away.
 | `en_savemsg` | memory-card captions in the executable | in game 2026-09-04: save + load; kept slots idx 1/9 Japanese by rule. Since 2026-09-05 the PPF owns every byte of the pool and tables, so the collection's six writes cannot survive at retail-equal bytes (the mechanism that broke the SOCOM line) |
 | `en_camsave` | the PHOTO ALBUM's own captions (`camera` overlay) | **fully verified 2026-09-04**: all 23 English on screen / by slot comparison; the six USA-blank slots stay Japanese (`ロード中です`, `ロードが完了しました`, `変更内容を上書き保存しますか？` are those) |
 | `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built 2026-09-05 and seen on screen the same day**: both pages of the Heliport and Comm Tower A logs, the controls and the slide (the one fault, stale-VRAM fragments during the slide, fixed at 13:05 and confirmed clean at 13:50). Statically, pages re-parse and equal USA's byte for byte and the PPF records rebuild the relocated 88-sector stage exactly on both discs. Stage in DUMMY3M slots 462..549. Not yet seen: a demo.gcx page (disc-2 saves) and a count-7 page |
-| `en_menu3` | the `title` disc-swap copy | **disabled** — crashes the title stage; diagnosed, not rebuilt (§5.3). Its two PPFs sit in `mods\_disabled\` (the top level of the mods folder, not under INTEGRAL), where Ketchup does not read them |
+| `en_menu3` | the `title` disc-swap copy — the fourth and last | **built and verified 2026-09-07, RAW DISC ONLY, not deployed.** The collection patches the same block (`disc1_1822B55D_patch`, at the address of our record 0), and the two layouts do not mix: the title stage dies with a `GCL:WRONG CODE` run. Staged as `INTEGRAL_disc{1,2}_en_menu3_raw.ppf` for the raw variant; `menu3.py --deploy` refuses. §5.3 |
 | unlock PPFs | title-screen extras | **parked**, `unlocks_parked\`, not deployed |
 
 ### VR-DISC patches (deployed 2026-09-06 in `mods\INTEGRAL\VR-DISK\`)
@@ -203,17 +203,57 @@ no inline data, so only the swap screens themselves show whose bytes win. If
 the game's own prompt draws in English, ours won; if it draws something else,
 note exactly what.
 
-### 5.3 Rebuild `en_menu3` (the `title` copy)
-README "Why `en_menu3` crashes" and "How to test it": shorten the STRING length
-bytes and shrink the enclosing containers per edited record (they span more than
-one OPTION — SCRIPT size `@0x10DA` BE32, ARG `@0x10DF` BE16, COMMAND `0x9906`
-`@0x1139` BE16, OPTION `v` `@0x11AF` u8), `gclparse` self-check, then the
-trivial test: boot to the title. Required for raw-disc completeness; 5.2 helps
-prioritise it but cannot prove the title copy unreachable. The disabled PPFs
-sit in `mods/_disabled/` (the top level of the mods folder), where Ketchup does
-not read them.
+### 5.3 `en_menu3` (the `title` copy) — DONE 2026-09-07, raw-disc only
+Built, verified, and deliberately **not deployed**. `menu3.py` writes
+`INTEGRAL_disc{1,2}_en_menu3_raw.ppf` into `work/` for the raw-disc variant
+(§5.4); `--deploy` refuses and prints why.
+
+**Why it cannot go in the collection.** The collection patches that exact block
+itself: `disc1_1822B55D_patch` lands at image `0x1822B55D`, the address of
+record 0's `07` header, from `099/patch/disc1_1822B55D_patch_PS5.bin` — a named
+file, so the watch reports "0 bytes" and its contents stay invisible. It is not
+filtered in normal play. Two patches writing the same five strings with
+different layouts desynchronise the script walk: the title stage dies on entry
+with a run of `GCL:WRONG CODE` reading out of `Press the Start Button`, the same
+seventeen bytes on 2026-08-28, 08-29 and again on 09-07, and the log ends
+mid-run. **The user's call, 2026-09-07: ship raw-only.** The alternative — an
+ini flag blacklisting their patch so ours owns the block, the `BrightnessText`
+mechanism — was declined as an ASI change buying a screen the collection cannot
+reach.
+
+**The old diagnosis in this section was wrong, and is corrected in the README.**
+It said the interpreter resumes at the early NUL and prescribed shrinking four
+container sizes. `GCL_GetNextValue` advances a STRING by its length byte, never
+by `strlen`; and the artefact that sat in `mods/_disabled/` changed payload bytes
+only, re-parsing cleanly with 25 records at retail's offsets. The prescription
+was written on 09-03 from the 08-28/29 logs and attached to a build it had never
+been tested against. The shape that crashed on 09-07 is the **length-preserving**
+one, which leaves retail's layout completely intact — so the record shape was
+never the fault.
+
+What the builder does, for whoever picks this up: it rewrites the five records
+inside the `-v` option of the title actor's `CMD 9906` (chara `0xCF79`,
+CHARA_OPEN, `onoda/open/open.c` — the same generic numbered-text module as
+`abst.c` and the VR captions), re-stamps the SCRIPT/ARG/COMMAND sizes that
+`containers_over` reports over each edit, and leaves the `-v` option's own u8
+alone because it is an overflowed truncation nothing reads (`v` is the last of
+the command's eighteen options and `open.c` asks for exactly those eighteen) —
+the same call `abst_build.py` makes for the mission log's `-i`. Record count and
+order are preserved because `open.c` reads a fixed 24 and indexes each line's
+position and colour by n. No text is modified: USA's sentences go in verbatim,
+and only the record slot shrinks.
+
+**Still unproven, and cheap when someone wants it:** boot once with
+`DisableCDROM = true`, which filters the collection's patches, and the deployed
+build should then load a clean title. That would turn "the collision is the
+cause" from a strong inference into a measurement. It costs achievements for one
+session, which is why it was not run.
 
 ### 5.4 A build switch for the raw-disc variant
+**`en_menu3` now belongs to this item** (§5.3): its two raw PPFs are built and
+waiting in `work/`, and they are the first artefacts that exist *only* for the
+raw variant. Packaging them is part of the switch.
+
 Two constants differ between the collection build and a raw PSX disc patch:
 `SC_KEEP_LINES` (4 collection / 6 raw — `optsctext.py`) and
 `OPTION_MC_CONTROL_SETTINGS` (1 / 0 — `opt.c`). Today they are edited by hand;
@@ -472,7 +512,8 @@ Texture lettering and runtime language branches are outside both tools.
 | `gclparse.py`, `gcldec.py` | GCL container parsing / record walking — `containers_over` for resizing |
 | `optscan.py` | option-stage inspection |
 | `optlabel2.py` | current option captions from retail, including the restored colon; replaces the unsafe recovered experiment |
-| `items.py`, `menu2.py` | recovered item/menu builders; `menu2.py` excludes the broken historical `menu3` mode |
+| `items.py`, `menu2.py` | recovered item/menu builders; the `title` copy lives in `menu3.py` instead |
+| `menu3.py [--collection]` | the `title` stage's disc-swap copy, **raw disc only** — rewrites the five records inside `CMD 9906`'s `-v` option, re-stamps the SCRIPT/ARG/COMMAND sizes and leaves the overflowed `-v` u8; `--deploy` refuses, `--collection` rebuilds the shape that crashes so the fault can be reproduced (§5.3) |
 | `audit_text.py` | main-disc and VR candidate inventory, save-title encoding; see `COVERAGE.md` |
 | `rebuild.py` | isolated collection build, checks, manifest and ZIP; see `BUILDING.md` |
 | `portio.py` | shared read-only disc access and deterministic PPF/stage serialisation (`stage`, `pack_stage`, `records`, `encode_records`, `changed_runs`, `ppf`, `relocation`) — the module the recovered builders and `rebuild.py` are built on |
@@ -519,7 +560,9 @@ KEY CONFIG port was built" · PPF → "PPF3's description field is 50 bytes" ·
 captions → "Memory-card messages (`en_savemsg`)", "The PHOTO ALBUM's own
 memory-card messages (`en_camsave`)" · sweep → "Sweep: is any UI text still
 Japanese?" · mission log → "The MISSION LOG port", "The disc-swap text: four
-copies" · scope → "Scope", "What stays
+copies", "Why `en_menu3` is raw-disc only" (and its two sub-sections: the
+diagnosis it replaces, and "The general trap: the collection may already own the
+bytes you are porting") · scope → "Scope", "What stays
 Japanese, and why" · brightness → "The collection shows only four of USA's six
 brightness lines", "Option → SCREEN", "The sc_text texture port" · briefing →
 "Briefing menu (`brf` stage)" · unlocks → "Unlocks", "Give items", "Unlock
@@ -702,6 +745,16 @@ deployed, which also corrected two earlier conclusions recorded here.
   overlay's own sector padding, and keeps USA's records and position table. All
   three captions are now English and deployed; the two-line form has not been
   seen on screen yet. §5.4a and README "The MOVIE selection captions".
+
+- **`en_menu3` is done, and the answer was "not here".** The last Japanese text
+  in the main game with a USA counterpart now has a builder (`menu3.py`) and two
+  verified PPFs - and they ship for a raw PSX disc only. The collection patches
+  that same block itself, at the exact address of our first record, and the two
+  layouts do not mix: the title stage dies on entry. Both the August crash and a
+  fresh one on 09-07 are the same seventeen bytes. The recorded diagnosis
+  (container sizes) turned out to describe nothing that was wrong with the file,
+  and the shape that crashed is the one that leaves retail's layout untouched.
+  The user chose raw-only over blacklisting the collection's patch. §5.3.
 
 Three process notes worth keeping:
 
