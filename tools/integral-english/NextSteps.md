@@ -265,6 +265,13 @@ caption, so the full PPF stays staged. Two defects were found, one fixed:
   TGS captions stay Japanese, which is rule-correct. The `f`/`m` GCL variable
   references remain the lead for the count.
 
+**VERIFIED ON SCREEN 2026-09-06, all three clips:** clip A
+`東京ゲームショウ'98春 出展映像A` and clip B the same with B - Japanese and
+untouched, as intended - and the E3 clip **`Video clip from E3 (6/97)`** in
+English. So the shipped state is exactly right: the one caption that can be
+ported faithfully is ported and visible, and the two that cannot are left
+Japanese rather than misattributed.
+
 **The movies are unlocked now** (`vr_unlock_movies.py`, deployed): the gate was
 the `movie` overlay's own `count / 3` score against 45 and 75, a separate copy
 of the pattern `vr_unlock` handles for missions. All three thumbnails appear, so
