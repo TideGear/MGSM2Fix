@@ -1518,6 +1518,25 @@ game hit (README "Font and text rendering"). Porting these two captions
 therefore needs the actor's line count *and* its KCB geometry changed, on an
 overlay that is not decompiled - the `abst.c` class of job.
 
+**What the decomp does and does not give here (checked 2026-09-06).**
+`source/stagevr/movie.c` is the stage's chara manifest and names the actor:
+`{ 0xfaa8, (NEWCHARA *)0x800d15b8 }, // CHARA_FAA8_MOVIE`, with
+`include/charalst.h` pointing at `chara/movie/movie.c` for its implementation -
+**a file that does not exist**, so this actor is not decompiled and
+disassembling it was the only route. Two things it did settle:
+
+- **The movie overlay's load base is `0x800C11A0`** (the same as the option
+  overlay's). The chara table's entry `0x800D15B8` lands on a function prologue
+  (`addiu sp, sp, -32`) at overlay `+0x10418`, which confirms it. Every offset in
+  this section can therefore be turned into a real address, which is what makes
+  cross-reference searching possible - the way to find **what writes the
+  variable `-m` points at**, and the next step for the line count.
+- **`-f` is probably a flag, not a count.** `chara/others/fonttext.c`, a
+  decompiled generic text actor, reads `-t` as one string and `-f` as a boolean
+  (`flags = GCL_GetNextInt() ? 16 : 0`). Option letters are per-actor
+  conventions, so this is a hint rather than proof, but it shifts the line-count
+  suspicion onto `-m`.
+
 The mechanism to find is whatever makes USA show two: the caption command's two
 other options, which *do* differ:
 
