@@ -115,7 +115,7 @@ been seen on screen yet** — that is the top of §5.
 | `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | **the option screen is verified on screen 2026-09-06** after three faults, all found by bisecting the PPF: the DAR's entry sizes were not 4-aligned and crashed the stage at `load option`; record 3 doubled the vibration-test sentence; and Integral's colon/values were lit beside the English while the lines sat off-centre. Fixed by padding every DAR payload to 4 (paid for with `pcx4`'s real 63-byte run cap), blanking record 3 as the main game does, unlighting the colon/values via the state switch, and giving each ported entry USA's `{num 1, x 160, y 196}`. All five rows now read as one centred English line, measured within 0.3 game px of centre. **KEY CONFIG itself is still unseen** — the collection intercepts it on the VR disc too, exactly as on the main discs, so its transplanted geometry and eight label textures can only be validated on a raw disc |
 | `vr_en_title` | the EXTRA menu's four help lines | statically; record 6 (PocketStation) deliberately kept — USA's `See the staff credits.` is a different feature |
 | `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used |
-| `vr_unlock` | the **mission menu** unlocked (test aid) | emulating the overlay through all five unlock passes: 46 → 361 of 373 items on Integral, 45 → 357 on USA. **Deployed 2026-09-06** and its three words verified in place against the deployed PPF. It does **not** open the EXTRA movies — that is a separate retail gate, `???` in USA's VR disc too. Safe to leave in and safe to save with (it writes no progress); delete the PPF to relock |
+| `vr_unlock` | the **mission menu** unlocked (test aid) | **verified in game 2026-09-06: every mission unlocked.** Emulation predicted 46 → 361 of 373 items on Integral (45 → 357 on USA) and its three words were verified in place against the deployed PPF. It does **not** open the EXTRA movies — that is a separate retail gate, `???` in USA's VR disc too. Safe to leave in and safe to save with (it writes no progress); delete the PPF to relock |
 
 `ppfcheck.py --deployed` is clean over all 26 deployed files and no two of the
 six VR PPFs touch the same disc byte. `vr_sweep.py` rebuilds every stage as the
@@ -216,11 +216,21 @@ Found 2026-09-06. The MOVIE screen's description text (shown when a clip opens)
 still Japanese is the one-line caption under the thumbnail on the *selection*
 screen, in the `movie` stage's own script, and it is not a 1:1 swap:
 
-| | Integral | USA |
+Both scripts decoded 2026-09-06 (`{qNN}` = a script-local font glyph, i.e. the
+typographic quotes; USA line 1 ends on "for" and reads into line 2):
+
+| | Integral, one record each | USA |
 |---|---|---|
-| TGS clip A | one 35-byte record (`東京ゲームショウ'98春 出展映像A`) | **two** records: `Exhibition clip "A" for` + `the Tokyo Game Show, Spring '98.` |
-| TGS clip B | one 35-byte record | two records |
-| E3 clip | one 22-byte record (`E3(97/6)…`) | one: `Video clip from E3 (6/97)` |
+| TGS clip A | `+125`, 36 B: `東京ゲームショウ'98春 出展映像A` | `+125`, 25 B: `Exhibition clip {q01}A{q02}for` **+** `+140`, 33 B: `the Tokyo Game Show, Spring '98.` |
+| TGS clip B | `+14B`, 36 B: the same with `B` | `+163` + `+17E`, likewise |
+| E3 clip | `+171`, 23 B: `E3{b09}97/6{p0A}…映像` | `+1A1`, 26 B: `Video clip from E3 (6/97)` — one line |
+| | `+18A` empty; `+1F`/`+19C` are not text | `+1BD` empty |
+| script records | **6** | **7** |
+
+The record counts differ because USA splits each TGS caption across two lines,
+so the caption actor's read count almost certainly differs too - that has to
+come out of the `movie` overlay (Integral's `sb` is 122,808 bytes and is not
+decompiled), the same way `abst.c` had to before the mission log could move.
 
 **Seeing the other two on screen needs the movie gate, which is not the mission
 unlock.** With `vr_unlock` deployed and applied the list still showed `???`, and
