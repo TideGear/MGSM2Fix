@@ -1,4 +1,4 @@
-# Text coverage evidence (2026-09-04, VR section added 2026-09-06)
+# Text coverage evidence (2026-09-04, VR section added 2026-09-06, updated 2026-09-07)
 
 The current patch is not a complete English port. The title's disc-swap copy
 (`en_menu3`) is ported but raw-disc only - the collection patches that block
@@ -103,7 +103,7 @@ Read from the VR binaries by `vrlib.py` and the five `vr_*.py` builders, not by
 | item / weapon / capture-mode pools | executable string arenas behind tables at `0x8009C11C`, `0x8009C304` and `0x80011F0C` | 3 pools | all, minus MP5 and frozen items (no USA text) |
 | save and load messages | executable tables at `0x8009C884` / `0x8009C8B4` | 12 + 12 | 20; indices 1 and 9 stay Japanese (USA draws nothing) |
 | option help lines | `chara 0x976C` option `-e` in the `option` stage | 31 records | 7 (1, 2, 3, 5, 6, 12, 26); the rest are Integral-only rows |
-| KEY CONFIG | eight label textures in the option stage's DAR, plus quad geometry in the overlay | 8 labels | all 8, with USA's rectangles and `key_syukan` +11 |
+| KEY CONFIG | eight label textures in the option stage's DAR, plus quad geometry in the overlay | 8 labels | all 8, with USA's rectangles and `key_syukan` +11; **verified on screen 2026-09-07** in all three button types, and the row's selection highlight widened to match (README, "The VR KEY CONFIG on screen"). Its help line under the controller stays Japanese: USA leaves records 17..25 empty |
 | EXTRA menu help lines | `chara 0x5667` option `-t` in `vrtitle` | 11 records | 4 (records 2–5) |
 | PHOTOGRAPHING memory-card messages | string table in the `camera` overlay at `+0x608` / `+0x638` / `+0x668` / `+0x708` | 4 groups | all but the two Japanese prompts and the two USA-empty slots |
 | MOVIE selection captions | `chara 0xFAA8` option `-t` in the `movie` stage | 3 captions (4 records) | **all 3** (6 records), the two TGS ones as USA's two lines |
