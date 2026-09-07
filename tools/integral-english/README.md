@@ -80,6 +80,8 @@ case — ask before doing it.**
 
 | the brightness paragraph's fifth and sixth lines — "Press the ○ button to return to the option screen." — are **blanked in the collection build** | The collection drops them from its own USA, because ○ is not the back button on every platform. Integral has no `sc_text` for those patches to replace, so our six-line Integral contradicted the collection's own USA two menus away. `SC_KEEP_LINES = 4` blanks the same two lines for the collection build; `= 6` is USA's own text and is what a raw PSX disc patch gets, where ○ really is the back button. **The user's call, stated 2026-09-03**: "in MC i prefer the circle message suppressed". Detail: "The collection shows only four of USA's six brightness lines". |
 
+| the VR disc's MOVIE **EXIT box** sits **4 game px higher** than Integral shipped it (screen y 186, USA's own `sp_exit` y of +66 against Integral's +70) | USA draws each TGS caption as two lines and makes room for them two ways: a shorter caption face and a higher EXIT box. The face is Integral's own art and stays, so at USA's caption rows the first line's ink (game y 201-213) overlapped Integral's box border (201-202) by two rows. Moving the box is chrome that positions text, and it is one immediate at overlay `+F128`; the selection highlight follows on its own, because both the `cur_l` cursor and the lit state anchor on the same widget object at `work+0xF0`. **Asked and approved by the user, 2026-09-07**, who named the default it departs from in the same message: *"Usually we skew toward the Integral visuals."* Detail: "The MOVIE selection captions". |
+
 The other three KEY CONFIG labels were checked the same way and need no shift:
 each already sits USA's distance from its own rule. Only the rules' far ends run
 longer in Integral, which is art, and stays.
@@ -319,6 +321,29 @@ executable's file-name table and is never opened by the game.
 - Resource ids are `GV_StrCode` hashes computed at runtime from strings in
   `.rodata`, so they are **not** immediates in the code — grep the overlay for
   the name instead.
+- **When a function indexes a global, find the same pattern in the decomp before
+  naming the global.** A `lw` from `0x800A9580`, scaled by 4 into a table, was
+  written down as `captions[clip]` in the VR `movie` overlay; `abst_sprt` in the
+  decomp indexes the same way with **`GV_Clock`** — frame parity — and the table
+  is the per-frame ordering table. That one name made a "one line per clip" rule
+  look structural in the drawing code and cost two builds and two play tests
+  (README "The MOVIE selection captions"). The decomp need not contain the
+  *function* to name what it touches: an undecompiled actor is often the engine's
+  generic module under another name, and here it was the mission log's own text
+  engine, `abst.c`, linked into the overlay twice.
+- **An overlay has room for a small stub without growing the stage.** Payloads
+  are padded to a sector by `pack_stage`, so the last one's slack (72 bytes in
+  the VR `movie` overlay's 60 sectors) takes a patch function with no payload
+  moving, no sector-count change and no risk to the collection's own patches.
+  Prove the RAM is overlay space the same way: every stage overlay in a game
+  loads at one base, so the *largest* overlay's end is the ceiling — `init`'s
+  `0x800EA1EC` on the VR disc, against the `movie` overlay's `0x800DF158`.
+- **A one-word retarget beats an in-place rewrite.** Where USA needs more
+  instructions than the Integral block has room for, leave the block's shape
+  alone, point its `jal` at a stub, and let the stub call retail's own helpers.
+  Remember `a0`-`a3` and `ra` do not survive a call, and that R3000 has no load
+  interlock: a `lw` result is not readable in the next instruction, and `jr ra`
+  needs a slot after `lw ra`.
 
 ### Measuring from screenshots
 
@@ -1471,7 +1496,7 @@ ported record records which USA stage it came from so the right font is read.
 26 stages end up with appended USA glyphs (5, 18 or 20 of them), 64 need no
 local font at all, and `movie` keeps Integral's plus two.
 
-### The MOVIE selection captions (`vr_en_movie`, 2026-09-06)
+### The MOVIE selection captions (`vr_en_movie`, 2026-09-06, solved 2026-09-07)
 
 The one line under the thumbnail on EXTRA -> MOVIE. The clip *descriptions* were
 already English (they come from `vr_en_missions`); these short captions were not.
@@ -1493,192 +1518,139 @@ counterpart(s) changes the record bytes by +24, +24 and +3 = **+51**, and
 *byte-identical to USA's* - which `verify()` asserts, along with the script
 round-tripping and the stage keeping its 251,904 bytes in place.
 
-**What is proven about the actor.** Its caption builder was diffed against USA's
-instruction for instruction (Integral overlay `+FE44`, USA `+FF44`, ends at
-`+C0`): **identical** but for one immediate, `addiu v1, zero, 832` against USA's
-`768` - the font VRAM column, the same 832/704 pattern `abst` has. Its read loop
-is `GetOption('t')` then `NextStr`/`GetString` **until NULL**, a while-loop and
-not a fixed count, so extra records are read. Diffing a 0x1200-byte window at
-that alignment found 38 differences, every one a data-address displacement.
+#### The actor is the engine's generic numbered-text module
 
-**SETTLED IN GAME 2026-09-06: the actor shows ONE record per clip, `record =
-clip`.** With the movies unlocked and the full six-record build deployed, all
-three clips were checked: clip A read `Exhibition clip "A" for` (record 0) and
-**clip B read `the Tokyo Game Show, Spring '98.`** (record 1) - clip A's *second*
-line, misattributed exactly as predicted. So Integral's caption is one record
-per clip, USA's is two, and the chain edit alone cannot reproduce USA's caption.
-The full build stays **wrong for Integral** and is not shipped.
+The decomp names the chara but does not implement it -
+`source/stagevr/movie.c` has `{ 0xfaa8, (NEWCHARA *)0x800d15b8 }` and
+`include/charalst.h` points at `chara/movie/movie.c`, **a file that does not
+exist** - so it was disassembled. Integral's `movie` overlay loads at
+**`0x800C11A0`** (the chara table's `0x800D15B8` lands on a function prologue at
+overlay `+0x10418`, which fixes it), and the actor's name string at `+1CDD8`
+reads `'movie.c'`.
 
-**And a single combined record is ruled out by measurement, not by guesswork.**
-The caption builder allocates its KCB at font `(832, 256)` with the CLUT at
-`(832, 276)` - a **20-row band, one line** - so USA's two lines concatenated
-(~56 characters, about 325 game px against the 240 px limit) would wrap and draw
-its continuation ~18 rows down, onto the CLUT row: the same corruption the main
-game hit (README "Font and text rendering"). Porting these two captions
-therefore needs the actor's line count *and* its KCB geometry changed, on an
-overlay that is not decompiled - the `abst.c` class of job.
-
-**What the decomp does and does not give here (checked 2026-09-06).**
-`source/stagevr/movie.c` is the stage's chara manifest and names the actor:
-`{ 0xfaa8, (NEWCHARA *)0x800d15b8 }, // CHARA_FAA8_MOVIE`, with
-`include/charalst.h` pointing at `chara/movie/movie.c` for its implementation -
-**a file that does not exist**, so this actor is not decompiled and
-disassembling it was the only route. Two things it did settle:
-
-- **The movie overlay's load base is `0x800C11A0`** (the same as the option
-  overlay's). The chara table's entry `0x800D15B8` lands on a function prologue
-  (`addiu sp, sp, -32`) at overlay `+0x10418`, which confirms it. Every offset in
-  this section can therefore be turned into a real address, which is what makes
-  cross-reference searching possible - the way to find **what writes the
-  variable `-m` points at**, and the next step for the line count.
-- **`-f` is probably a flag, not a count.** `chara/others/fonttext.c`, a
-  decompiled generic text actor, reads `-t` as one string and `-f` as a boolean
-  (`flags = GCL_GetNextInt() ? 16 : 0`). Option letters are per-actor
-  conventions, so this is a hint rather than proof, but it shifts the line-count
-  suspicion onto `-m`.
-
-**THE ACTOR, MAPPED (2026-09-06).** The decomp names it but does not implement
-it, so it was disassembled. Everything below is Integral's `movie` overlay,
-whose load base is **`0x800C11A0`** (established from the decomp, above), and
-the actor's own name string at `+1CDD8` reads `'movie.c'`:
+What it turned out to be is the same numbered-text module `abst.c` implements in
+the decomp - the mission log's own text engine, down to
+`work->field_51C[index].string` - linked into this overlay twice, and the
+captions use the first copy. That is the key to the whole thing, because
+**reading `abst.c` gives the C for code with no source**:
 
 | overlay | address | what |
 |---|---|---|
-| `+FBA8` | `0x800D0D48` | **`Act`** - per frame; its tail is the display path below |
-| `+FCF0` | `0x800D0E90` | the kill/cleanup passed to `GV_SetNamedActor` |
-| `+FE44` | `0x800D0FE4` | **the caption builder** - `GetOption('t')` then `NextStr`/`GetString` until NULL, one KCB line per record (index in `s1`). Identical to USA's but for `addiu v1, zero, 832` against USA's `768`, the font VRAM column |
-| `+FF58` | `0x800D10F8` | the **unlock gate**: `count / 3` vs 45 and 75 into `work+30`, then `GetOption('m')` into `work+40`, then `printf("vr_clear_stages %d : %x\n", ...)` |
-| `+1036C` | `0x800D150C` | `GetResources`, called from `NewChara` |
-| `+10418` | `0x800D15B8` | `NewChara` - `GV_NewActor`, then `GV_SetNamedActor(work, Act, kill, "movie.c")` |
-| `+D2B4` | `0x800CE454` | the caption **draw** routine, called `f(work+44, string)` |
+| `+CFFC` | `0x800CE19C` | **helper1**: allocate line `i`'s KCB - a 64-word x 21-row rect at (832, 256 + 21i) with the CLUT on the band's last row, wrapping to x 896 at y+21 >= 512 - then `font_set_kcb(kcb, -1, -1, 0, 6, 2, 0)`, a buffer, and `font_set_color(kcb, 0, table[i].color, 0)` |
+| `+D170` | `0x800CE310` | **helper2** (`abst.c`'s `func_800C47A8`): `if (string) { font_print_string; font_update; font_clut_update; }`, store the width and `max_height - 1`, place from the position table (`num 1` = centre on x, y), then `string = NULL` and **`num = 1`** - the slot is now live |
+| `+D2B4` | `0x800CE454` | **the draw** (`abst_line_sprt`): walk up to 12 slots and emit four `SPRT`s for **every** slot whose `num == 1`, plus two tpage prims. Its only difference from USA's is the immediate `0x340` (832) against `0x300` (768) |
+| `+D5CC` | `0x800CE76C` | `font_set_color(&kcb[i], 0, colour, 0)` + `font_clut_update` |
+| `+D628` | `0x800CE7C8` | per frame, over all `count` slots: `+D5CC(t, i, 0)` - **every caption starts each frame invisible** |
+| `+D684` | `0x800CE824` | **`highlight(work, i)`**: `+D5CC(work + 0x2c, i, 0x6739)` - light caption `i`. One call site |
+| `+FBA8` | `0x800D0D48` | `Act` - per frame; calls `+D628`, four update functions, then the draw |
+| `+FE44` | `0x800D0FE4` | **the builder**: `GCL_GetOption('t')`, then `GCL_NextStr`/`GCL_GetString` **until NULL, at most 24**; per record it stores the string, clears `num`, calls helper1, helper2 and `+D5CC(t, i, 0)`; finally stores the record count at `work+0x45C` |
+| `+FF58` | `0x800D10F8` | the unlock gate (`count / 3` vs 45 and 75) - reads `-m`, nothing to do with captions |
+| `+10418` | `0x800D15B8` | `NewChara` - `GV_SetNamedActor(work, Act, kill, "movie.c")` |
 
-**The display path, and why `record = clip` is structural.** `Act`'s tail:
+So **the number of lines on screen is simply how many slots are lit**, and the
+draw imposes no limit at all.
 
-    lw    v1, clip_index          ; a global at 0x800A9580
-    addiu v0, v0, -2484           ; a table base, 0x800AF64C
-    sll   v1, v1, 2
-    addu  v0, v0, v1
-    lw    a1, 492(v0)             ; a1 = captions[clip]  (table at ~0x800AF838)
-    jal   0x800CE454              ; draw(work+44 /*KCB*/, captions[clip])
-    addu  a0, s3, zero
+#### The line count: one word, and USA's own arithmetic
 
-So the draw is handed **exactly one string per clip**, chosen by the clip index -
-`record = clip` is not an accident of the data, it is what the code does. Making
-a clip show USA's two lines therefore needs the draw to emit two KCB lines, a
-structural change to an actor with no source.
+The two discs differ in exactly one place, in the clip-selection code:
 
-**And the wrap escape is now closed twice over.** The draw routine at `+D2B4` is
-a sprite/primitive builder - it walks slots emitting `POLY` entries and never
-calls `font_print_string` - so it cannot wrap a long string. That is independent
-of the earlier measurement (the caption KCB is font `(832,256)` / CLUT
-`(832,276)`, a 20-row band holding one line, so a ~56-character combined record
-would draw its continuation onto the CLUT row). Either reason alone rules out
-"put both lines in one record".
+    Integral +F448   lhu  v0, 0x1e(s7)      ; the per-clip unlock bitmask
+                     srav v0, v0, s6        ; s6 = the clip index
+                     andi v0, v0, 1
+                     beqz v0, done
+                     lw   a0, 0x48(sp)      ; work
+                     jal  highlight         ; highlight(work, clip)
+                     move a1, s6
+                     j    done
 
-**`Act` is identical too - the earlier diff had missed it.** The 0x1200-byte
-diff started at the caption builder `+FE44`, but `Act` sits *before* it at
-`+FBA8`, so it was never compared. Diffed since: Integral `+FBA8` against USA
-`+FCA8` differs in **three instructions, all data addresses** (the table base,
-the clip-index global, and one more). So the display path is the same program in
-both, and the contradiction is sharp: **identical code, yet USA draws two lines.**
-One of the premises must be wrong, and it is not the builder, not `Act`, and not
-the 0x1200 bytes around them.
+    USA      +F4F0   (the same bitmask test, then an extra
+                      `lw v0, 0x2c(s7); bnez v0, done` - USA hides the caption
+                      while the carousel is animating)
+                     sll  s0, s6, 1
+                     lw   a0, 0x48(sp)
+                     jal  highlight         ; highlight(work, clip*2)
+                     move a1, s0
+                     lw   a0, 0x48(sp)
+                     jal  highlight         ; highlight(work, clip*2 + 1)
+                     ori  a1, s0, 1
 
-**THE DATA-DRIVEN HYPOTHESIS IS DEAD - tested 2026-09-07.** If `Act` and the
-builder really are the same program, the two-line layout had to live in data,
-and there is a table that looked exactly like the missing piece. helper2
-(overlay `+D170`) places each caption from a 12-byte table at `0x800C9454`
-(overlay `+82B4`) in precisely `opt.c`'s model - `{int num; short x; short y;
-int color}`, `num 1` = centre on `(x, y)` - and helper1 (`+CFFC`) reads the same
-entry's colour at offset 8. Nothing else in the overlay references it, so it is
-this actor's own. The two versions differ in **y alone**, and it read like the
-giveaway: USA alternates two rows because each of its captions is two lines,
-Integral repeats one row.
+USA lights a clip's two lines; Integral lights its one. USA's sequence is 14
+words and Integral's block has 11, so it cannot be written in place. Instead the
+call site keeps its shape and **only its target changes** - one word - and a
+16-word stub does the doubling by calling retail's own `highlight` twice:
+
+    two_lines(work, clip):  highlight(work, clip*2); highlight(work, clip*2+1)
+
+`a0`/`a1` do not survive a call, so `work` goes to the frame's argument-save area
+and `clip` to `0x10(sp)`; `ra` is restored only after the second `jal`, which
+writes it; two `nop`s cover R3000 load-delay slots (`lw` then use, and `lw ra`
+before `jr ra`). `vr_movie.two_line_stub()` emits it from named encoders and
+`verify_overlay` re-reads it out of the built stage.
+
+**Where the stub lives, and why that is safe.** It is appended to the overlay
+payload at `+1DFB8` (RAM `0x800DF158`). Three facts make that a non-event:
+
+- **the stage does not grow.** The payload is 122,808 bytes and `pack_stage`
+  pads each payload to a sector, so its 60 sectors already hold 122,880: the 64
+  bytes land in padding the stage carries either way. No payload moves, the
+  stage keeps its 123 sectors and its LBA, and no collection patch is orphaned
+  (see "No stage is ever relocated").
+- **the RAM is overlay space by construction.** Every VR stage overlay loads at
+  `0x800C11A0`; USA's own `movie` overlay is 132,384 bytes there (9,576 past
+  Integral's end) and Integral's `init` runs to `0x800EA1EC`. Nothing else can
+  own `0x800DF158`.
+- **six lines is what retail dimensioned the module for.** The slot array ends
+  at `work+0x2c+0x434+24*224 = work+0x1960`, exactly where `Act`'s two tpage
+  primitives sit, and the builder's own cap is 24 records; the draw walks 12.
+  Their KCBs go to VRAM x 832..848, y 256..382 for six lines, inside the arena
+  the allocator itself treats as its own (x 832, then 896, y 256..511), and no
+  texture in the stage's DAR - **identical in both discs** - is anywhere near
+  x 832. Retail already puts four boxes there.
+
+#### The position table is the other half
+
+helper2 places each line from a 12-byte table - `{int num; short x; short y;
+int color}`, exactly `opt.c`'s model - at overlay `+82B4` (`0x800C9454`;
+USA's is `+82BC`, `0x800CC60C`). The two differ in **y alone**:
 
     entry        0    1    2    3    4    5
     Integral   208  208  208  196  196  196
     USA        196  208  196  208  196  208
 
-So the full six-record build was rebuilt with USA's y values written over
-Integral's - four halfwords, `num` (1), `x` (160) and the colour (`0x6739`)
-being identical already - and deployed. What came back settles two things at
-once:
+USA alternates because each caption is a pair of lines; Integral repeats one row
+because each is one line. `num` (1 = centre on x), `x` (160) and the colour
+(`0x6739`) are already identical, so the port writes four halfwords. Note what
+this does to the E3 caption: USA puts its single line on the **upper** row
+(entry 4, y 196) where Integral's sits at 208, so it moves up 12 px to USA's own
+placement - text placed as USA places it, which is the rule.
 
-| clip, in carousel order | caption drawn | which record | row |
-|---|---|---|---|
-| E3 (first, no left arrow) | `Exhibition clip {"}B{"} for` | 2 | upper |
-| TGS ROLL A | `Exhibition clip {"}A{"} for` | 0 | upper |
-| TGS ROLL B (last) | `the Tokyo Game Show, Spring '98.` | 1 | lower |
+#### The widths are measured, because wrapping here is not cosmetic
 
-1. **The table is real and indexed per record.** TGS ROLL B sat a row lower than
-   the other two clips, exactly as `[196, 208, 196, ...]` predicts for record 1
-   against records 0 and 2. The write landed and the actor honours it.
-2. **And still nobody drew two lines.** With USA's record count *and* USA's
-   position table in place, every clip drew one caption. So the layout is **not**
-   data-driven, and the argument that identical code plus USA's data must give
-   USA's behaviour is refuted by experiment, not by reasoning.
+The caption KCB is a 64-word rect, so `c_width = rect.w * 4 / 12` is 21 cells =
+252 px and `font_print_string` wraps at `kcb->width - 12` = **240 px** - the same
+budget as the main game's option entries, where a wrap lands the continuation on
+the CLUT row and writes past the buffer ("Wrap width"). Measured against
+Integral VR's own `font.res` (found by the same `>II 392, 2306` signature, in its
+`init` stage), USA's lines are 132, 133, 144 and **201 px** - the longest,
+`the Tokyo Game Show, Spring '98.`, clearing the limit by 39 px and the one-byte
+`max_width` ceiling by 54. `check_widths()` asserts it at build time.
 
-It also pins the mapping harder than before: the index is the **clip id in the
-retail record order** - TGS A = 0, TGS B = 1, E3 = 2 - and not the carousel
-slot, because Integral lists the clips E3, TGS A, TGS B on screen and the
-captions still came out 2, 0, 1. That is exactly why the E3-only build is right:
-under the retail three-record layout record 2 *is* the E3 caption, so swapping
-its text changes nothing structural.
+**Hence two builds, and the full one now ships.**
 
-Two candidates were checked and eliminated. USA's movie script instantiates a
-chara Integral does not - `0xB789` where Integral has `0xAA13` - but that is
-`CHARAID_ENDINGROLL` (`NewEndingRoll`, `takabe/ending2.c`), USA's staff-credits
-actor where Integral has PocketStation, which independently confirms the
-`vr_en_title` record 6 decision and has nothing to do with captions. And the
-`-m` option is consumed by the *gate* function at `+FF58`, not by the caption
-path at all.
+- **`INTEGRAL_vr_en_movie.ppf` - the whole port, DEPLOYED 2026-09-07.** USA's six
+  records, USA's position table, and the retargeted `jal` plus the stub. All
+  three captions in USA's English, the two TGS ones as USA's two lines.
+- **`INTEGRAL_vr_en_movie_e3.ppf` - the E3 caption alone, the fallback.** One
+  record for one record: retail's record count, order and overlay untouched, so
+  it is correct under any mapping and needs no code change. It shipped from
+  2026-09-06 (verified on screen) until the full build replaced it, and it is
+  what to fall back to if the stub ever has to come out. It leaves both TGS
+  captions Japanese.
 
-**Where a next attempt should start**, now that data is ruled out: the code that
-was never read. `Act` hands the draw exactly one string, so the comparison that
-matters is Integral's draw at `+D2B4` against USA's counterpart - the only thing
-that could turn one string into two rows - plus the five per-record helpers the
-builder calls (`+D628`, `+DC4C`, `+DE24`, `+E6D8`, `+F95C`) and whatever fills
-the `captions[]` table at `~0x800AF838`. The KCB geometry belongs in the same
-read: Integral's caption band is font `(832,256)` / CLUT `(832,276)`, 20 rows
-for one line, and if USA's is 40 rows then the two-line layout is the builder's
-allocation rather than the data. The idea that USA's *navigation* code steps the
-clip index by two is dead too - that would still hand the draw one string, and
-would give each clip only its first line. The `f`/`m` options are the weakest
-lead of the lot: `-m` is consumed by the unlock *gate* at `+FF58`, not by the
-caption path at all, and `chara/others/fonttext.c` shows `-f` is conventionally
-a boolean flag.
-
-**The honest statement of the problem, unchanged after two experiments:**
-identical `Act`, identical builder, identical position data, and USA still draws
-two lines where Integral draws one. For the record, the two options that *do*
-differ:
-
-    OPTION 'f'   Integral  VAR 11 00 04 80      USA  VAR 11 00 04 82
-    OPTION 'm'   Integral  VAR 12 00 04 82      USA  VAR 12 00 04 81
-
-Those are GCL variable *references*; copying USA's ids would point Integral at
-slots its own scripts never write, so they are left alone. The `-p` option's two
-procs (`A878`, `0EF7`) are the same ids in both and turn out to be the stage
-transition procs (they carry the `"movie"`/`"vrtitle"` names), so they do not
-answer it either.
-
-**Hence two builds, and only one ships.**
-
-- **`INTEGRAL_vr_en_movie_e3.ppf` - the E3 caption alone, DEPLOYED and verified
-  on screen.** One record for one record, so the record count and order stay
-  exactly as they were: whatever maps a clip to record 2, record 2 is still the
-  E3 caption, now in USA's English. Correct under *any* mapping, so it needs no
-  knowledge of the selection and cannot misattribute a caption. **This is the
-  file in `mods/INTEGRAL/VR-DISK/`**; it was put back there on 2026-09-07 after
-  the position-table experiment, and `ppfcheck --deployed` is clean over 29
-  files.
-- **`INTEGRAL_vr_en_movie.ppf` - the full port, STAGED, disproved twice.** Under
-  `record = clip` it gives clip A a sentence fragment and hands the other two
-  clips someone else's line, which is exactly what the 2026-09-07 shots show,
-  and USA's position table does not change it. It stays out of `mods/`. Its text
-  and glyph codes are correct, so only the line count is left - and the line
-  count is a code problem, not a data one. Kept as the reference artifact for
-  whenever that is solved.
+The two **overlap**, so exactly one may sit in `mods/INTEGRAL/VR-DISK/`:
+Ketchup applies a folder in name order, so `..._movie_e3.ppf` would land last
+and overwrite part of the full build. `vr_movie.py --deploy` installs the full
+one and moves the other to `work/` with a `.was-deployed` suffix.
 
 **THE LOCAL-FONT TRAP, caught on screen.** The first deployment of the full
 build rendered `Exhibition clip` followed by two kanji instead of the quotes.
@@ -1708,17 +1680,131 @@ patch already owns a stage, build from what the game will actually see.**
 `inplace_records(..., merge_gap=0)` then keeps each record to the bytes that
 really change; with the default 64 they span unchanged bytes and the outcome
 would depend on which PPF Ketchup applied last. Residual overlap is inherent -
-both patches write the same script - and this one must win, which it does
-because Ketchup loads a folder by name and `..._missions.ppf` sorts before
-`..._movie.ppf`. **The clean long-term fix is to fold the captions into
-`vr_windows.py` so one patch owns the stage**; not done blind, since
-regenerating `vr_en_missions` would rewrite 3.3 MB of verified output.
+both patches write the same script, 686 of this patch's 753 bytes - and this one
+must win, which it does because Ketchup loads a folder by name and
+`..._missions.ppf` sorts before `..._movie.ppf`. **The clean long-term fix is to
+fold the captions into `vr_windows.py` so one patch owns the stage**; not done
+blind, since regenerating `vr_en_missions` would rewrite 3.3 MB of verified
+output.
+
+#### Three corrections, and the one that mattered
+
+This section was wrong twice on the mechanism and once on an address, and each
+error cost a build and a play test. They are kept because the shape of the
+mistake is the lesson.
+
+1. **The record count alone** (2026-09-06). Six records with retail's single
+   highlight draws one line per clip, so clip A got a sentence fragment and the
+   other two clips someone else's line - exactly what the shots showed. Right
+   data, wrong count of lit slots.
+2. **The position table alone** (2026-09-07). Writing USA's y values moved the
+   rows on screen exactly as predicted - TGS B a row lower than the others - and
+   still gave one line each. That was read as *"the layout is not data-driven,
+   so nothing here is data"*, and the table was nearly reverted. Both halves
+   were needed: the table places the lines, the code decides how many there are.
+   "Identical code plus USA's data must give USA's behaviour" was refuted by
+   experiment, and the right conclusion was not "so it is all code" but "so
+   something outside the functions I diffed decides the count".
+3. **The address underneath both.** `Act`'s tail reads a global at `0x800A9580`,
+   scales it by 4 and loads `+0x1EC` from a table, and that was read as
+   `captions[clip]` - which made `record = clip` look structural in the draw and
+   sent the search into the draw and the "five per-record helpers". The decomp
+   names it: `abst_sprt` indexes the same way with **`GV_Clock`**, the frame
+   parity, and the table is the ordering table per frame. The draw is handed an
+   **OT, not a string**, and it draws every lit slot. Nothing there ever limited
+   a clip to one line.
+
+The lesson that generalises: **when a disassembled function indexes a global,
+find the same pattern in the decomp before naming the global.** One `lw` read as
+a clip index sent two sessions looking for a line count in the drawing code,
+when the module was the mission log's own text engine all along and the count
+was two `jal`s in the input handler. The `f`/`m` options were never the lead
+either - `-m` is read by the unlock *gate* at `+FF58` - and they stay Integral's,
+being GCL variable references that would point Integral at slots its own scripts
+never write:
+
+    OPTION 'f'   Integral  VAR 11 00 04 80      USA  VAR 11 00 04 82
+    OPTION 'm'   Integral  VAR 12 00 04 82      USA  VAR 12 00 04 81
+
+The `-p` option's two procs (`A878`, `0EF7`) are the same ids in both and are
+the stage transition procs (they carry the `"movie"`/`"vrtitle"` names).
+
+**One structural note worth keeping:** the two `movie` stages are not parallel -
+USA's carries an extra `cr` tag and ~100 KB more cache data than Integral's - so
+nothing here could have been done by wholesale stage substitution.
+
+**VERIFIED ON SCREEN 2026-09-07**, all three clips: TGS ROLL A reading
+`Exhibition clip “A” for` / `the Tokyo Game Show, Spring '98.` on two rows,
+TGS ROLL B the same with `B`, and E3 `Video clip from E3 (6/97)` on one - right
+text, right clip, and the typographic quotes rendering as quotes, so the
+local-font remap is right too.
+
+#### The EXIT box had to move, and that was a decision, not a detail
+
+Measured off those shots (9 display px per game px, x offset 480): the EXIT box's
+bottom border sits at game y 201-202 and the caption's **first line's ink runs
+201-213**, so with USA's rows they overlapped by two rows; line 2 (215-225) and
+E3's single line (203-213) were clear.
+
+USA avoids the collision **twice over**, and the user confirmed both halves from
+their own disc: USA VR's caption face is **shorter**, and its **EXIT box sits
+higher**. The face stays Integral's — a font face is its own art, not text (see
+"The white caption font differs between the two VR discs"), and line 1's ink is
+12 rows only because it is topped by the two 12x12 script-local quote glyphs,
+where the same font draws the option screen's `Sound setting.` in 8. So the room
+comes from the box, which is **chrome that positions text** under the user's
+rule 3.
+
+**Asked, and approved 2026-09-07** — and recorded as an exception, because the
+user named the default in the same breath: *"Usually we skew toward the Integral
+visuals."* Nothing else about the box changes; its art, colour and size are
+Integral's.
+
+**Where the position lives.** Every widget in this stage is built by
+`Init_Res(slot, 0, GV_StrCode(name), y)`, which centres the texture horizontally
+from its own header and offsets it by `y` from screen centre 120. Listing all 28
+such calls in both overlays gives y values **identical between the discs except
+one**:
+
+| resource | Integral | USA |
+|---|---|---|
+| `d3_sp_movie_head` | −82 (screen 38) | −82 |
+| `d3_mv_base` | −5 (115) | −5 |
+| `d3_mv_ya_l` / `_r` | −60 / +55 | −60 / +55 |
+| **`sp_exit`** | **+70 (screen 190)** | **+66 (screen 186)** |
+
+The measured retail top border is exactly 190, which confirms the model. One
+immediate carries it — a scan of every `addiu`/`ori`/`slti` in either overlay
+finds precisely one instruction holding 70 (Integral) or 66 (USA) — so the port
+writes `addiu a3, zero, 66` at overlay `+F128`, USA's own value, and
+`exit_patch` asserts USA's overlay really says it.
+
+**And the selection highlight moves with it.** The widget is a single object at
+`work+0xF0`, and both things that light it anchor on that object rather than on
+a coordinate of their own: `+10198` attaches the `cur_l` cursor as
+`f(work+0xF0, strcode, 1, 1)`, and `+F38C` sets its lit state as
+`f(work+0xF0, 0xFF, 1)`. Those two call sites, and all ten references to
+`work+0xF0`, are byte-identical between the discs. So USA's entire widget — box,
+label and highlight — sits at 186 because of that one immediate; nothing else
+could position the highlight, or USA's own would be misplaced. That is the
+argument for why moving one immediate is sufficient, and it is evidence rather
+than assumption because it is USA's own working screen that depends on it.
+
+Deployed 2026-09-07 with 3 rows of clearance under the box instead of a 2-row
+overlap. **The box and its highlight are the one thing here not yet seen on
+screen.**
 
 Checks that passed on the deployed result: the merged local font is **identical**
-(540 bytes / 15 glyphs) and so is the proc table, the script grows by exactly the
-predicted +3, the stage stays 251,904 bytes, `ppfcheck --deployed` is clean over
-28 files, and applying every deployed PPF in Ketchup's order leaves record 2
-reading `Video clip from E3 (6/97)` with records 0/1 still Japanese.
+(540 bytes / 15 glyphs) and so is the proc table; the `-t` payload equals USA's
+in length and differs in the 4 remapped glyph bytes; the overlay differs from
+retail in exactly five words (the `jal` and four position-table halfwords) plus
+the appended stub; the stage stays 251,904 bytes and 123 sectors;
+`ppfcheck --deployed` is clean over 29 files; the only cross-PPF overlap is the
+deliberate one with `vr_en_missions`; and applying every deployed PPF in
+Ketchup's own order and disassembling the result gives `+F464 jal 0x800DF158`,
+the stub verbatim, `addiu a3, zero, 66` at `+F128` for the EXIT box, and the six
+records at y 196/208/196/208/196/208 - clip A lines 0 and 1, clip B lines 0 and
+1, the E3 caption and its empty second line.
 
 ### What `vr_unlock` does and does not open (2026-09-06)
 
