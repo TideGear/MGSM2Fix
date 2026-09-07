@@ -1575,11 +1575,30 @@ of the earlier measurement (the caption KCB is font `(832,256)` / CLUT
 would draw its continuation onto the CLUT row). Either reason alone rules out
 "put both lines in one record".
 
-**Where a next attempt should start**, rather than from scratch: the caption
-builder registers a KCB line per record, and `Act` draws one. The open question
-is what fills the `captions[]` table at `~0x800AF838` and whether a second entry
-per clip can be drawn - i.e. read the builder's tail (`+FEDC` onward, past the
-loop) and whatever writes that table. The `f`/`m` options are a weaker lead than
+**`Act` is identical too - the earlier diff had missed it.** The 0x1200-byte
+diff started at the caption builder `+FE44`, but `Act` sits *before* it at
+`+FBA8`, so it was never compared. Diffed since: Integral `+FBA8` against USA
+`+FCA8` differs in **three instructions, all data addresses** (the table base,
+the clip-index global, and one more). So the display path is the same program in
+both, and the contradiction is sharp: **identical code, yet USA draws two lines.**
+One of the premises must be wrong, and it is not the builder, not `Act`, and not
+the 0x1200 bytes around them.
+
+Two candidates were checked and eliminated. USA's movie script instantiates a
+chara Integral does not - `0xB789` where Integral has `0xAA13` - but that is
+`CHARAID_ENDINGROLL` (`NewEndingRoll`, `takabe/ending2.c`), USA's staff-credits
+actor where Integral has PocketStation, which independently confirms the
+`vr_en_title` record 6 decision and has nothing to do with captions. And the
+`-m` option is consumed by the *gate* function at `+FF58`, not by the caption
+path at all.
+
+**Where a next attempt should start**, rather than from scratch: the per-record
+helper functions the builder calls - `+D628`, `+DC4C`, `+DE24`, `+E6D8`,
+`+F95C` and the draw at `+D2B4` - none of which have been read, plus whatever
+fills the `captions[]` table at `~0x800AF838`. A further possibility worth
+testing is that USA's *navigation* code (which writes the clip-index global, and
+was never diffed) steps by two, though that alone would still not explain two
+lines from one draw call. The `f`/`m` options are a weaker lead than
 they looked: `-m` is consumed by the *gate* function at `+FF58`, not by the
 caption path at all, and `chara/others/fonttext.c` shows `-f` is conventionally
 a boolean flag. USA achieving two lines with byte-identical code in this region
