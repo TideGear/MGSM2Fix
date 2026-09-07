@@ -1471,6 +1471,90 @@ ported record records which USA stage it came from so the right font is read.
 26 stages end up with appended USA glyphs (5, 18 or 20 of them), 64 need no
 local font at all, and `movie` keeps Integral's plus two.
 
+### The MOVIE selection captions (`vr_en_movie`, 2026-09-06)
+
+The one line under the thumbnail on EXTRA -> MOVIE. The clip *descriptions* were
+already English (they come from `vr_en_missions`); these short captions were not.
+They live in `OPTION 't'` of the `movie` script's `CMD 9906` whose chara is
+`0xFAA8` - **not a top-level command**: it sits inside an enclosing command's
+`-e` option wrapped in an ARG, so it is found with `vrlib.walk_commands`, not by
+scanning `parse_arg`'s result. `vr_movie.py` builds it.
+
+| | Integral, one record each | USA |
+|---|---|---|
+| TGS clip A | 36 B, `東京ゲームショウ'98春 出展映像A` | **two** records: 25 B `Exhibition clip {"}A{"}for` + 33 B `the Tokyo Game Show, Spring '98.` |
+| TGS clip B | 36 B, the same with `B` | two records, likewise |
+| E3 clip | 23 B | 26 B `Video clip from E3 (6/97)` - **one** record |
+| | 4 records, `-t` = 105 bytes | 6 records, `-t` = 156 bytes |
+
+**The arithmetic is the verification.** Replacing each Integral record with USA's
+counterpart(s) changes the record bytes by +24, +24 and +3 = **+51**, and
+105 + 51 = 156 exactly, so a correct full edit makes Integral's `-t` payload
+*byte-identical to USA's* - which `verify()` asserts, along with the script
+round-tripping and the stage keeping its 251,904 bytes in place.
+
+**What is proven about the actor.** Its caption builder was diffed against USA's
+instruction for instruction (Integral overlay `+FE44`, USA `+FF44`, ends at
+`+C0`): **identical** but for one immediate, `addiu v1, zero, 832` against USA's
+`768` - the font VRAM column, the same 832/704 pattern `abst` has. Its read loop
+is `GetOption('t')` then `NextStr`/`GetString` **until NULL**, a while-loop and
+not a fixed count, so extra records are read. Diffing a 0x1200-byte window at
+that alignment found 38 differences, every one a data-address displacement.
+
+**What is NOT proven: how a clip's line(s) are selected.** With identical code,
+four records give lines `[A][B][E3][]` and six give `[A1][A2][B1][B2][E3][]`, so
+something maps clip -> line(s) and it is not in the compared code. The
+candidates are the caption command's two other options, which *do* differ:
+
+    OPTION 'f'   Integral  VAR 11 00 04 80      USA  VAR 11 00 04 82
+    OPTION 'm'   Integral  VAR 12 00 04 82      USA  VAR 12 00 04 81
+
+Those are GCL variable *references*; copying USA's ids would point Integral at
+slots its own scripts never write, so they are left alone. The `-p` option's two
+procs (`A878`, `0EF7`) are the same ids in both and turn out to be the stage
+transition procs (they carry the `"movie"`/`"vrtitle"` names), so they do not
+answer it either.
+
+**Hence two builds, and only one ships.**
+
+- **`INTEGRAL_vr_en_movie_e3.ppf` - the E3 caption alone, DEPLOYED.** One record
+  for one record, so the record count and order stay exactly as they were:
+  whatever maps a clip to record 2, record 2 is still the E3 caption, now in
+  USA's English. Correct under *any* mapping, so it needs no knowledge of the
+  selection and cannot misattribute a caption.
+- **`INTEGRAL_vr_en_movie.ppf` - the full port, STAGED, not deployed.** Correct
+  if the actor walks a clip's records; if it indexes `line = clip`, clips B and
+  E3 would show the wrong English line, which is worse than leaving them
+  Japanese - misattributed text, against the port's rule. **One launch decides
+  it**: deploy it, open EXTRA -> MOVIE with `vr_unlock` in place and check all
+  three clips. If clip B is wrong the answer is the `f`/`m` variables above, not
+  the chain edit.
+
+**THE COMPOSITE TRAP, for the third time.** `vr_en_missions` already rebuilds the
+`movie` stage - 2,219 bytes of it, including the clips' English descriptions and
+the merged script-local font - so the first `vr_movie` build, made from retail,
+**overlapped it across all 704 of its bytes** and would have reverted those
+descriptions. It was caught by checking byte overlap between the deployed PPFs
+before trusting the build, and never reached a running game. `composite()` now
+builds on retail *plus every deployed VR PPF's writes to this stage*, excluding
+this patch's own two outputs so the builder can never consume itself. Same trap
+as `menu.ppf`'s chain records and `optsctext`'s pinned input: **when another
+patch already owns a stage, build from what the game will actually see.**
+`inplace_records(..., merge_gap=0)` then keeps each record to the bytes that
+really change; with the default 64 they span unchanged bytes and the outcome
+would depend on which PPF Ketchup applied last. Residual overlap is inherent -
+both patches write the same script - and this one must win, which it does
+because Ketchup loads a folder by name and `..._missions.ppf` sorts before
+`..._movie.ppf`. **The clean long-term fix is to fold the captions into
+`vr_windows.py` so one patch owns the stage**; not done blind, since
+regenerating `vr_en_missions` would rewrite 3.3 MB of verified output.
+
+Checks that passed on the deployed result: the merged local font is **identical**
+(540 bytes / 15 glyphs) and so is the proc table, the script grows by exactly the
+predicted +3, the stage stays 251,904 bytes, `ppfcheck --deployed` is clean over
+28 files, and applying every deployed PPF in Ketchup's order leaves record 2
+reading `Video clip from E3 (6/97)` with records 0/1 still Japanese.
+
 ### What `vr_unlock` does and does not open (2026-09-06)
 
 The test aid patches three predicate instructions in `selectvr` and that is all

@@ -114,7 +114,8 @@ been seen on screen yet** — that is the top of §5.
 | `vr_en_savemsg` | the VR executable's 12 save and 12 load messages | statically; indices 1 and 9 stay Japanese (USA draws nothing) |
 | `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | **the option screen is verified on screen 2026-09-06** after three faults, all found by bisecting the PPF: the DAR's entry sizes were not 4-aligned and crashed the stage at `load option`; record 3 doubled the vibration-test sentence; and Integral's colon/values were lit beside the English while the lines sat off-centre. Fixed by padding every DAR payload to 4 (paid for with `pcx4`'s real 63-byte run cap), blanking record 3 as the main game does, unlighting the colon/values via the state switch, and giving each ported entry USA's `{num 1, x 160, y 196}`. All five rows now read as one centred English line, measured within 0.3 game px of centre. **KEY CONFIG itself is still unseen** — the collection intercepts it on the VR disc too, exactly as on the main discs, so its transplanted geometry and eight label textures can only be validated on a raw disc |
 | `vr_en_title` | the EXTRA menu's four help lines | statically; record 6 (PocketStation) deliberately kept — USA's `See the staff credits.` is a different feature |
-| `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used |
+| `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used. Never seen on screen |
+| `vr_en_movie` | the MOVIE selection captions | **the E3 caption is deployed** (1:1 record, safe under any mapping); the two TGS captions are **staged only** pending one in-game check - see §5.4a. Built on the composite, because `vr_en_missions` already owns this stage |
 | `vr_unlock` | the **mission menu** unlocked (test aid) | **verified in game 2026-09-06: every mission unlocked.** Emulation predicted 46 → 361 of 373 items on Integral (45 → 357 on USA) and its three words were verified in place against the deployed PPF. It does **not** open the EXTRA movies — that is a separate retail gate, `???` in USA's VR disc too. Safe to leave in and safe to save with (it writes no progress); delete the PPF to relock |
 
 `ppfcheck.py --deployed` is clean over all 26 deployed files and no two of the
@@ -210,7 +211,7 @@ validation on a real PSX image, where the disc-swap text (5.3, and the
 disc-change abstract now inside `en_abst`) is reachable. README "The sc_text
 texture port" and "The collection's KEY CONFIG interception".
 
-### 5.4a TO DO: the VR movie selection captions
+### 5.4a The VR movie captions: E3 shipped, the two TGS ones staged
 Found 2026-09-06. The MOVIE screen's description text (shown when a clip opens)
 **is** English already — it comes from `vr_en_missions`' window text. What is
 still Japanese is the one-line caption under the thumbnail on the *selection*
@@ -231,6 +232,19 @@ The record counts differ because USA splits each TGS caption across two lines,
 so the caption actor's read count almost certainly differs too - that has to
 come out of the `movie` overlay (Integral's `sb` is 122,808 bytes and is not
 decompiled), the same way `abst.c` had to before the mission log could move.
+
+**Status 2026-09-06.** `vr_movie.py` builds both variants; README "The MOVIE
+selection captions" has the full analysis. The **E3 caption is ported and
+deployed** - one record for one record, structure untouched, so it is correct
+under any clip->line mapping. The **two TGS captions are staged, not deployed**
+(`work/INTEGRAL_vr_en_movie.ppf`): they need one Integral record to become USA's
+two lines, the `-t` payload comes out byte-identical to USA's, but how the actor
+selects a clip's lines is unproven, and if it indexes `line = clip` then clips B
+and E3 would show the wrong English line - misattributed text, worse than
+Japanese. **One launch decides it**: deploy that PPF, open EXTRA -> MOVIE with
+`vr_unlock` in place, check all three clips. If clip B is wrong, the answer is
+the caption command's `f`/`m` GCL variable references, which differ between the
+versions, not the chain edit.
 
 **Seeing the other two on screen needs the movie gate, which is not the mission
 unlock.** With `vr_unlock` deployed and applied the list still showed `???`, and
