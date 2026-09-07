@@ -1471,6 +1471,56 @@ ported record records which USA stage it came from so the right font is read.
 26 stages end up with appended USA glyphs (5, 18 or 20 of them), 64 need no
 local font at all, and `movie` keeps Integral's plus two.
 
+### What `vr_unlock` does and does not open (2026-09-06)
+
+The test aid patches three predicate instructions in `selectvr` and that is all
+it governs: **the mission menu**. Verified against the deployed PPF — the two
+cleared-predicates' `and v0, …` become `addiu v0, zero, 1` (stage `+1B400`,
+`+1B488`) and the score's `subu v1, a2, a0` becomes `addiu v1, zero, 0x100`
+(`+1BB88`), exactly as the module documents; by emulation that is 46 → 361 of
+373 menu items.
+
+**It does not open the EXTRA movies, and nothing of ours could.** With the aid
+deployed and applied (confirmed in the log) the MOVIE list still showed `???`
+either side of the one available clip — and so did **USA's VR disc, whose
+`mods\VR-DISK_US\` is empty**. That control is what settles it: the movie gate
+is retail behaviour in both games, separate from the mission bitmap, and every
+patch here is irrelevant to it. Where it does live is unknown; the candidates
+are the "one flag word" the save carries beside the bitmap, or a save-name scan
+like the main game's SPECIAL gate (README "Unlocks"). Needed only to see the
+second and third movie captions on screen — the `movie` script has all three
+regardless (§ "TO DO: the VR movie selection captions" in `NextSteps.md`).
+
+**Saving with the aid deployed is safe** — corrected 2026-09-06, having first
+told the user otherwise. Nothing in it writes progress: the save is built from
+the VRAM bitmap, which only a genuinely cleared mission ever touches, so a save
+written while it is deployed still records real progress only. Deleting the PPF
+relocks exactly as before.
+
+### The white caption font differs between the two VR discs — and it is not ours
+
+Noticed by the user 2026-09-06. **No VR patch writes a single byte to the
+`init` stage** (sectors 1..288, image `0x001373A0..0x001DC9A0`), which is where
+the global font lives; mapping every deployed VR PPF's records onto the disc's
+named stages gives `vr_en_missions` → the 92 mission stages, `vr_en_option` →
+`option`, `vr_en_title` → `vrtitle`, `vr_en_camsave` → `camera`,
+`vr_unlock` → `selectvr`, and `vr_en_items`/`vr_en_savemsg` → the executable.
+Our only font work is the *script-local* 12×12 sets at codes ≥ `0x9A00`
+(previous section), which hold typographic quotes and the like, never the Latin
+alphabet. So the difference is between the retail discs.
+
+**Why is UNMEASURED, deliberately.** The obvious guess — Integral being a
+Japanese release, its half-width Latin glyphs are drawn in a Japanese font's
+style — is exactly the claim that was made and *withdrawn* on the main game:
+"Integral's Latin glyphs are wider than USA's" drove a margin redesign that was
+unnecessary, because measuring gave identical widths (261 vs 261, 306 vs 306)
+and the error was comparing a computed *advance* against a measured *ink
+extent*. An attempt to locate USA VR's width table by structure returned 120
+false candidates, so nothing here is asserted. To answer it: render the same
+string from both discs' fonts and diff the glyph bitmaps. Scope note if they do
+differ — a font *face* is Integral's own art, not text, so the rule keeps it and
+porting USA's would be an art port under the 2026-09-03 amendment: ask first.
+
 ### No stage is ever relocated
 
 Relocating a stage orphans the collection's own patches to it — the KEY CONFIG
