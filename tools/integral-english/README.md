@@ -1537,6 +1537,54 @@ disassembling it was the only route. Two things it did settle:
   conventions, so this is a hint rather than proof, but it shifts the line-count
   suspicion onto `-m`.
 
+**THE ACTOR, MAPPED (2026-09-06).** The decomp names it but does not implement
+it, so it was disassembled. Everything below is Integral's `movie` overlay,
+whose load base is **`0x800C11A0`** (established from the decomp, above), and
+the actor's own name string at `+1CDD8` reads `'movie.c'`:
+
+| overlay | address | what |
+|---|---|---|
+| `+FBA8` | `0x800D0D48` | **`Act`** - per frame; its tail is the display path below |
+| `+FCF0` | `0x800D0E90` | the kill/cleanup passed to `GV_SetNamedActor` |
+| `+FE44` | `0x800D0FE4` | **the caption builder** - `GetOption('t')` then `NextStr`/`GetString` until NULL, one KCB line per record (index in `s1`). Identical to USA's but for `addiu v1, zero, 832` against USA's `768`, the font VRAM column |
+| `+FF58` | `0x800D10F8` | the **unlock gate**: `count / 3` vs 45 and 75 into `work+30`, then `GetOption('m')` into `work+40`, then `printf("vr_clear_stages %d : %x\n", ...)` |
+| `+1036C` | `0x800D150C` | `GetResources`, called from `NewChara` |
+| `+10418` | `0x800D15B8` | `NewChara` - `GV_NewActor`, then `GV_SetNamedActor(work, Act, kill, "movie.c")` |
+| `+D2B4` | `0x800CE454` | the caption **draw** routine, called `f(work+44, string)` |
+
+**The display path, and why `record = clip` is structural.** `Act`'s tail:
+
+    lw    v1, clip_index          ; a global at 0x800A9580
+    addiu v0, v0, -2484           ; a table base, 0x800AF64C
+    sll   v1, v1, 2
+    addu  v0, v0, v1
+    lw    a1, 492(v0)             ; a1 = captions[clip]  (table at ~0x800AF838)
+    jal   0x800CE454              ; draw(work+44 /*KCB*/, captions[clip])
+    addu  a0, s3, zero
+
+So the draw is handed **exactly one string per clip**, chosen by the clip index -
+`record = clip` is not an accident of the data, it is what the code does. Making
+a clip show USA's two lines therefore needs the draw to emit two KCB lines, a
+structural change to an actor with no source.
+
+**And the wrap escape is now closed twice over.** The draw routine at `+D2B4` is
+a sprite/primitive builder - it walks slots emitting `POLY` entries and never
+calls `font_print_string` - so it cannot wrap a long string. That is independent
+of the earlier measurement (the caption KCB is font `(832,256)` / CLUT
+`(832,276)`, a 20-row band holding one line, so a ~56-character combined record
+would draw its continuation onto the CLUT row). Either reason alone rules out
+"put both lines in one record".
+
+**Where a next attempt should start**, rather than from scratch: the caption
+builder registers a KCB line per record, and `Act` draws one. The open question
+is what fills the `captions[]` table at `~0x800AF838` and whether a second entry
+per clip can be drawn - i.e. read the builder's tail (`+FEDC` onward, past the
+loop) and whatever writes that table. The `f`/`m` options are a weaker lead than
+they looked: `-m` is consumed by the *gate* function at `+FF58`, not by the
+caption path at all, and `chara/others/fonttext.c` shows `-f` is conventionally
+a boolean flag. USA achieving two lines with byte-identical code in this region
+remains unexplained and is the thing to resolve.
+
 The mechanism to find is whatever makes USA show two: the caption command's two
 other options, which *do* differ:
 
