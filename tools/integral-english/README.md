@@ -1584,6 +1584,47 @@ both, and the contradiction is sharp: **identical code, yet USA draws two lines.
 One of the premises must be wrong, and it is not the builder, not `Act`, and not
 the 0x1200 bytes around them.
 
+**THE DATA-DRIVEN HYPOTHESIS IS DEAD - tested 2026-09-07.** If `Act` and the
+builder really are the same program, the two-line layout had to live in data,
+and there is a table that looked exactly like the missing piece. helper2
+(overlay `+D170`) places each caption from a 12-byte table at `0x800C9454`
+(overlay `+82B4`) in precisely `opt.c`'s model - `{int num; short x; short y;
+int color}`, `num 1` = centre on `(x, y)` - and helper1 (`+CFFC`) reads the same
+entry's colour at offset 8. Nothing else in the overlay references it, so it is
+this actor's own. The two versions differ in **y alone**, and it read like the
+giveaway: USA alternates two rows because each of its captions is two lines,
+Integral repeats one row.
+
+    entry        0    1    2    3    4    5
+    Integral   208  208  208  196  196  196
+    USA        196  208  196  208  196  208
+
+So the full six-record build was rebuilt with USA's y values written over
+Integral's - four halfwords, `num` (1), `x` (160) and the colour (`0x6739`)
+being identical already - and deployed. What came back settles two things at
+once:
+
+| clip, in carousel order | caption drawn | which record | row |
+|---|---|---|---|
+| E3 (first, no left arrow) | `Exhibition clip {"}B{"} for` | 2 | upper |
+| TGS ROLL A | `Exhibition clip {"}A{"} for` | 0 | upper |
+| TGS ROLL B (last) | `the Tokyo Game Show, Spring '98.` | 1 | lower |
+
+1. **The table is real and indexed per record.** TGS ROLL B sat a row lower than
+   the other two clips, exactly as `[196, 208, 196, ...]` predicts for record 1
+   against records 0 and 2. The write landed and the actor honours it.
+2. **And still nobody drew two lines.** With USA's record count *and* USA's
+   position table in place, every clip drew one caption. So the layout is **not**
+   data-driven, and the argument that identical code plus USA's data must give
+   USA's behaviour is refuted by experiment, not by reasoning.
+
+It also pins the mapping harder than before: the index is the **clip id in the
+retail record order** - TGS A = 0, TGS B = 1, E3 = 2 - and not the carousel
+slot, because Integral lists the clips E3, TGS A, TGS B on screen and the
+captions still came out 2, 0, 1. That is exactly why the E3-only build is right:
+under the retail three-record layout record 2 *is* the E3 caption, so swapping
+its text changes nothing structural.
+
 Two candidates were checked and eliminated. USA's movie script instantiates a
 chara Integral does not - `0xB789` where Integral has `0xAA13` - but that is
 `CHARAID_ENDINGROLL` (`NewEndingRoll`, `takabe/ending2.c`), USA's staff-credits
@@ -1592,20 +1633,25 @@ actor where Integral has PocketStation, which independently confirms the
 `-m` option is consumed by the *gate* function at `+FF58`, not by the caption
 path at all.
 
-**Where a next attempt should start**, rather than from scratch: the per-record
-helper functions the builder calls - `+D628`, `+DC4C`, `+DE24`, `+E6D8`,
-`+F95C` and the draw at `+D2B4` - none of which have been read, plus whatever
-fills the `captions[]` table at `~0x800AF838`. A further possibility worth
-testing is that USA's *navigation* code (which writes the clip-index global, and
-was never diffed) steps by two, though that alone would still not explain two
-lines from one draw call. The `f`/`m` options are a weaker lead than
-they looked: `-m` is consumed by the *gate* function at `+FF58`, not by the
+**Where a next attempt should start**, now that data is ruled out: the code that
+was never read. `Act` hands the draw exactly one string, so the comparison that
+matters is Integral's draw at `+D2B4` against USA's counterpart - the only thing
+that could turn one string into two rows - plus the five per-record helpers the
+builder calls (`+D628`, `+DC4C`, `+DE24`, `+E6D8`, `+F95C`) and whatever fills
+the `captions[]` table at `~0x800AF838`. The KCB geometry belongs in the same
+read: Integral's caption band is font `(832,256)` / CLUT `(832,276)`, 20 rows
+for one line, and if USA's is 40 rows then the two-line layout is the builder's
+allocation rather than the data. The idea that USA's *navigation* code steps the
+clip index by two is dead too - that would still hand the draw one string, and
+would give each clip only its first line. The `f`/`m` options are the weakest
+lead of the lot: `-m` is consumed by the unlock *gate* at `+FF58`, not by the
 caption path at all, and `chara/others/fonttext.c` shows `-f` is conventionally
-a boolean flag. USA achieving two lines with byte-identical code in this region
-remains unexplained and is the thing to resolve.
+a boolean flag.
 
-The mechanism to find is whatever makes USA show two: the caption command's two
-other options, which *do* differ:
+**The honest statement of the problem, unchanged after two experiments:**
+identical `Act`, identical builder, identical position data, and USA still draws
+two lines where Integral draws one. For the record, the two options that *do*
+differ:
 
     OPTION 'f'   Integral  VAR 11 00 04 80      USA  VAR 11 00 04 82
     OPTION 'm'   Integral  VAR 12 00 04 82      USA  VAR 12 00 04 81
@@ -1618,17 +1664,21 @@ answer it either.
 
 **Hence two builds, and only one ships.**
 
-- **`INTEGRAL_vr_en_movie_e3.ppf` - the E3 caption alone, DEPLOYED.** One record
-  for one record, so the record count and order stay exactly as they were:
-  whatever maps a clip to record 2, record 2 is still the E3 caption, now in
-  USA's English. Correct under *any* mapping, so it needs no knowledge of the
-  selection and cannot misattribute a caption.
-- **`INTEGRAL_vr_en_movie.ppf` - the full port, STAGED, and now known to be
-  incomplete.** `line = clip` was confirmed on screen, so it gives each clip
-  only its first record: clip A would read `Exhibition clip "A" for` with no
-  second line, and the gated clips would be misattributed. Held back until the
-  two-line mechanism is solved. Its text and glyph codes are now correct, so
-  only the line count is left.
+- **`INTEGRAL_vr_en_movie_e3.ppf` - the E3 caption alone, DEPLOYED and verified
+  on screen.** One record for one record, so the record count and order stay
+  exactly as they were: whatever maps a clip to record 2, record 2 is still the
+  E3 caption, now in USA's English. Correct under *any* mapping, so it needs no
+  knowledge of the selection and cannot misattribute a caption. **This is the
+  file in `mods/INTEGRAL/VR-DISK/`**; it was put back there on 2026-09-07 after
+  the position-table experiment, and `ppfcheck --deployed` is clean over 29
+  files.
+- **`INTEGRAL_vr_en_movie.ppf` - the full port, STAGED, disproved twice.** Under
+  `record = clip` it gives clip A a sentence fragment and hands the other two
+  clips someone else's line, which is exactly what the 2026-09-07 shots show,
+  and USA's position table does not change it. It stays out of `mods/`. Its text
+  and glyph codes are correct, so only the line count is left - and the line
+  count is a code problem, not a data one. Kept as the reference artifact for
+  whenever that is solved.
 
 **THE LOCAL-FONT TRAP, caught on screen.** The first deployment of the full
 build rendered `Exhibition clip` followed by two kanji instead of the quotes.

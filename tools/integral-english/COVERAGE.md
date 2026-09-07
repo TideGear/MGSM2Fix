@@ -104,6 +104,7 @@ Read from the VR binaries by `vrlib.py` and the five `vr_*.py` builders, not by
 | KEY CONFIG | eight label textures in the option stage's DAR, plus quad geometry in the overlay | 8 labels | all 8, with USA's rectangles and `key_syukan` +11 |
 | EXTRA menu help lines | `chara 0x5667` option `-t` in `vrtitle` | 11 records | 4 (records 2–5) |
 | PHOTOGRAPHING memory-card messages | string table in the `camera` overlay at `+0x608` / `+0x638` / `+0x668` / `+0x708` | 4 groups | all but the two Japanese prompts and the two USA-empty slots |
+| MOVIE selection captions | `chara 0xFAA8` option `-t` in the `movie` stage | 3 captions (4 records) | **1**, the E3 clip; the two TGS captions are blocked, not absent |
 
 Known to remain Japanese on the VR disc, each because USA has no counterpart:
 the PocketStation help line, prompt and はい/いいえ (USA's fifth EXTRA item is
@@ -111,8 +112,14 @@ STAFF CREDIT, a different feature); save/load indices 1 and 9; two camera
 prompts; `vrtitle`'s four and `vrsave`'s one debug window, where USA carries the
 identical Japanese; MP5, the frozen items and the mine-detector line.
 
+One VR item is **blocked rather than absent**: the two TGS **MOVIE captions**.
+USA has both, but it draws each as two lines where Integral's actor draws one
+record per clip, and two data theories for that - the record count and the
+caption position table - were tested in game and failed, so the line count is in
+overlay code the port has not read (README "The MOVIE selection captions"). They
+stay Japanese rather than misattributed.
+
 Not yet inventoried on the VR disc: texture lettering outside the eight KEY
-CONFIG labels (the camera's EXORCISE textures are known and deferred), the
-`movie` stage's `-t` titles (USA has two records where Integral has one), and
-any string reached only through the five-language selection in USA's executable
+CONFIG labels (the camera's EXORCISE textures are known and deferred), and any
+string reached only through the five-language selection in USA's executable
 other than the English pool the port reads.
