@@ -35,8 +35,10 @@ VR Missions `SLUS-00957`; see "The VR disc (SLPM-86249)"):
 | `vr_en_title` | the EXTRA menu's four help lines |
 | `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages |
 
-`en_menu3` is disabled — it crashes the title stage with `GCL:WRONG CODE`. See
-"Why `en_menu3` crashes" below; diagnosed 2026-09-03, not yet rebuilt.
+`en_menu3` is **raw-disc only** and must not be deployed in the collection: the
+collection patches that same block itself and the two layouts do not mix, which
+kills the title stage. Built and verified 2026-09-07; see "Why `en_menu3` is
+raw-disc only" below.
 
 ## Scope: what this port changes, and what it deliberately keeps
 
@@ -1295,7 +1297,7 @@ through STAGE.DIR (`stage_lookup` arithmetic, see "Reading disassembly"):
 | `rank` | 5 | — | Integral-only text, not ported |
 | `init` | 2 | — | the stage that holds `font.res` — unknown what they change |
 | `camera` | 6 (+0x9348, +0xD614..+0xD6A8) | — | **en_camsave** patches this stage in place; none of the six falls inside or within 256 bytes before a camsave record |
-| `title` | 2 (+0x165A4, +0x165CC) | 1 (+0x3B1B5 = image 0x1822B55D) | the named file starts **at the title's disc-swap block** (`en_menu3`'s target, disabled); en_menu's `RADAR OFF` record sits 130 bytes after it |
+| `title` | 2 (+0x165A4, +0x165CC) | 1 (+0x3B1B5 = image 0x1822B55D) | the named file starts **exactly on record 0's `07` header** in the title's disc-swap block - `en_menu3`'s target. **This is the collision that makes `en_menu3` raw-disc only**: deploying ours over theirs kills the title stage (see "Why `en_menu3` is raw-disc only"). en_menu's `RADAR OFF` record sits 130 bytes after it and is unaffected |
 | `demosel` | — | 2 (+0x18FED, +0x19000) | **both start at en_menu2's disc-swap records** — one 2 bytes before our first record, one exactly on a record |
 | `change` | — | 1 (+0x421F) | **2 bytes before en_menu2's first record** there |
 | `option` | 1 (+0x2B04) | 1 (+0x2538C, the KEY CONFIG doorbell) | stage relocated; the doorbell is reproduced in `opt.c` |
@@ -1338,7 +1340,7 @@ states, so nobody has to re-derive them:
 |---|---|---|
 | 1 | `demosel` | **ported**, `en_menu2` |
 | 2 | `change` - the stage that performs the disc check and the swap | **ported**, `en_menu2` |
-| 3 | `title` | **not shipping** - `en_menu3`, diagnosed (container sizes), disabled pending the rebuild described under "Why `en_menu3` crashes" |
+| 3 | `title` | **not shipping in the collection** - `en_menu3` is built and verified but raw-disc only, because the collection patches the same block (see "Why `en_menu3` is raw-disc only") |
 | 4 | `abst` - `ab_ch.c`, the disc-change abstract | **ported 2026-09-05** in `en_abst` ("The MISSION LOG port") |
 
 **None of the four has been seen in the collection.** The open question is
@@ -2225,91 +2227,95 @@ and they affect blending, not layout.
 **Still Japanese on that screen, by the rule:** Integral's per-row bottom help
 line, which USA has no counterpart for.
 
-## Why `en_menu3` crashes (diagnosed 2026-09-03)
+## Why `en_menu3` is raw-disc only (diagnosed 2026-08-28, corrected 2026-09-07)
 
-`menu2.py` ports the same five disc-swap messages ("Insert DISC 1.", "Press the
+`menu3.py` ports the same five disc-swap messages ("Insert DISC 1.", "Press the
 Start Button", "after inserting DISC 1.", "Now Checking...", "The correct DISC
-was not inserted.") into three places. Two of them — the `demosel` and `change`
-stages — shipped as `en_menu2` and work. The third, the `title` stage
-(`menu2.py menu3`), crashes on entry with a run of `GCL:WRONG CODE <byte>` and
-those bytes are **the English letters themselves** (`73 68 65 74 61 72 74` =
-`s h e t a r t`, every second byte of "Press the Start Button"), i.e. the
-interpreter is executing the replacement text as bytecode. It always follows
-`> set map 32249` (0x7DF9, the `-m` string every stage-load carries).
+was not inserted.") into the `title` stage - the fourth and last copy. It is
+built and verified, and it **must not be deployed in the collection**. The
+reason is not in our file.
 
-The cause is *where* the title's copies live. In `demosel` and `change` the
-strings are a standalone data chain that `GCL_GetString` reads. In `title` they
-are **inline arguments inside the executable script body**: chunk offset 0x11B5
-sits within the script body (0x10DE, length 850, ends 0x1430), in the `-v`
-option of the title actor's `CMD 9906` at 0x1138. The interpreter walks that
-region as a value list.
+**The collection patches this exact block itself.** Its CD-ROM patch
+`disc1_1822B55D_patch` lands at image offset `0x1822B55D`, which is not merely
+inside the block - it is the address of record 0's `07` header. Its bytes come
+from `099/patch/disc1_1822B55D_patch_PS5.bin`, so the patch watch reports it as
+"0 bytes" and its contents stay invisible. It is **not** filtered in normal play:
+the 164 "filtering CD-ROM patch" lines in a boot log are the ghost restores, and
+the one Sept-3 log that shows this patch being filtered was a `DisableCDROM =
+true` session.
 
-The conflict is the terminator. The renderer centres these strings, so trailing
-spaces before the NUL shift the visible text left; `menu2.py` therefore writes
-`English + NUL + spaces`, keeping the length byte untouched. In a data chain
-that is harmless. Inside the script body, something resumes parsing at the
-early NUL and lands mid-payload, where ASCII bytes are opcodes that each eat an
-operand — the double-NUL trick fixes the odd/even case but not the fact that
-execution resumes inside the text at all.
+Deploy ours on top and the title stage dies on entry with a run of
+`GCL:WRONG CODE` whose bytes are the English letters, then the process exits -
+the log ends mid-run. Seen 2026-08-28, again 08-29, and reproduced exactly on
+2026-09-07, the same seventeen bytes every time:
 
-The fix is the method already proven on `preope`: instead of padding, shorten
-the STRING value's length byte and shrink every enclosing container. Then there
-is no padding and no early NUL, so nothing resumes inside the text, and the
-centring is correct because the string really is shorter. Not attempted yet.
+    82 73 68 65 74 61 72 74 75 74 74 6f 6e 22 22 22 22
 
-**The containers, measured (2026-09-03).** `gclparse.py`'s `containers_over`
-returns exactly the four sized nodes over the first message at `0x11B5`, with
-the offset of each size field:
+which read out of `Press the Start Button` and then off the end of the `.gcx`.
 
-| node | span | size field | note |
-|---|---|---|---|
-| `SCRIPT` | `0x10DE..0x1430` | `0x10DA`, BE32 | length 850 |
-| `ARG` | `0x10DE..0x1430` | `0x10DF`, BE16 | |
-| `COMMAND` | `0x1138..0x1406` | `0x1139`, BE16 | **id `0x9906`** |
-| `OPTION` | `0x11AD..0x1205` | `0x11AF`, u8 | option letter `'v'` |
+**The bytes the interpreter walked are not ours.** `GCL_GetNextValue` was
+transcribed from `libgcl/parse.c` and run over the builder's output from every
+start offset in the chunk: no start reproduces that sequence, and the trailing
+`22 22 22 22` does not occur anywhere in the stage. Two patches are writing the
+same five strings over the same bytes with different layouts, and the walk
+desynchronises in the mixture.
 
-**Careful: the messages do not all live in that one OPTION.** Records run from
-`0x11B5` to about `0x1290`, while the `'v'` OPTION ends at `0x1205` — so only
-the first few are inside it and the rest sit in later blocks. Run
-`containers_over` **per edited record** rather than assuming one container set.
+Decisive detail: the shape that crashed is the **length-preserving** one, which
+leaves every record header, every length byte and every container size exactly
+as retail. If retail's layout survives intact and the stage still dies, the
+fault cannot be the record shape.
 
-They are `07 <len> <payload>` records, the same shape as the option chain's, and
-the payload is the game's own font encoding, not Shift-JIS: `0x80xx` is a Latin
-glyph, so `80 44 80 49 80 53 80 43 20 80 31` reads `DISC 1`.
+**So it ships for a raw PSX disc only** (NextSteps 5.4), where no collection
+patch exists. `py menu3.py` writes `INTEGRAL_disc{1,2}_en_menu3_raw.ppf` into
+`work/`; `--deploy` refuses and prints why; `--collection` rebuilds the crashing
+shape for anyone who wants to reproduce the fault. Decided with the user
+2026-09-07, who chose raw-only over the alternative below.
 
-### How to test it
+**If the collection's wording ever has to be ours**, the lever exists:
+`SQHook::SetPatchFileBlacklist("disc1_1822B55D_patch")` behind an ini flag, the
+same mechanism `BrightnessText` uses to take the brightness texture back. Then
+the port owns the block and there is no mixture. Not done, because it is an ASI
+change buying a screen the collection cannot reach - the same conclusion KEY
+CONFIG reached from the other direction.
 
-**The crash test is easy, and it is the test that matters.** `GCL:WRONG CODE`
-fires while the interpreter walks the script, which happens **on entry to the
-title stage** — the first screen you see. So: rebuild, deploy, boot. Title
-screen with no `GCL:WRONG CODE` run in the log means the container arithmetic is
-right. No special conditions, no disc swapping, no save state.
+### The diagnosis this replaces, and why it survived so long
 
-**There is a static test too, and it catches the same class of bug first.**
-`gclparse.py` is self-checking by construction: every container carries its own
-size, so a parse that lands exactly on each declared end proves the sizes are
-consistent, and a wrong edit desynchronises the walk and fails loudly. Re-parse
-the rebuilt chunk before deploying — that is precisely the failure that shipped
-last time.
+This section previously said the interpreter "resumes parsing at the early NUL"
+because `menu2.py` writes `English + NUL + spaces`, and prescribed shortening
+the STRING length bytes and shrinking four enclosing containers. Both halves are
+wrong, and both checks are cheap:
 
-**Seeing the text on screen is the hard part, and may be impossible here.**
-Nothing in `stage/title.c` references these strings; they are arguments to
-command `0x9906`, and the real disc checking lives in `change.c` (`THIS IS
-DISC 2!!`, `THIS IS NOT DISC 2!!!`), whose copy already ships working as
-`en_menu2`. The collection swaps to disc 2 by itself, so the game may never
-reach a "wrong disc" path at the title screen at all — the same situation as
-KEY CONFIG, where the port's value turned out to be the raw disc patch rather
-than anything visible in the collection. Ways to force it, cheapest first:
+- **`GCL_GetNextValue` advances a STRING by its length byte** - `p += *p + 1`,
+  `libgcl/parse.c` - never by `strlen`. An early NUL inside a payload cannot
+  desynchronise it.
+- **The disabled artefact had no container fault.** The PPFs that sat in
+  `mods/_disabled/` change payload bytes only - 150 of them - leaving every
+  record header, length byte and container size as retail. They re-parse cleanly
+  with `gclparse`: 25 records at retail's offsets, same as the untouched stage.
 
-- Load a disc-2 save with disc 1 mounted, and see whether the game asks or the
-  collection just swaps.
-- Write the disc number the title stage checks, using MGSM2Fix's RAM hooks
-  (`SQOnRamWrite`/`SQOnRamRead`), once that variable is identified — `change.c`
-  shows how the game identifies a disc.
+The prescription was written on 09-03 from the 08-28/29 logs and attached to an
+artefact it had never been tested against; nobody re-ran it, so the file sat
+disabled for four days behind a fix that addressed nothing. **The pattern worth
+keeping: a diagnosis carried forward onto a different artefact.** When a build is
+shelved as broken, record which build - the next person will assume the
+diagnosis and the file match.
 
-**Use the cheap reachability check to prioritise the fix.** A normal swap does
-not settle the title's wrong-disc path. `en_menu3` remains required for raw-disc
-completeness even if a dedicated test establishes that the collection hides it.
+### The general trap: the collection may already own the bytes you are porting
+
+This is the third time the collection's own patches have shaped a port, and the
+first time they have blocked one outright:
+
+| where | what the collection does | what the port did about it |
+|---|---|---|
+| KEY CONFIG (`option`) | intercepts the screen with its own Control Settings panel | reproduced the doorbell in `opt.c`; the user prefers the interception |
+| the brightness paragraph | replaces USA's `sc_text` with its own four-line version | `BrightnessText` blacklists their files and ranges and writes ours |
+| the `title` disc-swap block | patches the same five strings with its own layout | **cannot coexist** - raw disc only |
+
+The check to run *before* building anything that writes a block: map the
+collection's patches to it (README "Where the collection's own disc patches
+land") and see whether one starts inside the region. If it does, the choices are
+to blacklist theirs, to match their layout, or to ship raw-only - and that is a
+decision to take before the build, not after a crash.
 
 ## The collection shows only four of USA's six brightness lines (found 2026-09-03)
 
@@ -2685,10 +2691,13 @@ standing and is itself unattributed.
   re-applied 0.6 s later — the deferred-RAM case it exists for. Residual caveat:
   a mid-run write followed within 30 frames by an unrelated re-apply would be
   invisible to both checks; nothing suggests that happens.
-- **Whether the disc-swap prompt is reachable in the collection at all** (all
-  four copies, `en_menu3` included). The collection swaps discs by itself, so
-  the game's own prompt may never draw. Decided by the same disc-2 run above.
-  See "The disc-swap text: four copies".
+- **Whether the disc-swap prompt is reachable in the collection at all** (the
+  three copies that ship). The collection swaps discs by itself, so the game's
+  own prompt may never draw. Decided by the same disc-2 run above. See "The
+  disc-swap text: four copies". The fourth copy, `en_menu3`, is settled a
+  different way: the collection patches that block itself, so in the collection
+  the text there is the collection's, not ours - see "Why `en_menu3` is raw-disc
+  only".
 - ~~The other ~22 PHOTO ALBUM strings~~ **Done 2026-09-04.** PHOTO ALBUM →
   SELECT MEMORY CARD → load and overwrite, with a photo on the card: `PHOTO
   DATA`, `PHOTO 01`, `TIME`, `LOADING...`, `COMPLETE`, `OVERWRITE OK?`,

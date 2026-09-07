@@ -2,7 +2,8 @@
 
 `rebuild.py` builds all nine enabled patch families for both main discs in a
 fresh directory (the ninth, `en_abst`, since 2026-09-05). It never installs patches or changes game files. This is the
-collection variant; raw-disc packaging and the disabled `en_menu3` remain open.
+collection variant; raw-disc packaging remains open, and `en_menu3` is built by
+`menu3.py` for that variant only (it must never enter `mods/`).
 M2Package packages the ASI separately and is not the Integral asset packager.
 
 ## Inputs
