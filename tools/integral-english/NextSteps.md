@@ -416,12 +416,26 @@ ones on two rows (§5.4a, which also records the one cosmetic item left there:
 line 1 touches the EXIT box, because USA moves its EXIT up and Integral's face
 is taller). What is left, in rough order:
 
-1. **Still unseen, and each needs only the user at the controller**: the EXTRA
-   menu's four help lines (`vrtitle`), a mission's title / briefing / result
-   windows read in play, an item and a weapon description, a save and a load
-   message, and the PHOTOGRAPHING mode's card messages (the ALBUM path). If
-   something is wrong, bisect the same way as the main game: move that one PPF
-   out of `mods\INTEGRAL\VR-DISK\` and confirm the Japanese comes back.
+1. **On screen 2026-09-07: mission windows.** Two shots, both correct English -
+   `ADVANCED MODE / SOCOM LEVEL 01`, "Eliminate all enemy soldiers and head for
+   the goal! / Enemies 2", and `1 MIN. BATTLE VS. TARGET / SOCOM`, "Use Socom to
+   destroy targets! / Conditions to clear: 15 targets". That is the title and
+   the briefing of the `vr_en_missions` family, the largest one, read in play.
+
+   **Still unseen**: a mission RESULT window, the EXTRA menu's four help lines
+   (`vrtitle`), an item and a weapon description, a save and a load message, and
+   the PHOTOGRAPHING mode's card messages (the ALBUM path). If something is
+   wrong, bisect the same way as the main game: move that one PPF out of
+   `mods\INTEGRAL\VR-DISK\` and confirm the Japanese comes back.
+
+   **On reaching the item and weapon descriptions:** there is no "give all" for
+   VR and there does not need to be. Every mission fixes its own loadout, so the
+   pools are covered by playing the mission that carries each one - the mission
+   aid makes them all selectable and that is as far as unlocking can take you.
+   Four entries are Japanese **on purpose** and are not faults: Integral's MP5 SD
+   (no USA counterpart), the frozen Ration/Ketchup pair (no USA counterpart, and
+   unreachable in VR), and the mine-detector HARD/EXTREME line (VR has no
+   difficulty level).
 2. **KEY CONFIG — DONE 2026-09-07.** Seen with `DisableRAM = true` and
    `DisableCDROM = true`: Integral's own screen, all eight labels English in
    all three button types, `key_syukan`'s +11 shift clearing the connector
@@ -433,11 +447,20 @@ is taller). What is left, in rough order:
    17..25 empty. **The flags are only for looking at it** — the user's rule
    stands that in the collection they prefer the interception, and the
    transplant is for the raw disc.
-3. **Both unlock aids may stay for testing and must come out after.**
-   `vr_unlock.py` (missions) and `vr_unlock_movies.py` (the EXTRA clips) each
-   write no progress, so saving with them in place is safe; the standing rule is
-   achievements **off** first, unlock, test, delete the unlock PPFs,
-   achievements back on.
+3. **Three unlock aids may stay for testing and must come out after.**
+   `vr_unlock.py` (Integral's missions), `vr_unlock_movies.py` (the EXTRA clips)
+   and - for the donor disc - `VRUS_unlock_missions.ppf`, which `vr_unlock.py`
+   also builds. None writes progress, so saving with them in place is safe; the
+   standing rule is achievements **off** first, unlock, test, delete the unlock
+   PPFs, achievements back on.
+
+   **The USA one sat unbuilt-into-place for a day**: it was written 2026-09-06
+   and never copied to `mods\VR-DISK_US\`, so USA's missions were still locked
+   when the user went to compare against them on 2026-09-07. Deployed then.
+   Ketchup's base path for that title really is `mods\VR-DISK_US` with no
+   version or disk subdirectory - confirmed in the log, `[Ketchup] base path is
+   mods\VR-DISK_US`. There is no USA equivalent of `vr_unlock_movies` yet; USA's
+   own EXTRA clips gate the same way and would need their own offsets.
 4. **The number substitutions** in §6 need the user's word.
 5. **Deferred edges**, each a small piece of work: the camera's EXORCISE
    textures, and whether anything in the mission windows overflows a line at
