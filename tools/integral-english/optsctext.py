@@ -82,7 +82,7 @@ usage: optsctext.py [--deploy]      (writes work/ always; PPFs only with --deplo
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-from workdir import WORK, GAME, DECOMP
+from workdir import WORK, GAME, DECOMP, VARIANT, pick
 import struct, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -121,7 +121,8 @@ CHAIN_OFF, CHAIN_TAG = 0x1B8, 6
 SCT_VRAM, SCT_CLUT = (512, 256), (1008, 237)
 PAD_VRAM           = (512, 326)
 SC_ROWS            = 70          # USA's whole canvas height - never cropped (see the docstring)
-SC_KEEP_LINES      = 4           # 4 = the collection build; 6 = USA's own text, for a raw disc
+SC_KEEP_LINES      = pick(4, 6)  # 4 = the collection build; 6 = USA's own text, for a raw disc
+                                 # (`rebuild.py --variant raw`, or INTEGRAL_ENGLISH_VARIANT=raw)
 
 # KEY CONFIG: swap in USA's eight label textures. Four of the quads change too
 # (see opt.c); the other four already carry USA's constants, and for three of

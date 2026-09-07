@@ -111,12 +111,18 @@ CALL_SITE_PATCHES = [
     # not what was wrong. The key_button row's pair (y -70) is left alone - that
     # label is 88 wide on both discs.
     #
-    # Rule 3 names this case outright: "the chrome that positions text (rules,
-    # connectors, highlight boxes, row spacing)".
+    # The height goes with it: USA's art is 13 rows to Integral's 12, and the
+    # main game's opt.c already writes `option_800C449C(work, -148, 38, 112, 13,
+    # 255, 1)` at both of its equivalent sites - the same helper, the same
+    # arguments, ported in 2026-09-03. Measured on the shots: USA's glow is 17
+    # rows to our 16 before this. So all three arguments become USA's, and the
+    # box matches the label it frames.
     (0x2234, addiu(A1, ZERO, -149), addiu(A1, ZERO, -148)),
     (0x223C, addiu(A3, ZERO, 88), addiu(A3, ZERO, 112)),
+    (0x2240, addiu(V0, ZERO, 12), addiu(V0, ZERO, 13)),
     (0x2424, addiu(A1, ZERO, -149), addiu(A1, ZERO, -148)),
     (0x242C, addiu(A3, ZERO, 88), addiu(A3, ZERO, 112)),
+    (0x2430, addiu(V0, ZERO, 12), addiu(V0, ZERO, 13)),
     # abe = 1 on key_action / key_buki / key_hohuku / key_syukan
     (0x5418, sw(ZERO, 28), sw(S1, 28)),
     (0x5470, sw(ZERO, 28), sw(S1, 28)),

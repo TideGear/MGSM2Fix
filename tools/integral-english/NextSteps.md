@@ -34,7 +34,7 @@ authoritative**; if they disagree with a memory file, the memory file is stale.
 | working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, the four retail executables, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, `map_pristine.map` (the pristine exe's symbol map), ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `workdir.py` also exports `GAME` (`INTEGRAL_ENGLISH_GAME`, default the Steam folder) and `DECOMP` (`INTEGRAL_ENGLISH_DECOMP`, default `D:\mgsbuild\d`); no tool hardcodes those paths any more. `py workdir.py` prints what it resolved |
 | VR working data | `work\vrint_stage.dir`, `work\vrus_stage.dir` (the two VR STAGE.DIRs), `work\vrint.exe` (rebuilt from the decomp, `build.py --variant vr_exe`, SHA-256 `c370f8e4…`), `work\vrus.exe` (real `SLUS-00957`), `work\INTEGRAL_vr_*.ppf` | `vrlib.py` finds the two VR ISOs inside the containers itself (`0x57592000` and `0xD39B7000`) and computes stage LBAs from STAGE.DIR |
 | retail executables | `work\int1.exe`, `int2.exe` (641,024 bytes each), `us1.exe`, `us2.exe` (651,264) — hashes in `BUILDING.md`; `rebuild.py` rejects any other | **the collection's ISO executable extents are zero-filled**, so extracting an exe from `alldata.bin`/`dlc_japan.bin` yields no code — the first clean-build attempt failed on exactly that. These four files are the only source of executable bytes |
-| reproducible build | `py rebuild.py --output <fresh dir> --game … --decomp … --psyq D:\mgsbuild\psyq --executables …\work --compare-deployed` (see `BUILDING.md`) | never installs anything. Last artefact: `D:\mgsbuild\repro7\Integral-English-collection.zip`, SHA-256 `870a691a…51ca` (2026-09-05 13:06), all 18 PPFs' effective bytes equal to the deployed set (16 byte-identical; `en_menu2` ×2 differ only in record grouping) |
+| reproducible build | `py rebuild.py --output <fresh dir> [--variant raw] [--compare-deployed]` (see `BUILDING.md`) | never installs anything. Builds **everything**: nine families × two main discs plus the VR disc's seven. Last artefact `D:/mgsbuild/repro8/Integral-English-collection.zip`, SHA-256 `a13eefc0…faef` (2026-09-07), **all 25 PPFs equal to the deployed set's effective bytes**. `--variant raw` builds the raw-disc variant instead (§5.4) |
 | game | `D:\Steam\SteamApps\common\MGS1` (Master Collection Vol. 1, Steam app **2131630**) | launch: `Start-Process steam://rungameid/2131630`; process name `METAL GEAR SOLID`; **kill by PID only, never `taskkill /IM`** |
 | Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2); the VR disc is `mods\INTEGRAL\VR-DISK\` and the USA VR disc `mods\VR-DISK_US\` | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually. Its `RootPath` adds a version folder only when a title has more than one version and a disk folder only when a version has more than one disk, which is why the two VR folders have no numbered subdirectory |
 | deployed ini | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.ini` is a **Vortex symlink**; edit the target: `%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-5-3-6-0-1774482213\MGSM2Fix.ini` | edit with Python or via `realpath`; `sed -i` on the link would replace the link with a file. The repo's `MGSM2Fix.ini` is the committed default, not what the game reads |
@@ -143,8 +143,9 @@ retail inputs in an isolated directory by `rebuild.py` — stage files extracted
 from the collection, the four retail executables as hashed inputs, the decomp
 exported at `7964de7` plus `decomp-overlay-changes.patch`, three overlays
 recompiled (byte-identical to the shipped ones) — and all 18 PPFs match the
-deployed set's effective changed bytes (last run `repro7`, 2026-09-05 13:06,
-after the final fix). So the deployed patches are
+deployed set's effective changed bytes. **Since 2026-09-07 the VR disc's seven
+are in the same run** (its executable built from the decomp, not copied), so the
+last clean run, `repro8`, reproduces **25 of 25** against what is deployed. So the deployed patches are
 no longer artefacts of a lost scratchpad: they can be regenerated. `BUILDING.md`
 has the inputs, hashes, command, outputs and the ZIP's hash. This is static
 equivalence, not a new gameplay test.
@@ -262,19 +263,40 @@ build should then load a clean title. That would turn "the collision is the
 cause" from a strong inference into a measurement. It costs achievements for one
 session, which is why it was not run.
 
-### 5.4 A build switch for the raw-disc variant
-**`en_menu3` now belongs to this item** (§5.3): its two raw PPFs are built and
-waiting in `work/`, and they are the first artefacts that exist *only* for the
-raw variant. Packaging them is part of the switch.
+### 5.4 The raw-disc variant — DONE 2026-09-07
+One switch now builds both, where two constants used to be edited by hand:
 
-Two constants differ between the collection build and a raw PSX disc patch:
-`SC_KEEP_LINES` (4 collection / 6 raw — `optsctext.py`) and
-`OPTION_MC_CONTROL_SETTINGS` (1 / 0 — `opt.c`). Today they are edited by hand;
-they should be one switch that builds both variants, and `rebuild.py` should
-package the raw variant too. The raw variant then needs its own runtime
-validation on a real PSX image, where the disc-swap text (5.3, and the
-disc-change abstract now inside `en_abst`) is reachable. README "The sc_text
-texture port" and "The collection's KEY CONFIG interception".
+    py rebuild.py --output <dir>                 # collection, what mods/ gets
+    py rebuild.py --output <dir> --variant raw   # for a real PSX disc image
+
+| | collection | raw |
+|---|---|---|
+| `SC_KEEP_LINES` (`optsctext.py`) | 4 | 6, USA's own text |
+| `OPTION_MC_CONTROL_SETTINGS` (`opt.c`) | 1, the KEY CONFIG doorbell | 0, nothing to intercept |
+| `en_menu3` | excluded | included (§5.3) |
+
+It is `INTEGRAL_ENGLISH_VARIANT`, resolved in `workdir.py` beside
+`WORK`/`GAME`/`DECOMP`, so a hand-run tool honours it too. `rebuild.py` sets it
+for every tool, rewrites the `opt.c` constant in its own isolated decomp export
+before compiling, records both values in the report, names the ZIP for the
+variant, and refuses `--compare-deployed` with `--variant raw` (what is deployed
+is the collection build). `BUILDING.md` has the table and the commands.
+
+**One bug the first raw build found, and it is the kind only packaging finds.**
+`en_menu3` rewrites the whole title block and shifts every record in it, while
+`en_menu` writes `RADAR OFF` at retail's offset 130 bytes in - two patches on the
+same bytes with different layouts. `rebuild.py`'s packaged-set overlap check
+caught it on the first run, at `0x1822b5df`. The fix moves ownership: under
+`--variant raw`, `menu2.py` skips that record and `menu3.py` ports it (index 4,
+the one entry in its table with no change/demosel twin). Worth remembering as
+the general shape - **a builder that shifts records has to own every patch that
+writes into the region it moves**, and the only thing that notices is a check
+over the assembled set.
+
+**What is NOT proven: the raw variant has never run on a real PSX image.** It
+builds and packages; nobody has applied it to a real disc and booted it. That is
+the remaining raw-disc work, and it is where `en_menu3`, the six-line brightness
+paragraph and Integral's own KEY CONFIG would finally be visible.
 
 ### 5.4a The VR movie captions — DONE and VERIFIED ON SCREEN 2026-09-07
 All three MOVIE selection captions are ported and deployed as
@@ -421,8 +443,18 @@ is taller). What is left, in rough order:
    textures, and whether anything in the mission windows overflows a line at
    240 px the way the main game's could. (The two TGS MOVIE captions were the
    third item here and are done — §5.4a.)
-6. **`rebuild.py` does not build the VR patches.** They are built by hand
-   (`BUILDING.md`, "The VR disc"). Folding them in is the reproducibility gap.
+6. **`rebuild.py` builds the VR patches — DONE 2026-09-07.** All seven come out
+   of the same isolated run as the main discs and are packaged under
+   `mods/INTEGRAL/VR-DISK/`. Three things were needed: extracting the two VR
+   stage dirs, **building** Integral's VR executable from the decomp rather than
+   copying it (the generator runs a second time for the `vr_exe` variant, then
+   ninja makes `obj_vr/_mgsi.exe`, checked against SHA-256 `c370f8e4…`), and
+   giving `vr_movie` an `INTEGRAL_ENGLISH_VR_PPF_DIR` so it composes on the run's
+   own output instead of the deployed folder. The VR set's one deliberate
+   overlap (`vr_en_movie` over `vr_en_missions`) is allowed by name and any other
+   is an error. The two unlock aids are deliberately not built: they are test
+   aids and must never ship. Verified on `repro8`: **25 PPFs, 18 main + 7 VR, all
+   25 equal to the deployed set's effective bytes.**
 
 ### 5.6 Sync with upstream, and the pull request — one job, done once
 **Measured 2026-09-07, and the decision was to defer it deliberately.** A
@@ -555,7 +587,7 @@ Texture lettering and runtime language branches are outside both tools.
 
 | tool | purpose |
 |---|---|
-| `workdir.py` | resolves the working directory (`py workdir.py` prints it) |
+| `workdir.py` | resolves the working directory **and the build variant** (`py workdir.py` prints both); `VARIANT`/`RAW`/`pick(collection, raw)` come from `INTEGRAL_ENGLISH_VARIANT` |
 | `ppfcheck.py [--deployed]` | validates PPFs exactly as Ketchup reads them — run before deploying anything |
 | `optsctext.py` | builds `en_option` (sc_text texture, KEY CONFIG art, chain, relocation to DUMMY3M slot 384, doorbell stub check) |
 | `verify_integral_option.py`, `verify_usa_brightness.py` | read the deployed PPFs / built-in patch back and check them |
@@ -572,7 +604,7 @@ Texture lettering and runtime language branches are outside both tools.
 | `items.py`, `menu2.py` | recovered item/menu builders; the `title` copy lives in `menu3.py` instead |
 | `menu3.py [--collection]` | the `title` stage's disc-swap copy, **raw disc only** — rewrites the five records inside `CMD 9906`'s `-v` option, re-stamps the SCRIPT/ARG/COMMAND sizes and leaves the overflowed `-v` u8; `--deploy` refuses, `--collection` rebuilds the shape that crashes so the fault can be reproduced (§5.3) |
 | `audit_text.py` | main-disc and VR candidate inventory, save-title encoding; see `COVERAGE.md` |
-| `rebuild.py` | isolated collection build, checks, manifest and ZIP; see `BUILDING.md` |
+| `rebuild.py [--variant raw]` | the isolated build of **everything**: nine main families for both discs and the VR disc's seven, checks, manifest and ZIP. Builds Integral's VR executable from the decomp rather than copying it, and points `vr_movie` at its own output. `--variant raw` swaps the two constants and adds `en_menu3`; `--compare-deployed` checks every PPF's effective bytes against `mods/`. See `BUILDING.md` |
 | `portio.py` | shared read-only disc access and deterministic PPF/stage serialisation (`stage`, `pack_stage`, `records`, `encode_records`, `changed_runs`, `ppf`, `relocation`) — the module the recovered builders and `rebuild.py` are built on |
 | `iso.py` | raw-sector disc reader (`Disc(path, base)`; mode-2 24-byte headers), used to read the images inside `alldata.bin` / `dlc_japan.bin` |
 | `kcplace.py`, `kcquads.py`, `kcrects.py` | KEY CONFIG port helpers: VRAM/CLUT allocation for USA's eight labels, quad extraction from an option overlay, the per-button-type label rectangles |
