@@ -1498,6 +1498,65 @@ ported record records which USA stage it came from so the right font is read.
 26 stages end up with appended USA glyphs (5, 18 or 20 of them), 64 need no
 local font at all, and `movie` keeps Integral's plus two.
 
+### The VR KEY CONFIG on screen, and the highlight box (2026-09-07)
+
+**First look at Integral's own VR KEY CONFIG**, with `DisableRAM = true` and
+`DisableCDROM = true` so the collection's interception is out of the way. The
+port is right: Integral's own screen draws (not the collection's Control
+Settings panel), and all eight labels read English — `button type`,
+`first person view` on both the bottom-row selector and the △ button, `weapon`,
+`action`, `crawl`, `normal`, `reverse` — through all three button types, whose
+rectangles the per-type function rewrites every frame. `key_syukan`'s +11 px
+shift does its job: Integral's connector corner sits further right than USA's,
+and the label keeps USA's gap from it instead of landing on the curve.
+
+**One fault, spotted by the user: the selection highlight was the wrong size.**
+On the `first person view` row the lit box stopped short and the hexagon's right
+chevron hung outside the glow. Measured off paired shots (9 display px per game
+px, x offset 480), reading the band inside the box but above the glyphs:
+
+| | glow span | width |
+|---|---|---|
+| Integral, before | game x 10..101 | 91 |
+| Integral, after | game x 12..125 | 113 |
+| USA | game x 11..125 | 114 |
+
+24 px short, which is exactly `112 - 88`: USA's `key_sykan` art is 112 wide
+where Integral's Japanese is 88.
+
+**Why the port missed it.** The eight labels are placed by `Init_Res` quads, and
+those were all transplanted. The highlight is **not** an `Init_Res` quad —
+Integral draws it with hardcoded arguments, `glow(work, x, y, w, h, 255, ...)`
+at `0x800C23E4`, and the `key_sykan` row has **two** such call sites, one per
+selection state, both carrying retail's `x = -149, w = 88`. Nothing in
+`vr_kcgeom`'s quad model can see them, because they are not quads. They were
+found by scanning the overlay for the `addiu a1/a2/a3/v0` argument shape and
+diffing every hit against USA's overlay, which is how the pair at `+2234` and
+`+2424` turned up alongside the untouched `key_button` pair at y −70.
+
+The fix is four immediates in `vr_option.CALL_SITE_PATCHES`: `x` −149 → −148 and
+`w` 88 → 112 at both sites, so the box spans −148..−36, the label quad's own
+extent. The height stays Integral's 12 against USA's 13-tall art — that is
+Integral's own and was not what looked wrong. The `key_button` row's pair is
+left alone, since that label is 88 wide on both discs.
+
+Rule 3 covers this without an amendment: it names "highlight boxes" among the
+chrome that positions text.
+
+**The general lesson, and it is the same one as the MOVIE captions:** a port
+that transplants geometry has to account for every *kind* of primitive that
+draws the thing, not just the kind it already models. The quads were complete
+and correct, and the screen was still wrong, because a second mechanism drew
+part of the same widget. Both times the missing piece was hardcoded arguments to
+a helper rather than data in a table.
+
+**Still Japanese on that screen, and correctly so:** the help line under the
+controller (`主観モード時の操作 ： 通常操作`, `ボタン設定 ： タイプB`, and the
+rest of records 17..25). USA leaves those records **empty** — its own KEY CONFIG
+draws nothing there — so under the no-translation rule they stay Integral's.
+Same call as the READ MISSION LOG? caption.
+
+
 ### The MOVIE selection captions (`vr_en_movie`, 2026-09-06, solved 2026-09-07)
 
 The one line under the thumbnail on EXTRA -> MOVIE. The clip *descriptions* were
