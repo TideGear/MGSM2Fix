@@ -160,9 +160,10 @@ Three things are particular to the VR half of a clean build:
   order gives. The packaged-set overlap check allows exactly that pair and no
   other, on top of the main discs' own check.
 
-The two unlock aids (`vr_unlock.py`, `vr_unlock_movies.py`) are **not** built or
-packaged: they are test aids, they must never ship, and they are documented
-under "Unlock every VR mission" and "Unlocking the EXTRA movies".
+The unlock aids (`vr_unlock.py`, `vr_unlock_movies.py`, `vr_unlock_extras.py`)
+are **not** built or packaged: they are test aids, they must never ship, and
+they are documented under "Unlock every VR mission", "Unlocking the EXTRA
+movies" and "Unlocking the EXTRA menu's items".
 
 ### Inputs
 

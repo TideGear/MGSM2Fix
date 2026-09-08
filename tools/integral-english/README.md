@@ -1887,6 +1887,38 @@ the VRAM bitmap, which only a genuinely cleared mission ever touches, so a save
 written while it is deployed still records real progress only. Deleting the PPF
 relocks exactly as before.
 
+### Unlocking the EXTRA menu's items (`vr_unlock_extras`, 2026-09-07)
+
+A third gate, found when the user reported only MOVIE, ALBUM and EXIT on the
+menu - leaving three of `vr_en_title`'s four ported help lines unreachable,
+PHOTOGRAPHING not even present to select. **Three separate gates on one disc,
+one per aid**: the mission menu in `selectvr`, the clips in `movie`, the menu
+items here in `vrtitle`.
+
+The menu keeps a visibility bitmask at `work+0x1e` and builds it from progress
+flags in the word at `+0x1a1c`, one item at a time, each test also bumping the
+item count in `s2`:
+
+    +0639C  lhu   v1, 0x1e(s6)      ; the mask so far
+    +063A4  ori   v0, v1, 1         ; MOVIE - unconditional
+    +063AC  lw    v0, 0x1a1c(s1)    ; the progress word
+    +063B4  andi  v0, v0, 3         ; PHOTOGRAPHING
+    +063D4  andi  v0, v0, 0x10      ; ALBUM
+    +063F8  andi  v0, v0, 0x40      ; PocketStation
+
+Each item's block is `lw` / `andi` / `beqz` / set the bit / bump the count. The
+aid forces the three **tests** to pass (`andi` -> `addiu v0, zero, 1`) rather
+than writing the mask, and the reason is the count: the same blocks that set the
+bits increment it, so a mask forced from outside would leave the menu's layout
+and navigation disagreeing with what is drawn. It writes no progress - the mask
+is rebuilt from the progress word on every entry - and it patches the `vrtitle`
+overlay, which `vr_en_title` does not touch (that one rewrites the script
+chunk's records), so the two cannot interfere.
+
+With it, all five items appear. PocketStation's help line is Japanese on
+purpose: Integral's fifth item is PocketStation where USA's is STAFF CREDIT, so
+USA's `See the staff credits.` is not its translation.
+
 ### Unlocking the EXTRA movies (`vr_unlock_movies`, 2026-09-06)
 
 The MOVIE clips are gated by the `movie` overlay's own progress score, not by

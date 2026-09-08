@@ -422,9 +422,16 @@ is taller). What is left, in rough order:
    destroy targets! / Conditions to clear: 15 targets". That is the title and
    the briefing of the `vr_en_missions` family, the largest one, read in play.
 
-   **Still unseen**: a mission RESULT window, the EXTRA menu's four help lines
-   (`vrtitle`), an item and a weapon description, a save and a load message, and
-   the PHOTOGRAPHING mode's card messages (the ALBUM path). If something is
+   **Also on screen 2026-09-07**: an item description (`《Diazepam》 Anti-anxiety
+   drug. Temporarily stops involuntary trembling.`) and a weapon description
+   (`《PSG1》 Sniper rifle. Aim with directional buttons, press □ to fire.`, the
+   button glyph rendering correctly) - and the same PSG1 window shot on USA's
+   own disc reads **identically**, which is the port matching its donor word for
+   word rather than merely looking plausible.
+
+   **Still unseen**: a mission RESULT window, three of the EXTRA menu's four
+   help lines (EXIT's was seen; see the aid below), a save and a load message,
+   and the PHOTOGRAPHING mode's card messages (the ALBUM path). If something is
    wrong, bisect the same way as the main game: move that one PPF out of
    `mods\INTEGRAL\VR-DISK\` and confirm the Japanese comes back.
 
@@ -447,10 +454,23 @@ is taller). What is left, in rough order:
    17..25 empty. **The flags are only for looking at it** — the user's rule
    stands that in the collection they prefer the interception, and the
    transplant is for the raw disc.
-3. **Three unlock aids may stay for testing and must come out after.**
-   `vr_unlock.py` (Integral's missions), `vr_unlock_movies.py` (the EXTRA clips)
-   and - for the donor disc - `VRUS_unlock_missions.ppf`, which `vr_unlock.py`
-   also builds. None writes progress, so saving with them in place is safe; the
+3. **Four unlock aids may stay for testing and must come out after.**
+   `vr_unlock.py` (Integral's missions), `vr_unlock_movies.py` (the EXTRA
+   clips), `vr_unlock_extras.py` (the EXTRA MENU's items) and - for the donor
+   disc - `VRUS_unlock_missions.ppf`, which `vr_unlock.py` also builds.
+
+   **There are three separate gates on this disc and each needed its own aid**,
+   which is the lesson: the mission menu is gated in `selectvr`, the clips in
+   `movie`, and the menu items in `vrtitle`. The last was found 2026-09-07 when
+   the user reported only MOVIE, ALBUM and EXIT on the menu, leaving three of
+   `vr_en_title`'s four ported help lines unreachable. The EXTRA menu builds a
+   visibility bitmask at `work+0x1e` from progress flags at `+0x1a1c`, one item
+   per test, each test also bumping the item count - so the aid forces the three
+   **tests** (`andi v0, v0, 3` / `0x10` / `0x40` -> `addiu v0, zero, 1`) rather
+   than the mask, because a mask forced from outside would leave the count and
+   the layout disagreeing. With it, PocketStation appears too, and its help line
+   is Japanese **on purpose** (Integral's fifth item is PocketStation where USA's
+   is STAFF CREDIT, §6). None writes progress, so saving with them in place is safe; the
    standing rule is achievements **off** first, unlock, test, delete the unlock
    PPFs, achievements back on.
 
@@ -646,6 +666,7 @@ Texture lettering and runtime language branches are outside both tools.
 | `vr_movie.py [--deploy]` | the MOVIE selection captions. Builds **two** PPFs into `work\`: `..._movie.ppf` (all six USA records, USA's position table and the two-line stub — **the port**, deployed) and `..._movie_e3.ppf` (the E3 caption alone, retail structure and no code change — the fallback). `--deploy` installs the first and moves the second out of `mods\`, since they overlap and only one may be present. Built on the composite, since `vr_en_missions` already owns the stage |
 | `vr_kcgeom.py` | VR KEY CONFIG geometry read from an overlay: `Init_Res` quads and the per-button-type rectangles (imported by `vr_option.py`) |
 | `vr_unlock.py [--deploy]` | the removable VR **mission** unlock test aid — three words, never deploy with achievements live |
+| `vr_unlock_extras.py [--deploy]` | the removable VR **EXTRA menu** unlock test aid — three `andi` tests in the `vrtitle` overlay's visibility-mask construction, so PHOTOGRAPHING / ALBUM / PocketStation always appear. Writes no progress; delete the PPF to relock |
 | `vr_unlock_movies.py [--deploy]` | the removable VR **movie** unlock test aid — one instruction in the `movie` overlay's own `count / 3` score gate, which `vr_unlock` does not touch. Writes no progress; delete the PPF to relock |
 | `vr_sweep.py [--samples]` | rebuilds every VR stage from the deployed PPFs and reports what is still game-encoded, beside USA's own tally — the VR equivalent of `jpsweep.py`, and the only tool here that inverts `portio.image_offset`'s 2352-byte sector geometry |
 | `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
@@ -679,6 +700,7 @@ Japanese, and why" · brightness → "The collection shows only four of USA's si
 brightness lines", "Option → SCREEN", "The sc_text texture port" · briefing →
 "Briefing menu (`brf` stage)" · unlocks → "Unlocks", "Give items", "Unlock
 everything", "Unlock every VR mission", "Unlocking the EXTRA movies",
+"Unlocking the EXTRA menu's items",
 "Achievements" · VR → "The VR disc (SLPM-86249)", "The MOVIE selection
 captions", "The white caption font differs between the two VR discs",
 "Sweep: is any VR text still Japanese?" · tests → "Not tested" (struck-through items are
