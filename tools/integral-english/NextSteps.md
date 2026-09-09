@@ -5,7 +5,9 @@ reproducible-build pass (§9), through 2026-09-05 as the MISSION LOG port,
 the item-text fixes and their on-screen checks landed (§10), on 2026-09-06
 when the **VR disc** was ported (§11), and through 2026-09-07, the day the VR
 disc was tested on screen and the three items that were still open all closed:
-the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12). Written for whoever
+the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12), and on
+2026-09-08 when the sweep's one uncovered finding became the `en_pad2`
+family (§5.11, §15). Written for whoever
 picks this up cold: a later session of the same assistant, a different model, or
 a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
@@ -31,18 +33,19 @@ authoritative**; if they disagree with a memory file, the memory file is stale.
 | MGSM2Fix repo | `C:\Users\Tideg\My Drive\Development\MGSM2Fix`, branch **`integral-english-text`** | based on MGSM2Fix **3.6.0**; upstream is now **3.7.2** — a rebase is needed before any upstream PR |
 | remotes | `origin` = `https://github.com/TideGear/MGSM2Fix.git` (push here); `upstream` = nuggslet's MGSM2Fix — **never push to upstream** | |
 | decompilation | `D:\mgsbuild\d`, branch `integral-english-text`, origin `FoxdieTeam/mgs_reversing` — **do not push there** | our source changes are captured as `tools/integral-english/decomp-overlay-changes.patch` (= `git diff 7964de7`); regenerate it after any decomp edit. Local decomp commits exist (e.g. `0534934` for the doorbell in `opt.c`) |
-| working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, the four retail executables, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, `map_pristine.map` (the pristine exe's symbol map), ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `workdir.py` also exports `GAME` (`INTEGRAL_ENGLISH_GAME`, default the Steam folder) and `DECOMP` (`INTEGRAL_ENGLISH_DECOMP`, default `D:\mgsbuild\d`); no tool hardcodes those paths any more. `py workdir.py` prints what it resolved |
+| working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, the four retail executables, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, `map_pristine.map` (the pristine exe's symbol map), ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `workdir.py` also exports `GAME` (`INTEGRAL_ENGLISH_GAME`, default the Steam folder) and `DECOMP` (`INTEGRAL_ENGLISH_DECOMP`, default `D:\mgsbuild\d`); the builders and `rebuild.py` take every path from it; a few standalone helpers still carry their own — `ppfcheck.py`'s `MODS`, `audit_text.py`'s argparse defaults, and the repo path that `jpsweep.py`, `kcplace.py`, `kcquads.py` and `kcrects.py` insert into `sys.path`. `py workdir.py` prints what it resolved |
 | VR working data | `work\vrint_stage.dir`, `work\vrus_stage.dir` (the two VR STAGE.DIRs), `work\vrint.exe` (rebuilt from the decomp, `build.py --variant vr_exe`, SHA-256 `c370f8e4…`), `work\vrus.exe` (real `SLUS-00957`), `work\INTEGRAL_vr_*.ppf` | `vrlib.py` finds the two VR ISOs inside the containers itself (`0x57592000` and `0xD39B7000`) and computes stage LBAs from STAGE.DIR |
 | retail executables | `work\int1.exe`, `int2.exe` (641,024 bytes each), `us1.exe`, `us2.exe` (651,264) — hashes in `BUILDING.md`; `rebuild.py` rejects any other | **the collection's ISO executable extents are zero-filled**, so extracting an exe from `alldata.bin`/`dlc_japan.bin` yields no code — the first clean-build attempt failed on exactly that. These four files are the only source of executable bytes |
-| reproducible build | `py rebuild.py --output <fresh dir> [--variant raw] [--compare-deployed]` (see `BUILDING.md`) | never installs anything. Builds **everything**: nine families × two main discs plus the VR disc's seven. Last artefact `D:/mgsbuild/repro8/Integral-English-collection.zip`, SHA-256 `a13eefc0…faef` (2026-09-07), **all 25 PPFs equal to the deployed set's effective bytes**. `--variant raw` builds the raw-disc variant instead (§5.4) |
+| reproducible build | `py rebuild.py --output <fresh dir> [--variant raw] [--compare-deployed]` (see `BUILDING.md`) | never installs anything. Builds **everything**: ten families × two main discs plus the VR disc's seven. Last artefact `D:/mgsbuild/repro17/Integral-English-collection.zip`, SHA-256 `3eb2e105…a6fb` (2026-09-08), **all 27 PPFs equal to the deployed set's effective bytes**. `--variant raw` builds the raw-disc variant instead (§5.4) |
 | game | `D:\Steam\SteamApps\common\MGS1` (Master Collection Vol. 1, Steam app **2131630**) | launch: `Start-Process steam://rungameid/2131630`; process name `METAL GEAR SOLID`; **kill by PID only, never `taskkill /IM`** |
 | Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2); the VR disc is `mods\INTEGRAL\VR-DISK\` and the USA VR disc `mods\VR-DISK_US\` | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually. Its `RootPath` adds a version folder only when a title has more than one version and a disk folder only when a version has more than one disk, which is why the two VR folders have no numbered subdirectory |
 | deployed ini | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.ini` is a **Vortex symlink**; edit the target: `%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-5-3-6-0-1774482213\MGSM2Fix.ini` | edit with Python or via `realpath`; `sed -i` on the link would replace the link with a file. The repo's `MGSM2Fix.ini` is the committed default, not what the game reads |
 | deployed ASI | same Vortex folder, `MGSM2Fix64.asi` | |
 | build | `"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe" MGSM2Fix.sln /p:Configuration=Release /p:Platform=x64` → `x64\Release\MGSM2Fix.asi` → copy to the Vortex folder as `MGSM2Fix64.asi`; compare hashes | if MSBuild times out it can leave `cl.exe` processes behind — stop them by PID |
-| log | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.log` (rotates to `.prev`) | it logs an ini parse error at **line 12** every boot — that is the `[Internal Resolution]` header, an old inipp quirk, harmless; every setting still parses |
+| log | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.log` (rotates to `.prev`) | **Corrected 2026-09-07.** The boot-time `Error parsing ini file ... at these lines: 12` was recorded here as a harmless inipp quirk on the `[Internal Resolution]` header at line 12. It was neither. inipp prints the offending line's **content**, not its number, and the content really was a bare `12` — the deployed ini's `[Update Notifications]` section header had been overwritten by it at some point. It was not harmless: with the header gone, `CheckForUpdates = true` fell into `[Game]` and the fix read `bShouldCheckForUpdates: false`. Header restored; the file now has all ten sections and no unparseable line. **If that message comes back, read the line it quotes as text and go find it.** |
 | screenshots | `C:\Program Files (x86)\Steam\userdata\7924217\760\remote\2131630\screenshots` | 3840×2160; 9 display px per game px, x offset 480 |
 | USA source data | `work\usa1_stage.dir` / `usa2_stage.dir` (real USA discs, extracted from `windata\alldata.bin`); `work\us1_stage.dir` is **European** despite its name — do not source text from it | README "Toolchain and environment" and the source-discs note |
+| credit and provenance | [`CREDITS.md`](CREDITS.md) | whose work this is built on, what of it is in this repository, and the one thing that is **not settled**: the decomp states no licence |
 | git identity | `git -c user.name=TideGear -c user.email=tidegear@gmail.com commit` | **no `Co-Authored-By: Claude` or any AI attribution in commit messages** |
 | title ids | from `MGS1_Ketchup` in `src/mgs1.h`: **99** INTEGRAL, **980** MGS1_JP, **981** MGS1_US, 101/102 VR, 982–986 EU | attribute a collection patch to a title by its id, never by the order lines appear in a log |
 
@@ -57,6 +60,21 @@ paraphrase them away.
 2. **Previous Operations:** "For Previous Operations, change the page count. Do not edit."
 3. **Scope:** "the goal is verbatim text placed identically, but integral could have relevant adjustsments (since it was a later release) that are worth keeping I'm ok with keeping Integrals differences if they aren't text translation and appropriate positioning." — Fix text and the chrome that positions text (rules, connectors, highlight boxes, row spacing); leave Integral's colour, brightness, blend and background-art differences alone and note them in the README's Scope table.
 4. **Amendment (2026-09-03):** "Where Integral's art/gui/hud/etc. is intentionally different, consider moving the English text to fix it, but ask me first." — Measure the relationship USA has between text and the art it relates to, reproduce that relationship against Integral's art, do not port the art — and **ask before doing it**, case by case. Worked examples: `key_syukan` on KEY CONFIG, and the VR MOVIE EXIT box (§5.4a), where the chrome moved rather than the text. **The default, in the user's words (2026-09-07): "Usually we skew toward the Integral visuals."** So every such move is an exception that has to be asked for and written down.
+4b. **Amendment (2026-09-07): Integral's own ENGLISH may be replaced by USA's,
+   when asked.** The no-translation rule and the scope rule were both written
+   for Japanese text: port English where English exists, keep what Integral did
+   differently. Neither says what to do when **Integral already has English and
+   it differs from USA's**. The first case forced the question and the user
+   settled it, of the item side-column abbreviation: *"this is a case where we
+   are replacing existing english in integral instead of japanese, so it's an
+   exception to our rule."*
+
+   So it is an exception, not a new default: an Integral string that is already
+   English is left alone unless it is asked for, case by case, exactly like the
+   art amendment above. Done so far: **one**, `SCARF` -> `HANDKER` (§5.9).
+   Still outstanding under the same heading and NOT done: the `abst` location
+   spellings (`Tank Hanger` / `Medi rm` / `Cmnder rm`).
+
 5. **In the collection:** "in MC i prefer the circle message suppressed and key config intercepted" — the four-line brightness text (no ○-button line) and the collection's own Control Settings panel for KEY CONFIG.
 6. **The raw disc matters:** "\"They'd still matter for a raw PSX disc patch.\" that was the point of porting the text. I want the intercept still in mc." — Text the collection hides (KEY CONFIG labels, disc-swap prompts) is still ported for a future raw-PSX-disc patch, while the collection keeps its interception.
 7. **Documentation:** "Make sure you're remembering to document and gotchas worth documenting" — and, 2026-09-04: nothing important may live only in a conversation or a memory file.
@@ -92,7 +110,7 @@ paraphrase them away.
 
 | patch | what | verified |
 |---|---|---|
-| `en_items` | item and weapon descriptions, the frozen Ration/Ketchup pair, the HARD/EXTREME Mine Detector message (executable) | in game. Three faults found from the user's shots and fixed 2026-09-05 (card level digit offset, SOCOM suppressor rewrite, a retail-equal byte the collection's RAM patch owned — README "Three item-text faults"); **the fixes were seen on screen at 12:55** (SOCOM, ID Card `level 7 security`, Mine Detector) and the audit is silent. The PPF owns every byte of both arenas |
+| `en_items` | item and weapon descriptions, the frozen Ration/Ketchup pair, the HARD/EXTREME Mine Detector message (executable) | **Fully verified against USA on screen 2026-09-07**: all 24 items and all 10 weapons photographed in both games and compared side by side, text, line breaks and glyphs - `<<`/`>>`, the O/X/[] button glyphs, apostrophes, the `<Limitless>` single angle quotes. **34 of 34 identical.** The only difference anywhere in those shots was the side column's short name for item 22, `SCARF` against `HANDKER` - a different table the port did not touch. **Asked and changed the same evening** (§5.9, and §2 amendment 4b: the port's first replacement of Integral's own English); redeployed 22:56 and **seen on screen at 23:03**. The two conditional descriptions were photographed the same evening too (§5.1a), so every form of every item and weapon description in this family has now been read on screen. Earlier: in game. Three faults found from the user's shots and fixed 2026-09-05 (card level digit offset, SOCOM suppressor rewrite, a retail-equal byte the collection's RAM patch owned — README "Three item-text faults"); **the fixes were seen on screen at 12:55** (SOCOM, ID Card `level 7 security`, Mine Detector) and the audit is silent. The PPF owns every byte of both arenas |
 | `en_menu`, `en_menu2` | menu strings; `en_menu2` includes the `demosel` and `change` disc-swap copies | in game (menus); the disc-swap copies **never seen** (see §5.1) |
 | `en_option` | option-screen strings; KEY CONFIG labels (8 textures); brightness paragraph as USA's `sc_text` texture, four lines in the collection build | in game, pixel-measured; SCREEN / KEY CONFIG (collection panel via the doorbell) / EXIT all confirmed 2026-09-04 |
 | `en_preope` | Previous Operations, USA's exact pagination (MG1 13 pages, MG2 19) | in game, 29 lines pixel-exact |
@@ -101,15 +119,19 @@ paraphrase them away.
 | `en_camsave` | the PHOTO ALBUM's own captions (`camera` overlay) | **fully verified 2026-09-04**: all 23 English on screen / by slot comparison; the six USA-blank slots stay Japanese (`ロード中です`, `ロードが完了しました`, `変更内容を上書き保存しますか？` are those) |
 | `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built 2026-09-05 and seen on screen the same day**: both pages of the Heliport and Comm Tower A logs, the controls and the slide (the one fault, stale-VRAM fragments during the slide, fixed at 13:05 and confirmed clean at 13:50). Statically, pages re-parse and equal USA's byte for byte and the PPF records rebuild the relocated 88-sector stage exactly on both discs. Stage in DUMMY3M slots 462..549. Not yet seen: a demo.gcx page (disc-2 saves) and a count-7 page |
 | `en_menu3` | the `title` disc-swap copy — the fourth and last | **built and verified 2026-09-07, RAW DISC ONLY, not deployed.** The collection patches the same block (`disc1_1822B55D_patch`, at the address of our record 0), and the two layouts do not mix: the title stage dies with a `GCL:WRONG CODE` run. Staged as `INTEGRAL_disc{1,2}_en_menu3_raw.ppf` for the raw variant; `menu3.py --deploy` refuses. §5.3 |
+| `en_pad2` | the controller-port subtitle `second.c` draws in the Psycho Mantis room, at all three of its call sites per disc | **built and deployed 2026-09-08**, 159 bytes a disc. Statically verified by effect: the archive keeps its length, both stages re-walk to the same command structure, every changed byte is inside the three slots, and each slot re-parses at length 55 with USA's English at the front. Disjoint from all nine other PPFs on each disc. **Never seen on screen** — it needs the Mantis room *and* a controller in port 2. §5.11 |
 | unlock PPFs | title-screen extras | **parked**, `unlocks_parked\`, not deployed |
 
 ### VR-DISC patches (deployed 2026-09-06 in `mods\INTEGRAL\VR-DISK\`)
 
 Ported from USA's VR Missions (`SLUS-00957`). README "The VR disc (SLPM-86249)"
-is the technical record; `vrlib.py` is the shared library. **Four have been seen
-on screen** — the option screen, both unlock aids and the E3 movie caption; the
-two-line MOVIE captions were deployed 2026-09-07 and are the next thing to look
-at; the rest are statically verified only, and §5.5 lists what is still unseen.
+is the technical record; `vrlib.py` is the shared library. **Seen on screen by
+the end of 2026-09-07:** the option screen, KEY CONFIG (with the two flags on),
+the mission menu with every mission unlocked, all three MOVIE captions, the
+EXTRA menu with every item, mission title and briefing windows, and an item and
+a weapon description. **Still unseen:** a mission RESULT window, three of the
+EXTRA help lines, a save and a load message, the PHOTOGRAPHING card messages,
+and the EXIT box after its move — §5.5's list 1 and §5.4a.
 
 | patch | what | verified |
 |---|---|---|
@@ -121,7 +143,7 @@ at; the rest are statically verified only, and §5.5 lists what is still unseen.
 | `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used. Never seen on screen |
 | `vr_en_movie` | the MOVIE selection captions | **all three ported 2026-09-07**, the two TGS ones as USA's two lines. The line count was never data: USA calls the actor's own `highlight(work, i)` twice — for `clip*2` and `clip*2+1` — where Integral calls it once, so the port retargets that one `jal` at a 16-word stub in the overlay's own sector padding. **Verified on screen 2026-09-07**, all three clips: both TGS captions on two rows with correct attribution and real typographic quotes, E3 on one. Line 1's ink then overlapped the EXIT box by 2 rows, because Integral's caption face is taller than USA's; the box moved up 4 px to USA's own y with the user's approval (§5.4a, §6), and **that part is not yet seen on screen** |
 | `vr_unlock_movies` | the EXTRA movies unlocked (test aid) | **verified in game 2026-09-06: all three thumbnails appear.** One instruction in the `movie` overlay: its own `count / 3` score gate, separate from the mission one. Writes no progress; delete the PPF to relock |
-| `vr_unlock` | the **mission menu** unlocked (test aid) | **verified in game 2026-09-06: every mission unlocked.** Emulation predicted 46 → 361 of 373 items on Integral (45 → 357 on USA) and its three words were verified in place against the deployed PPF. It does **not** open the EXTRA movies — that is a separate retail gate, `???` in USA's VR disc too. Safe to leave in and safe to save with (it writes no progress); delete the PPF to relock |
+| `vr_unlock` | the **mission menu** unlocked (test aid) | **verified in game 2026-09-06: every mission unlocked.** Emulation predicted 46 → 361 of 373 items on Integral (45 → 357 on USA) and its three words were verified in place against the deployed PPF. It does **not** open the EXTRA movies — that is a separate retail gate, `???` in USA's VR disc too. Saving with it in place is safe (it writes no progress) and deleting the PPF relocks; the standing rule still holds — achievements off (`DisableRAM`/`DisableCDROM` true) while any unlock aid is deployed |
 
 `ppfcheck.py --deployed` is clean over all 29 deployed files. The nine VR PPFs
 are disjoint but for **one deliberate overlap**: `vr_en_movie` shares 686 of
@@ -138,14 +160,14 @@ local-font glyphs, and the rest are exactly the list the README calls
 "Deferred, with reasons". Nothing with a USA English counterpart is still
 Japanese.
 
-**Reproducibility:** every one of the nine shipping families is rebuilt from
+**Reproducibility:** every one of the ten shipping families is rebuilt from
 retail inputs in an isolated directory by `rebuild.py` — stage files extracted
 from the collection, the four retail executables as hashed inputs, the decomp
 exported at `7964de7` plus `decomp-overlay-changes.patch`, three overlays
-recompiled (byte-identical to the shipped ones) — and all 18 PPFs match the
+recompiled (byte-identical to the shipped ones) — and all 20 PPFs match the
 deployed set's effective changed bytes. **Since 2026-09-07 the VR disc's seven
 are in the same run** (its executable built from the decomp, not copied), so the
-last clean run, `repro8`, reproduces **25 of 25** against what is deployed. So the deployed patches are
+last clean run, `repro17` (2026-09-08), reproduces **27 of 27** against what is deployed. So the deployed patches are
 no longer artefacts of a lost scratchpad: they can be regenerated. `BUILDING.md`
 has the inputs, hashes, command, outputs and the ZIP's hash. This is static
 equivalence, not a new gameplay test.
@@ -165,36 +187,80 @@ equivalence, not a new gameplay test.
 | `[Game] GiveItems` (test aid) | `GiveItems =` (empty) | built; **never exercised** — the developer menu grants everything anyway |
 | `[Game] StageSelect` = `true` / menu name / stage name | `StageSelect = false` | works; see README "The disc-swap text" for what it can and cannot reach |
 
-### Deployed ini right now (play defaults)
+### Deployed ini right now, and the play defaults
 
-`DisableRAM = false`, `DisableCDROM = false` (achievements live), `StageSelect = false`, `GiveItems =`, `EnglishText = true`, `BrightnessText = fixed`, `PreserveConfiguration = true`, `UnlockBriefing = false`. The user has real saves: **Heliport** and **Comm Twr A** (both disc 1, the latter made with a full developer-menu inventory and a photo).
+**Live at 2026-09-08 22:20 — back at the play defaults, and the test session is over.** `DisableRAM = false`, `DisableCDROM = false` (achievements live), `GiveItems` and `GiveWeapons` both empty, and **no `_unlock_` PPF anywhere under `mods\`** — all four aids (`INTEGRAL_vr_unlock_{missions,movies,extras}.ppf` and `VRUS_unlock_missions.ppf`) were deleted. Remember the ini the game reads is the **Vortex symlink target**, `%APPDATA%\Vortex\...\MGSM2Fix.ini`; write that, not the link. **27 PPFs are deployed and `ppfcheck.py --deployed` is clean over all of them**: 20 main (the ten families × two discs) and the VR disc's seven. The VR seven were redeployed from `repro17` the same evening, which is what finally put the **disjoint** `vr_en_missions` / `vr_en_movie` pair on disk — the deployed pair had still been the old overlapping build, 686 bytes shared and every one of them conflicting, working only because Ketchup applies a folder in name order. They now share **0 bytes**, and the whole VR set was proved equal in effect to what it replaced before it went on (`vr_set_effect_equal`, no differences).
+
+**Play defaults:** `DisableRAM = false`, `DisableCDROM = false` (achievements live), `StageSelect = false`, `GiveItems =`, `EnglishText = true`, `BrightnessText = fixed`, `PreserveConfiguration = true`, `UnlockBriefing = false`, and no `_unlock_` PPF anywhere under `mods\`. The user has real saves: **Heliport** and **Comm Twr A** (both disc 1, the latter made with a full developer-menu inventory and a photo).
 
 ---
 
 ## 5. What remains — in the order I would do it
 
-**State of play, end of 2026-09-07.** Three items in this section are now DONE
-and kept only for their reasoning: 5.3 (`en_menu3`, raw-disc only), 5.4a (the
-MOVIE captions) and 5.5's KEY CONFIG. **Nothing with a USA counterpart is known
-to be Japanese any more, on any of the three discs.** What is left is of four
-kinds:
+**Correction, 2026-09-07 evening.** This section used to say that nothing with
+a USA counterpart was still Japanese on any disc. That was believed on the
+strength of `vr_sweep.py` for the VR disc and a candidate inventory for the main
+discs — and a candidate inventory cannot establish it. `mainsweep.py`, written
+this evening to do for discs 1 and 2 what `vr_sweep` does for the VR disc, found
+**one**: §5.11, **built and deployed 2026-09-08**. Everything else it flags is
+inside a stage a patch family already owns, or is Japanese on the USA disc
+too. Its own universe turned out to have a hole as well — it compares only
+the 82 stage names both discs share, so the same string in the
+Integral-only `s07br` was invisible to it. That is recorded in
+`COVERAGE.md` now.
+
+**State of play, 2026-09-08.** Nine items in this section are now
+DONE and kept only for their reasoning: 5.1a (the six conditional descriptions,
+all seen), 5.3 (`en_menu3`, raw-disc only), 5.4 (the raw-disc build switch),
+5.4a (the MOVIE captions), 5.5's items 2 and 6, 5.9's `SCARF` -> `HANDKER`, and
+5.10 (the whole patch-side review) and, since 2026-09-08, 5.11. **Nothing with
+a USA counterpart is known to be Japanese any more, on any of the three
+discs.** What is left is of five kinds — and none of it is text to port:
 
 | kind | items |
 |---|---|
-| **needs you at the controller**, nothing to build | 5.1, 5.2, and 5.5's list 1 |
-| **real engineering** | 5.4 the raw-disc build switch, 5.5's item 6 (`rebuild.py` does not build the VR patches), 5.6 the upstream sync |
-| **your call** | §6, and 5.9 |
-| **loose ends** | 5.7 untested runtime features, 5.8 the text census, 5.5's item 5 |
+| ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
+| **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, and the new `en_pad2` subtitle (5.11) |
+| **real engineering** | the raw variant's first boot on a real disc image (end of 5.4, and 5.13), 5.6 the upstream sync |
+| **to investigate** | 5.14, where else Integral's own English differs from USA's — the blind spot every existing sweep shares |
+| **held open on purpose** | §6's four **[open 2026-09-07]** items, and 5.9. Raised, considered beside the `SCARF` case decided the same evening, and deliberately not decided — see the note at the head of §6 |
+| **loose ends** | 5.7's remaining untested runtime features, 5.5's items 4 and 5, and the `us1.exe` parity mismatch in 5.13 |
 
 ### 5.1 Still to be seen (needs the user; nothing to build)
 Everything built so far has been seen on screen except: a mission-log page from
 demo.gcx (a disc-2 save) and a count-7 page (USA's `1/2` with an empty second
 screen — reproduced on purpose, §5.9); the other weapon descriptions besides the
-SOCOM; and the disc-swap screens, which only 5.2 can reach. If anything looks
+SOCOM; the disc-swap screens, which only 5.2 can reach; and the controller-port
+subtitle of §5.11, which needs the Mantis room and a pad in port 2. If
+anything looks
 wrong, bisect first: move the family's two PPFs out of the mods folders and
 confirm the retail text comes back. No debug shortcut exists for any of it —
 the collection's launcher waits for a game to be chosen before anything loads
 (a `StageSelect = abst` smoke test idled there on 2026-09-05 00:39).
+
+### 5.1a The six conditional descriptions — ALL SEEN ON SCREEN 2026-09-07
+Found 2026-09-07 by reading the two functions that decide which description is
+printed (README, "Descriptions that change with the game state"). An item's text
+is not always the string its table points at, and six slots change with the game
+state. Four were already covered by the 34-pair comparison against USA; the two
+conditional ones had never been drawn, and `GiveItems` made both reachable
+whatever the difficulty. **Both were photographed the same evening and both are
+right:**
+
+- **The Mine Detector on HARD** (seen 23:08) draws USA's three lines,
+  `《Mine Detector》` / `Cannot be used in` / `HARD or EXTREME mode.` That is also
+  the first on-screen proof that this string's **relocation** works - it is 59
+  bytes against Integral's 53, so `items.py` moves it and repoints the
+  `lui`/`addiu` pair that reaches it.
+- **The MP5 SD on VERY EASY** (seen 23:07, 999/999 rounds). On that difficulty
+  Integral **replaces the FA-MAS with the MP5 SD** - it is a different weapon,
+  not a relabelled one, and it reuses `WP_Famas` as its id, which is why the
+  code reads as if it were about the FA-MAS. Three places do it: `check_type`
+  (`game/item.c`) returns 0 for that id so the **FA-MAS pickup never spawns**;
+  `menu/weapon.c` names the slot from an inline `"MP 5 SD"` literal; and the
+  description pointer becomes the MP5's. **Its text is Japanese and correct, not
+  a fault** - Integral-only, and USA has neither the weapon nor the difficulty:
+  `《MP 5 SD》 サブマシンガン。□ボタンを押すと発砲。押しつづけると、フルオート連射。サプレッサー装備。`
 
 ### 5.2 The disc-2 run (needs the user at the controller; nothing to build)
 Load the **Comm Twr A** save (no debug) and play through the actual story disc
@@ -296,7 +362,14 @@ over the assembled set.
 **What is NOT proven: the raw variant has never run on a real PSX image.** It
 builds and packages; nobody has applied it to a real disc and booted it. That is
 the remaining raw-disc work, and it is where `en_menu3`, the six-line brightness
-paragraph and Integral's own KEY CONFIG would finally be visible.
+paragraph and Integral's own KEY CONFIG would finally be visible. Two things the
+build does not do yet stand in front of that boot, both found 2026-09-07 (§5.10):
+the PPFs are computed against the collection's embedded images, so the first
+step is to show those equal a retail dump (hash the extracted ISO against
+redump's track for SLPM-86247 / 86248 / 86249), and the raw PPFs carry no
+blockcheck that would refuse a wrong image; and nothing regenerates the EDC/ECC
+tail of the sectors the PPFs change — irrelevant to the collection's emulator,
+not to real hardware or a strict emulator.
 
 ### 5.4a The VR movie captions — DONE and VERIFIED ON SCREEN 2026-09-07
 All three MOVIE selection captions are ported and deployed as
@@ -412,9 +485,9 @@ correct: the option screen's seven help lines, centred, after the three faults
 §4 records; the mission menu with every mission unlocked; a clip's description
 window in English when a TGS video opens; and EXTRA -> MOVIE with all three
 thumbnails and, since 2026-09-07, all three captions in English — the two TGS
-ones on two rows (§5.4a, which also records the one cosmetic item left there:
-line 1 touches the EXIT box, because USA moves its EXIT up and Integral's face
-is taller). What is left, in rough order:
+ones on two rows (§5.4a; the overlap those shots showed between line 1 and the
+EXIT box was fixed the same day by moving the box to USA's y, deployed and not
+yet seen). What is left, in rough order:
 
 1. **On screen 2026-09-07: mission windows.** Two shots, both correct English -
    `ADVANCED MODE / SOCOM LEVEL 01`, "Eliminate all enemy soldiers and head for
@@ -559,8 +632,56 @@ doing it twice. When it happens:
   orphaned by the `en_abst` relocation); named-file patches carry no inline
   data, so their content stays unknown to the watch.
 - `PreserveConfiguration` catching a real stale write (intermittent race).
-- `GiveItems` in a stage where the inventory is actually empty (a real save,
-  not the developer menu).
+- ~~`GiveItems` in a stage where the inventory is actually empty~~ **Exercised
+  for the first time 2026-09-07, and it did not work. Fixed the same evening.**
+
+  Run on MGS1 **USA** (title 981, disc 1, stage `s01a`) with all 24 ids, it
+  logged twenty-four lines and granted nothing: `count 65535 -> 65535`, over and
+  over, while the inventory stayed empty. **An item Snake does not have is
+  stored as -1, not 0.** `game/g_define.h` says so in one line - `IT_None = -1`
+  - and `game/item.c` tests `GM_Items[IT_Ketchup] == -1`. The feature looked for
+  a count of zero, which is a state an absent item is never in, so the guard
+  that was meant to protect a real inventory silently protected everything.
+
+  Two things it got wrong beyond the sentinel, both now corrected in
+  `src/mgs1.cpp`. It also wrote `GM_ItemsMax[id]` wherever that read 0, which
+  helps nothing: for the three consumables the max the game actually consults is
+  `GM_Items[id + 11]` (`item.c` `add_item`), and for everything else `add_item`
+  simply assigns. That write is gone. And an owned-but-**disabled** item is a
+  third state - `disable_equipment()` ORs `IT_TYPE_DISABLED` (0x8000) into the
+  entry - so `0x8001` is now deliberately left alone rather than being read as
+  "absent" and quietly re-enabled.
+
+  The log line says which happened: `granted (65535 -> 1)` or `already held,
+  left alone`. **Confirmed working on screen 2026-09-07**: all 24 items in the
+  inventory on MGS1 USA disc 1.
+
+- **`[Game] GiveWeapons`, added 2026-09-07** once the items worked and the
+  weapons visibly had not. Weapons are a different shape: two arrays, ammo in
+  `GM_Weapons` (`linkvarbuf[17..26]`) and capacity in `GM_WeaponsMax`
+  (`[27..36]`), ten of each, in MGS1's own `WP_` order - which is **not** the
+  menu's: 0 SOCOM, 1 FA-MAS, 2 Grenade, 3 Nikita, 4 Stinger, 5 Claymore, 6 C4,
+  7 Stun Grenade, 8 Chaff Grenade, 9 PSG1.
+
+  Ownership is the same convention the items turned out to use, and the menu
+  states it outright - `GM_Weapons[i] >= 0` (`menu/weapon.c`), so -1 is "not
+  carried". **What goes in the magazine is taken from the game, not invented.**
+  Its own `add_weapon` lifts a negative entry to 0 and fills toward
+  `GM_WeaponsMax`, so a granted weapon gets the full magazine the game already
+  records for it, and an empty one where no capacity is recorded. Nothing writes
+  `GM_WeaponsMax`: there is no capacity table anywhere in the decompiled source
+  to write a truthful one from, and making up ammo counts is the kind of
+  invention this project does not do. If a weapon arrives empty, that is the
+  game having no number for it, and the log says so.
+
+  Both keys work on **Integral** as well as USA - the code is in the shared
+  `MGS1` handler, keyed on the `scene_name` memory define every version has,
+  with no title check. Set both back to empty for normal play.
+
+  **The lesson is the general one this project keeps relearning:** the feature
+  was written, built, reviewed and documented as working for five weeks without
+  ever being pointed at an empty inventory. "Built" is not "exercised", and a
+  guard that never fires looks exactly like a guard that never needs to.
 - `Ketchup::Audit` did report two `differs from what was written` lines on
   2026-09-05 — both were the game's own code editing ported strings, fixed in
   `items.py`. Both pools are now owned byte for byte; a future audit line means
@@ -578,31 +699,359 @@ screen — USA itself shows 307 flagged, so a flag is not a Japanese string.
 Texture lettering and runtime language branches are outside both tools.
 
 ### 5.9 Optional, ask first
-- The caption under READ MISSION LOG? (作戦記録を参照しますか？): kept because
+**Held open on purpose, 2026-09-07.** Both remaining items here were put to the
+user the same evening the `SCARF` case below was decided, and both were kept
+open rather than swept along with it. They are decisions still owed, not
+oversights; §6 carries the same marker.
+
+- **[open 2026-09-07]** The caption under READ MISSION LOG? (作戦記録を参照しますか？): kept because
   USA draws nothing there; `KEEP_PROMPT_CAPTION = False` in `abst_build.py`
   gives USA's empty record. Also the `1/2` counter and empty second screen on
   count-7 pages — USA's own behaviour, reproduced.
-- Location-name spellings in `abst` (`Tank Hanger` / `Medi rm` / `Cmnder rm`
+- **[open 2026-09-07]** Location-name spellings in `abst` (`Tank Hanger` / `Medi rm` / `Cmnder rm`
   vs USA `Hangar` / `Medi room` / `Cmnder room`): Integral's own English, not
   Japanese — outside the rule as written, so ask.
+- **The item short-name table: `SCARF` -> `HANDKER`, ASKED AND DONE 2026-09-07.**
+  **This is the port's first replacement of Integral's own English** rather than
+  of its Japanese, and therefore the first case under amendment 4b in §2.
+
+  *What it is.* The abbreviations in the inventory's side column are a different
+  string set from the descriptions: NUL-terminated names on an 8-byte stride in
+  the executable, items 23 down to 0, **already Latin on both discs**, which is
+  why the port had never touched them. Dumping both tables and comparing entry
+  by entry, exactly one differs - item 22, `SCARF` on Integral against
+  `HANDKER` on USA. Every other item and weapon abbreviation was already
+  identical.
+
+  *Why it was worth changing.* Integral's own Japanese description for that item
+  reads 《ハンカチ》 - *hankachi*, a handkerchief - and its own description says
+  so. Its short label was the only thing calling it a scarf, so the change makes
+  Integral agree with itself as well as with USA. Read with `rendertext.py`.
+
+  *What went in, and what could not.* `HANDKER`, which is USA's own string - not
+  "Handkerchief". The slot is 8 bytes, so seven characters is the ceiling, and
+  any other abbreviation would be invented text rather than ported text. USA's
+  is exactly seven, so it lands in the existing slot and **nothing moves**:
+  the patch grew by exactly 8 bytes per disc and changed nothing else, which the
+  deployed-set comparison confirms byte for byte.
+
+  *Where it lives.* `items.py`, `IN_SHORTNAME = 0x09BCC0` against USA's
+  `0x09E448`, added to the regions `en_items` owns outright so Ketchup writes
+  and audits all 8 bytes. Both discs, deployed 2026-09-07 22:56. **Not yet seen
+  on screen.**
+
+  **Seen on screen 2026-09-07 23:03**: the side column reads `HANDKER`, beside
+  the description it already agreed with.
+
+  Two facts about that block worth keeping. **Cold Medicine and Diazepam are not
+  in it** - both names are 8 characters, one too many for a slot that must also
+  hold a terminator, so both games keep those two elsewhere. And the `MP 5 SD`
+  string sitting near the table is **not a table entry** - a first pass with a
+  fixed 8-byte stride suggested Integral's table was one longer than USA's, and
+  that was wrong: it is a string literal in `menu/weapon.c` that names the FA-MAS
+  slot on VERY EASY, emitted into rodata beside the table. Walk this region as
+  NUL-terminated strings and compare by content, never by index.
 - `rank`: 36 Integral-only Japanese sentences with no USA counterpart → stays
   Japanese unless a USA source turns up. Nothing to do without one.
+
+### 5.10 The patch-side pass — DONE 2026-09-07 (evening)
+Seven robustness and completeness gaps were identified in the morning review and
+all seven were closed the same evening. None of them changes what a player sees;
+what they change is what can go wrong unnoticed.
+
+**1. The two VR patches that wrote the same stage now have one owner each.**
+`vr_en_movie` used to share 686 of its 753 bytes with `vr_en_missions` and work
+only because Ketchup applies a folder in file-name order — a dependency nothing
+enforced and nothing would report. `vr_windows.py` now ports the `movie` stage
+as before but writes none of its records, handing the finished stage to
+`vr_movie.py` as `work/vr_movie_base.bin` (`vr_windows.HANDOVER`); `vr_movie`
+emits against **retail** and owns the stage outright. The two share **0 bytes**,
+the deployed-folder dependency (`INTEGRAL_ENGLISH_VR_PPF_DIR`) is gone, and
+`rebuild.py` now refuses *any* VR overlap instead of allowing that one pair.
+
+**Verified by effect, which is what made it safe to do at all:** applying the new
+pair gives the disc byte for byte what the old pair gave. Of 136 positions where
+the two sets differ as *files*, every one is a byte equal to retail either way —
+the old set wrote them redundantly inside merged runs. **Positions where the disc
+would actually differ: 0.** Both files must be replaced together when this is
+deployed; neither works with the other's old copy.
+
+**2. Width checking, and what it turned out the invariant is.** `widths.py`
+derives a `vrwindow`'s real budget from the decomp rather than guessing it —
+`align4(w) - 16`, to VRAM words, to whole 12-px cells, less the 12 px
+`font_draw_string` reserves — so a 256-wide window gives 228 px. Then the
+measurement said not to assert it: **retail Integral has 107 lines over that
+budget and USA has 19**, so it is not an invariant, it is an estimate. What IS
+enforced is exact and cheap: `substitute_numbers` may never make a line render
+wider than the USA line it came from (the only width known to be safe, because
+USA shipped it), plus the 255-px ceiling that `kcb->max_width` imposes on
+anything, over every record the port writes. Both hold today and every VR patch
+rebuilds byte-identical, so these are regression guards, not fixes.
+
+`vr_exe.py` deliberately has **no** width check, and the reason is recorded in
+it: its pools hold multi-line descriptions, the English ones break on `0x807C`,
+and retail Integral's own Japanese entries in the same arena measure 540 px
+unsplit — so they break on something not yet established. Asserting there would
+fail on bytes the game ships and works with.
+
+**3. The raw disc now carries correct error correction.** A PPF that changes a
+payload byte invalidates that sector's EDC and P/Q parity; the collection's
+emulator does not care and a real console may. `cdecc.py` implements both sums
+and `rawdisc.py` recomputes the tail of every sector a raw patch set touches —
+413 sectors per main disc, 2003 on the VR disc. Each PPF also gains a PPF3 block
+check so a tool can refuse the wrong image. `py rawdisc.py <package>` applies a
+finished set in memory and confirms every touched sector verifies; it does.
+
+**The pass rests on one invariant, checked per sector: before anything is
+applied, the sector as we believe retail has it must verify against its own
+stored parity.** That is a 280-byte sum over 2048 bytes, so it cannot pass by
+accident, and it is what makes the executables safe — their ISO extents are
+zero-filled in the collection's images, so the retail file is put back first.
+
+**4. The collection's named-file patches are no longer a mystery.** See §5.12.
+
+**5, 6, 7. Ketchup, the sweep and the tests.** `Ketchup::ApplyBlock` now warns
+when part of a record lands in a sector's 304-byte tail and is not mirrored,
+instead of logging success — the silent loss that once cost `en_savemsg` 142 of
+442 bytes. `ReportOverlaps` warns when two PPFs in a folder write the same byte
+with **different** values, naming both files. `ApplyPPF3` validates the whole
+record chain before applying any of it, so a malformed file is refused rather
+than walked to a count that never reaches zero — the 306 MB log. The block check
+is still skipped and now says so: the fix has no way to read the disc image
+back, so it cannot be verified here. `mainsweep.py` is §5.11. `selftest.py` runs
+23 tests over the pure pieces in a hundredth of a second, and each one was
+checked by mutation to confirm it fails when the thing it guards is broken.
+
+### 5.11 The one thing the main-disc sweep found — BUILT AND DEPLOYED 2026-09-08
+`mainsweep.py` pairs every GCL string on both discs by the command that owns it,
+so "Integral has Japanese here and USA has English" becomes a comparison rather
+than a guess. Run over discs 1 and 2 it reports twelve owners; nine are inside
+stages a patch family already owns, two are Japanese in identical numbers on the
+USA disc as well (`cmd 4AD9`, the location titles; `chara 9302`, `rank`). One
+was neither, and it is now the `en_pad2` family — `pad2.py`, two PPFs, 159 bytes
+each, deployed 2026-09-08 22:02.
+
+**What the text is.** Stage `s07b` is the Psycho Mantis room (`stage/s07b.c`
+registers `CHARA_PSYCHOMANTIS`). The owner is `CHARA_2D0A_2ND` → `NewSecond` in
+`game/second.c`, 45 lines long, and it settles by itself what draws the string:
+the actor takes **one** string per spawn, writes it as a subtitle with
+`MENU_JimakuWrite(work->message, 20000)` when `GV_PadData[1].status` first goes
+true, and clears it when pad 1 comes back. So it is the line shown when the
+controller moves to **port 2** for the Mantis fight, telling the player to put
+it back. Integral's reads コントローラ端子1のコントローラを|使用してください。
+(`rendertext.py`; three of its codes fall outside the located font bank, so read
+the PNG, not the codes). USA's is `PLUG CONTROLLER INTO | CONTROLLER PORT 1.`
+
+**This entry used to describe it wrongly, in two ways.** It said "two records"
+of one owner, record 0 English on USA and record 1 Japanese, and that USA
+"translated the first of the pair". Both are wrong, and reading `second.c` is
+what shows it: one string per spawn means there is no record 0/record 1 to
+index. What the script has is **two separate spawns, in two branches**:
+
+| | Integral | USA |
+|---|---|---|
+| site A | string at script `body+0x88C`, path `elif 1903 → if 2043` | same offset, **byte-identical Japanese** |
+| site B | string at script `body+0xC3A`, path `elif 2845 → if 2985` | `body+0xC0E`, **English** |
+
+So USA translated the **later** site by offset, not the first, and left the
+other — its own inconsistency, because both branches hand the same message to
+the same actor.
+
+**And there is a third site the sweep cannot see.** `s07br` carries the same
+string at `body+0xC3A`. That stage is one of the 13 **Integral-only** names, and
+`mainsweep.py` walks only the 82 names the two discs share, which puts every
+Integral-only stage outside its universe. This is a second blind spot beside the
+one §5.14 records, and it is now written down in `COVERAGE.md` as a limit of the
+tool rather than left to be rediscovered. `s07br`'s overlay source is
+byte-identical to `s07b`'s (`diff` is empty), so it is the same code over
+different stage data; **what that stage is for has not been established.**
+
+Five sites in total: three per disc, two discs, and both discs hold both stages
+at the same LBA with identical bytes, so the two PPFs are the same writes at the
+same offsets.
+
+**The decision, and it was the user's.** Porting only USA's one site is what
+"placed where USA places it" says literally, and it would leave a player who
+trips the other branch — or who is in `s07br` at all — reading Japanese. Asked
+and answered 2026-09-08: **port every site.** The text is USA's own verbatim
+either way; the rule exists to forbid invention, not to reproduce an oversight.
+
+**Why nothing had to move.** A GCL STRING is length-prefixed and
+`GCL_GetNextValue` advances by that length byte, never by `strlen` (the
+correction §5.3 records). USA's 42 bytes fit inside Integral's 55-byte slot, so
+the length byte stays at 55 and the walk steps over the same bytes it always
+did. The English and its terminator go in at the front, the dead tail is spaces,
+and the record's own final NUL is left alone — `menu2.py`'s convention.
+`MENU_JimakuWrite` only stores the pointer and `font_print_string` reads to the
+NUL (`menu/jimaku.c`), so the tail is never looked at. No container to
+re-stamp, no sector to grow, no relocation, no DUMMY3M slot.
+
+**One trap worth keeping.** The padding must go *after* the terminator, never
+before it. `font_print_string` measures what it draws and jimaku centres on that
+width (`field_4_x = (FRAME_WIDTH - max_width) / 2`), so trailing spaces ahead of
+the NUL would silently pull the line off centre. `selftest.py` guards it, and
+that guard was confirmed by mutation along with three others.
+
+**How far it is verified.** Statically, and by effect rather than by inspection:
+applying the build to the archive leaves its length unchanged, re-walks both
+stages to the same 1279 and 906 commands with identical structure (so nothing
+desynced), leaves all 159 changed bytes inside the three slots, and each slot
+re-parses at length 55 with the English at the front. The English itself is read
+out of `usa1_stage.dir` at build time rather than retyped. The two PPFs are
+disjoint from all nine deployed PPFs on each disc, `ppfcheck.py --deployed` is
+clean over all 31 files, and the family is registered in `rebuild.py`: the clean
+run `repro17` rebuilt both PPFs **byte-identical** to the deployed ones, 27 of 27
+across the set.
+
+**Not yet seen on screen** — and it needs more than a save: the subtitle only
+fires when pad 2 becomes active, so it wants the Mantis room *and* a second
+controller in port 2 (or the emulator's port-2 assignment). `StageSelect = s07b`
+can load the stage, but §5.7 records a direct `s14e` entry hanging without story
+state, so expect to reach it in play. Which branch the game actually takes, and
+whether site A is reachable at all, is worth noting when it is seen.
+
+### 5.12 What the collection's own disc patches contain — ANSWERED 2026-09-07
+Three documents said this could not be known. It can.
+
+The collection's patch table has two kinds of entry. An *offset* patch carries
+its bytes inline, so `SQHook::SetPatchWatch` logs them. A *named file* patch
+carries only a name and the game reads the bytes from its own archive later, so
+the watch reports "0 bytes" and the content stayed invisible — including the
+five that land on the port's own text. `m2archive.py` reads them.
+
+**How.** `windata/alldata.bin` is a flat blob and `alldata.psb.m` beside it is
+its index: an MDF (`mdf\0`, a u32 size, then a zlib stream XOR-obfuscated with a
+64-byte keystream from `MD5("25G/xpvTbsb+6" + the file's own lowercased name)`
+seeded through MT19937 — the literal is in the game exe at 0x75ECE0). Inflated,
+it is a PSB v3 whose `file_info` maps 4,926 paths to `[offset, size]`.
+`099/patch/` holds 176 entries, each an MDF wrapping a *stored* deflate block,
+so the payload is plain bytes behind one layer of obfuscation and its adler32
+checks — which is what makes an extraction certain rather than plausible.
+
+**What they say.** Not translation: they **blank the line telling the player to
+open the disc tray** and reword the prompt. On the `title` block (`0x1822B55D`,
+592 bytes, 30 differing from retail) record 1 becomes twelve spaces and record 2
+is reworded; the `abst` block (`0x132F2716`, 240 bytes, 83 differing) blanks
+records 1 and 3; `change` (`0x18345E07`, 174 bytes, 48) blanks record 2. One,
+`disc1_18412A95_patch_PS5` on `demosel`, differs from retail in **0 of its 19
+bytes** — it writes exactly what is already there. The platform suffixes
+(`_NX`, `_PS`, `_PS5`, `_XBOX`, `_STEAM`) differ only in button-glyph codes.
+
+**Three things this settles.**
+
+* **`en_menu3`'s collision is confirmed with bytes.** Their patch overwrites 592
+  bytes starting at the address of our record 0, in retail's own layout. Ours
+  rewrites the same block with USA's English and different record boundaries.
+  Whichever lands last decides, and if ours does not, the block is inconsistent
+  — which is the `GCL:WRONG CODE` run seen three times. Raw-disc-only stands.
+* **The `abst` patch our relocation orphans is harmless.** It blanked two
+  Japanese strings that `en_abst` replaces with USA's English anyway.
+* **The archive index confirms every image base this port found by scanning.**
+  Integral discs 1/2/3 at 0, `0x2AE54800`, `0x57592000`; USA discs 1/2 at
+  `0xF12F8000`, `0x11B3E5800`; USA VR at `0xD39B7000`. All six, exactly.
+
+### 5.13 Two measurements worth keeping
+**Integral's images are faithful retail dumps where it matters, and that is now
+proved rather than assumed.** Put the separately supplied retail executable back
+into its zero-filled ISO extent and recompute the parity the collection left
+behind: `int1.exe` reproduces all **313** stored sector tails, `int2.exe` all
+313, and `vrint.exe` — which is *built from the decomp*, not copied — all **308**.
+A 280-byte sum over 2048 bytes, matched 934 times. So the decomp's output is the
+disc's own bytes where its source is unchanged, and the raw-disc variant's
+assumption about these images holds.
+
+**`us1.exe` is not the executable the collection's USA image was built with.**
+The same check reproduces only **8 of 318** tails there. The file is a genuine
+`SLUS` build by its own strings and the image's `SYSTEM.CNF` boots
+`slus_005.94`, so the likeliest explanation is a different pressing — but it is
+not established, and it is one more reason the port takes USA text from
+`usa1_stage.dir` (real USA discs) rather than from this image. It does not touch
+the Integral patches, which is why it is recorded rather than chased.
+
+### 5.14 Where else does Integral's own English differ from USA's? — TO INVESTIGATE
+Raised by the user 2026-09-07, immediately after the `SCARF` case: *"if there are
+other instances of existing English in Integral that differ from USA."*
+
+**Two are known, and both were found by accident.** `SCARF` against USA's
+`HANDKER` turned up because it happened to sit in the corner of a screenshot
+taken for another purpose; the `abst` location spellings (`Tank Hanger`,
+`Medi rm`, `Cmnder rm`) turned up while porting the mission log. Neither was
+found by looking. There is no reason to think two is the total.
+
+**Why nothing here would have caught them.** Every sweep this project owns hunts
+*Japanese*: `mainsweep.py` and `vr_sweep.py` pair a record with USA's and ask
+whether Integral's is Japanese where USA's is English; `jpsweep.py` scans for
+Japanese-looking pointer slots; `audit_text.py` inventories game-encoded string
+candidates. A string that is already English on both discs and merely **says
+something different** passes all four without a murmur. That is the blind spot,
+and it is exactly the shape of both known cases.
+
+**A method that would work, sketched.** The obstacle is pairing: the two builds
+lay their data out differently, so a positional diff is meaningless. But both
+known cases sit in a *sequence* whose neighbours match - `SCARF` is between
+`SUPPR.` and `ROPE` on both discs - which is what a diff is for.
+
+1. ~~**Executables.**~~ **DONE 2026-09-07, and the answer is one.** Extract the
+   ordered NUL-terminated Latin strings from `int1.exe` and `us1.exe` and run a
+   sequence diff over the two lists: equal runs align themselves, and a
+   **replace** hunk of one string against one, with matching context either
+   side, is exactly the `SCARF`/`HANDKER` shape.
+
+   Filtering to text-like strings - printable, mostly letters - and running it
+   at minimum lengths of 5, 4 and 3 characters gives the **same single result
+   every time**: `SCARF` against `HANDKER` at 0x09BCC0, the one already changed.
+   Nothing else in the executable differs. (Both discs' executables are
+   byte-identical, so disc 2 is covered by the same pass.)
+
+   The other hunks are all accounted for and none is portable text: the region
+   and product strings (`...for Japan area` / `BISLPM-86247` against
+   `...for North America area` / `BASLUS-00594`), a scatter of `.c` source
+   filenames USA's build kept, USA's memory-card message pool - which shows as
+   an insert only because Integral's counterparts are Japanese and so never
+   enter a Latin extraction - and a few short runs of MIPS code that read as
+   ASCII.
+2. **Stage archives.** `mainsweep.py` already pairs GCL records by the command
+   that owns them. Extend it: where Integral's record and USA's are **both**
+   plain English and differ, report the pair. Today it only counts them.
+3. **Not textures.** Lettering drawn as art is out of scope for a text sweep and
+   stays that way.
+
+**Expect noise, and know its shape before starting.** Integral-only features
+(VERY EASY, the MP5 SD, PocketStation, `rank`'s commentary), product branding and
+the save-title suffix, and version or build strings will all differ legitimately.
+The useful output is the small residue: the same UI element, worded differently.
+
+**What to do with a result is already settled** - §2 amendment 4b. Each find is
+the user's call, one at a time, and the answer may well be "leave it": Integral's
+own English is not wrong, it is just not USA's.
 
 ---
 
 ## 6. Decisions that are the user's — ask, do not assume
 
-- The caption under READ MISSION LOG? (kept Japanese by rule; one constant
-  blanks it) and USA's `1/2` on single-screen pages (reproduced) — §5.9.
+**Four of these were put to the user on 2026-09-07 and DELIBERATELY LEFT OPEN.**
+They are marked **[open 2026-09-07]** below. That is a decision in itself, not an
+oversight: they were raised, considered alongside the `SCARF` case that was
+decided the same evening, and held. Do not re-raise them as though they were
+newly noticed, and do not read the passage of time as consent - each still needs
+an explicit answer before anything changes.
+
+- **[open 2026-09-07]** The caption under READ MISSION LOG? (kept Japanese by
+  rule; one constant blanks it) and USA's `1/2` on single-screen pages
+  (reproduced) — §5.9.
 - Anything under the 2026-09-03 amendment: moving English text to fit
   Integral's own art.
 - The `en_savemsg` collision approach, if one is ever observed.
 - Achievements on or off for a given test session (`DisableRAM` /
   `DisableCDROM`); they are **on** now. Turning them off keeps SPECIAL / PHOTO
   ALBUM reachable without earning it and has never affected the PPFs.
-- Anything that touches Integral's own English (5.9), the `abst` location
-  spellings first.
-- **The VR disc's three number substitutions.** Where Integral and USA state
+- **[open 2026-09-07]** Anything that touches Integral's own English (§5.9),
+  the `abst` location spellings first — `Tank Hanger` / `Medi rm` / `Cmnder rm`
+  against USA's `Hangar` / `Medi room` / `Cmnder room`. **This is exactly the
+  shape of the `SCARF` -> `HANDKER` case**, which was asked and done the same
+  evening and created amendment 4b in §2; these were held rather than swept along
+  with it. The precedent says how to decide them, not that they are decided.
+- **[open 2026-09-07] The VR disc's three number substitutions.** Where Integral and USA state
   different values, USA's sentence was taken with **Integral's** numbers put
   into it, so the text matches the disc it runs on: SNEAKING MODE / NO WEAPON
   LEVEL 10 25 not 35; SNEAKING MODE / SOCOM LEVEL 03 40 not 43; WEAPON MODE /
@@ -619,7 +1068,14 @@ Texture lettering and runtime language branches are outside both tools.
   same object. Approved against the user's stated default, **"usually we skew
   toward the Integral visuals"**, which makes this a named exception rather than
   a precedent: §5.4a has the measurements and the reasoning.
-- **VR EXTRA menu record 6.** Integral's fifth item is PocketStation where
+- **The item short-name `SCARF` -> `HANDKER` — ASKED AND APPROVED 2026-09-07,
+  and it set a precedent.** Integral's side-column abbreviation for item 22 was
+  already English and disagreed both with USA's and with Integral's own Japanese
+  description (《ハンカチ》, a handkerchief). The user's instruction created
+  amendment 4b in §2: replacing Integral's **existing English** is an exception
+  to the rule, allowed when asked, case by case. It is not a new default - the
+  `abst` location spellings are the same shape and remain undone and unasked.
+- **[open 2026-09-07] VR EXTRA menu record 6.** Integral's fifth item is PocketStation where
   USA's is STAFF CREDIT, so `See the staff credits.` was **not** used. If the
   user would rather see English there, it needs new text, which the rule
   forbids without authorisation.
@@ -672,6 +1128,14 @@ Texture lettering and runtime language branches are outside both tools.
 | `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
 | `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
 | `pcx4.py` | encode/decode the 4-plane RLE PCX the texture loader expects (how `sc_text` and the KEY CONFIG art were read and written) |
+| `selftest.py` | **23 tests over the pieces that need no game data** — the PPF emitter's two split boundaries, the record chain, the PCX codec, the EDC/ECC algebra, the width model. `py selftest.py`, a hundredth of a second. Ground truth lives elsewhere: `cdecc.py` against the real discs, `rebuild.py --compare-deployed` against the deployed set |
+| `cdecc.py` | EDC and P/Q parity for raw Mode 2 Form 1 sectors. `py cdecc.py` is the check that proves both the sums and the retail executables: it rebuilds each zero-filled executable extent from the supplied retail file and matches the parity the collection left behind (313/313, 313/313, 308/308) |
+| `rawdisc.py` | the raw-disc EDC/ECC pass. As a library `rebuild.py --variant raw` uses it to emit each disc's `*_zz_ecc.ppf`; as a command, `py rawdisc.py <package>` applies a finished raw set in memory and confirms every touched sector verifies |
+| `widths.py` | how wide a ported line renders and how wide it may be: the `vrwindow` budget derived step by step from the decomp, the 255-px `max_width` ceiling, and the pool line separator. Read its docstring before adding a width assert — the per-window budget is **not** an invariant, retail exceeds it |
+| `mainsweep.py` | the main discs' answer to `vr_sweep.py`: pairs every GCL string with the USA disc's by owning command, so "Integral Japanese where USA has English" is measured. `py mainsweep.py [--disc 2] [--samples]`. Its one uncovered finding is §5.11, ported 2026-09-08; note that it compares only the 82 stage names both discs share, so an Integral-only stage is outside its universe |
+| `pad2.py` | `en_pad2`: USA's controller-port subtitle into all three of the sites `second.c` is spawned at, on both discs. Length-preserving — the English goes in at the front of Integral's longer slot and the length byte never changes. `py pad2.py` |
+| `rendertext.py` | **reads the game's own Japanese, by drawing it.** The scripts store font indices, not Shift-JIS, so no table turns a Japanese string into characters - `game_text` can only print `<822F><8253>...`. This looks the glyphs up the way `font.c` does and renders them to a PNG: `py rendertext.py --item 22`, `--weapon N`, `--hex ...`, `--exe us1.exe`. Two things in it were settled by rendering a word whose reading was known, not by reasoning - the bit order, and a one-glyph bank offset - because either mistake produces plausible-looking Japanese that is simply the wrong Japanese |
+| `m2archive.py` | reads the collection's own archive: `--roms` the disc images and bases, `--list 099/patch` what it patches, `--patches` every Integral disc-1 CD-ROM patch decoded against retail, `--extract` one member. This is what answered §5.12 |
 
 Rescued from the session scratchpad on 2026-09-04, where they existed nowhere
 durable: `bridge.py`, `gcldump.py`, `gclprocs.py` (now in this directory) and
@@ -704,7 +1168,12 @@ everything", "Unlock every VR mission", "Unlocking the EXTRA movies",
 "Achievements" · VR → "The VR disc (SLPM-86249)", "The MOVIE selection
 captions", "The white caption font differs between the two VR discs",
 "Sweep: is any VR text still Japanese?" · tests → "Not tested" (struck-through items are
-done, with dates) · decomp → "Audit against the decomp".
+done, with dates) · decomp → "Audit against the decomp" ·
+the collection's own patches → "Where the collection's own disc patches land",
+"What the collection's named-file patches say" (what they contain, read
+2026-09-07) · raw disc → "Raw-disc error correction, and what it proved on the
+way" · widths → "Line widths: what is an invariant here and what only looks like
+one" · credit and licence → `CREDITS.md`.
 
 ## 9. The 2026-09-04 late pass: what changed and what it settled
 
@@ -880,8 +1349,10 @@ against.
   `highlight(work, i)` **twice**, for `clip*2` and `clip*2+1`, where Integral
   calls it once. The port retargets that single `jal` at a 16-word stub in the
   overlay's own sector padding, and keeps USA's records and position table. All
-  three captions are now English and deployed; the two-line form has not been
-  seen on screen yet. §5.4a and README "The MOVIE selection captions".
+  three captions are English, deployed, and were seen on screen the same day
+  (the user's shots at 01:03: both TGS captions on two rows, E3 on one); the
+  EXIT box's 4 px move that followed is the part not yet seen. §5.4a and README
+  "The MOVIE selection captions".
 
 - **`en_menu3` is done, and the answer was "not here".** The last Japanese text
   in the main game with a USA counterpart now has a builder (`menu3.py`) and two
@@ -931,3 +1402,116 @@ Three process notes worth keeping:
   table. One misnamed global cost two builds and two play tests. The general
   lever: the decomp does not have to contain the *function* to name what it
   touches, and here it contained the whole module under another name.
+
+## 13. The 2026-09-07 evening pass: the seven-item review, closed
+
+A review of the port asked what could be improved in the patches themselves
+rather than in the text, listed seven things, and then did all seven. Details
+are in §5.10 to §5.13; what the day is worth remembering for is smaller than
+that list.
+
+- **A budget you derived is still a guess until you check it against retail.**
+  The `vrwindow` width budget was read out of the decomp one call at a time and
+  is, as far as anyone can tell, correct — and retail Integral has 107 lines
+  over it. Asserting it would have failed on the game's own shipped data. The
+  invariant that survived is the one with a witness: never render wider than the
+  USA line this came from, because USA drew it.
+- **The thing three documents called unknowable took one afternoon.** "A named
+  patch's bytes are only visible through `SetPatchWatch`, and named-file patches
+  carry no inline data" was true and complete about the *watch*, and it quietly
+  became a belief about the *bytes*. They were in a file on disk the whole time.
+  When a document says something cannot be known, check whether it means cannot
+  be known or merely was not tried by the route in front of you.
+- **A checksum makes a good oracle for questions that are not about checksums.**
+  Recomputing sector parity was meant to make raw-disc patches correct. It also
+  proved the retail executables are the disc's, proved the decomp's build is
+  byte-faithful, found the collection's zero-filling in a second measurement,
+  and showed that its USA image was not pressed with the executable this port
+  uses. None of that was the reason for writing it.
+- **Test the tests.** All 23 passed on their first run, which is not evidence.
+  Mutating three modules one at a time and confirming each mutation is caught is
+  evidence — and it immediately turned up a real trap: a same-length edit
+  restored within the same second leaves Python running the **cached bytecode**,
+  so a test can appear to fail against source that is already correct. Clear
+  `__pycache__` before believing a result like that.
+
+## 14. The 2026-09-07 late pass: the item text read against USA, end to end
+
+The evening's seven-item review (§13) was the port looking at itself. What
+followed was the opposite - the game being read on screen against its donor,
+which turned up two faults in the fix, one gap in the port, and two corrections
+to things this file had asserted.
+
+- **`[Game] GiveItems` had never worked, and nobody knew** because nobody had
+  pointed it at an empty inventory in five weeks. An item Snake does not have
+  is stored as **-1**, not 0, so its "only where the count is zero" guard could
+  never fire; it logged twenty-four grants and made none. Fixed, along with two
+  neighbouring faults, and `[Game] GiveWeapons` added beside it once items alone
+  turned out not to be the ask. §5.7.
+- **All 24 items and all 10 weapons were then photographed in both games and
+  compared** - text, line breaks, and glyphs including `《》`, the button glyphs
+  and the apostrophes. **34 of 34 identical.** The one difference in any of the
+  shots was in a table the port had never touched: the side column's
+  abbreviation, `SCARF` against USA's `HANDKER`.
+- **That produced a new rule.** Replacing Integral's *own English* is a case
+  neither standing rule covered; the user's answer is amendment 4b in §2, and
+  `SCARF` -> `HANDKER` is its first and so far only application. Four other
+  questions of the same family were deliberately left open.
+- **A description is not always the string its table points at.** Reading the
+  only two functions that print one turned up six slots that change with the
+  game state - and one of them, the MP5 SD that replaces the FA-MAS on VERY
+  EASY, is Japanese, reachable, and correct. Both conditional forms were then
+  seen on screen for the first time. §5.1a.
+
+Three process notes, and the first two are the same note twice:
+
+- **"Built" is not "exercised."** `GiveItems` was written, compiled, reviewed and
+  documented as working, and its guard had never once been in a state where it
+  could fire. A guard that never fires looks exactly like a guard that is never
+  needed.
+- **A stride is not a structure.** Walking the short-name region on a fixed
+  8-byte stride said Integral's table had an extra entry, `MP 5 SD`. It does
+  not: the table ends earlier, and that string is a literal the compiler put
+  nearby. Walking the same region as NUL-terminated strings gave the right
+  answer immediately. The first version of that claim reached this file before
+  the second version corrected it.
+- **The bytes could not be read without drawing them.** None of the Japanese
+  here is Shift-JIS - it is font indices, so `game_text` can only ever print
+  `<822F><8253>`. `rendertext.py` draws a string with the game's own font, and
+  two of its own details (bit order, and a one-glyph bank offset) were settled
+  by rendering a word whose reading was already known. Both mistakes produce
+  plausible-looking Japanese that is simply the wrong Japanese, which is the
+  only reason the check was worth making.
+
+## 15. The 2026-09-08 pass: the sweep's last finding, and what the sweep could not see
+
+`en_pad2` was built, verified, deployed and registered in one short pass (§5.11
+has the record). It is the smallest family in the port — 159 bytes a disc, three
+slots, no container touched — and the interesting part is not the patch.
+
+- **Reading the caller settled in five minutes what the notes had guessed at
+  for a day.** `game/second.c` is 45 lines. It takes one string per spawn and
+  draws it with `MENU_JimakuWrite` when pad 2 goes live. That single fact showed
+  the "two records, record 0 and record 1" this file described could not exist:
+  what `s07b` has is two *spawns*, in two script branches, and USA translated
+  the later one. The general form of this is already in §13 — when a document
+  describes data, check whether anyone has read the code that consumes it.
+- **A sweep's universe is part of its result.** `mainsweep.py` reports "one
+  finding" and that is true of the 82 stage names both discs share, which is
+  what it compares. The same string sits in `s07br`, one of the 13
+  Integral-only names, where nothing was ever going to look for it. Neither the
+  tool nor the three documents quoting it said so. A tool that pairs two things
+  can only see their intersection, and that boundary belongs in the write-up
+  beside the count.
+- **The user's decision is the one worth recording.** USA is inconsistent here:
+  the same message reaches the same actor down two branches and only one was
+  translated. "Verbatim USA text, placed where USA places it" read literally
+  means shipping that inconsistency. Asked, and the answer was to port all five
+  sites — the rule forbids inventing text, not fixing a donor's oversight with
+  the donor's own words. Worth remembering the next time the rule and the
+  outcome point in different directions: ask, and say which way each points.
+- **The trap in a length-preserving edit is where the padding goes.** After the
+  terminator it is dead bytes; before it, it is drawn — and jimaku centres on
+  the width it measures, so the line would drift off centre with nothing in the
+  bytes to suggest why. `selftest.py` guards it, and the guard was proved by
+  mutation, as §13 requires: four mutations, four failures.

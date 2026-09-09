@@ -36,6 +36,14 @@ typedef struct {
 	std::string name;
 } Ketchup_DiskPatch;
 
+// One write as it was applied, kept only until the folder has been processed
+// so collisions between two patches can be reported. See ReportOverlaps().
+typedef struct {
+	uint64_t offset;
+	unsigned int source;
+	std::vector<unsigned char> data;
+} Ketchup_Write;
+
 template <Squirk Q = Squirk::Standard>
 class Ketchup
 {
@@ -89,4 +97,18 @@ private:
 	constexpr static unsigned int RamAuditInterval = 300;
 	static inline unsigned int RamAuditReports = 0;
 	static inline std::set<unsigned int> RamAuditSeen = {};
+
+	// Every write this pass made, with the patch it came from, so that two
+	// patches writing the same disc byte with different values can be reported
+	// once the folder is done. Ketchup applies a folder in directory order, so
+	// such a pair silently resolves by file name - the reason a mod can work
+	// and then stop working because another was added beside it. Dropped as
+	// soon as the report is out; a very large set stops being tracked.
+	static void ReportOverlaps();
+	static inline std::vector<Ketchup_Write> Writes = {};
+	static inline std::vector<std::string> WriteSources = {};
+	static inline unsigned int WriteSource = 0;
+	static inline size_t WriteBytes = 0;
+	static inline bool WritesTruncated = false;
+	constexpr static size_t WriteByteLimit = 32u << 20;
 };

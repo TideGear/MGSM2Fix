@@ -445,32 +445,19 @@ def composite(isd):
     port"): build from the composite, and the emitted records then carry only
     the caption delta.
     """
-    base = bytearray(stage_bytes(isd, 'movie'))
-    lba = stage_lba(int_disc(), isd, 'movie')
-    lo, hi = lba * 2352, (lba + len(base) // 2048) * 2352
-    applied = {}
-    # Normally the deployed folder, because that is what the game will see. An
-    # isolated build has no deployed folder and must compose on the PPFs it just
-    # made instead, so `rebuild.py` points this at its own work directory.
-    d = _os.environ.get('INTEGRAL_ENGLISH_VR_PPF_DIR') or _os.path.join(GAME, 'mods/INTEGRAL/VR-DISK')
-    assert _os.path.isdir(d), 'no PPF directory to compose on: %s' % d
-    for name in sorted(_os.listdir(d)):
-        if not name.endswith('.ppf') or name == PPF_NAME or name == SAFE_NAME:
-            continue
-        n = 0
-        for off, data in portio.read_ppf(_os.path.join(d, name)):
-            if not (lo <= off < hi):
-                continue
-            sec, within = divmod(off - 24, 2352)
-            fo = (sec - lba) * 2048 + within
-            if fo < 0 or fo + len(data) > len(base):
-                continue
-            base[fo:fo + len(data)] = data
-            n += len(data)
-        if n:
-            applied[name] = n
-    print('composite base: %s' % (', '.join('%s %d bytes' % kv for kv in applied.items()) or 'retail only'))
-    return bytes(base)
+    handover = _os.path.join(WORK, 'vr_movie_base.bin')
+    # Refused, not degraded. This patch owns the whole `movie` stage, so
+    # building it on retail would quietly ship a stage with the clips' English
+    # descriptions reverted to Japanese - and it would look like a normal build.
+    assert _os.path.exists(handover), (
+        'missing %s.\n'
+        'vr_windows.py ports the `movie` stage and hands it here rather than\n'
+        'writing its own records for it, so that one patch owns the stage.\n'
+        'Run `py vr_windows.py --build` first.' % handover)
+    base = open(handover, 'rb').read()
+    assert len(base) == len(stage_bytes(isd, 'movie')), 'handover stage changed size'
+    print('composite base: %s (%d bytes) from vr_windows' % (handover, len(base)))
+    return base
 
 
 def build(pairing=PAIRING, expect_delta=EXPECT_DELTA, check_usa=True):
@@ -624,7 +611,13 @@ def emit(name, pairing, expect_delta, check_usa, note):
     # (Cleanest long-term fix: fold the captions into vr_windows.py so one patch
     # owns the stage. Not done blind - regenerating vr_en_missions would rewrite
     # 3.3 MB of verified output.)
-    recs = inplace_records(lba, base, stage, merge_gap=0)
+    # Against RETAIL, not against the composite. This patch is the `movie`
+    # stage's only owner (vr_windows.HANDOVER), so its records must carry every
+    # byte that differs from the disc - the mission-window port included. Built
+    # against the composite instead, the two patches would each write part of
+    # the stage and Ketchup's file-name order would decide the result.
+    recs = inplace_records(lba, stage_bytes(open(INT_STAGE, 'rb').read(), 'movie'),
+                           stage, merge_gap=0)
     write_ppf(_os.path.join(WORK, name), recs, DESC)
     print('%s: %d records, %d bytes  %s' % (name, len(recs), sum(len(d) for _, d in recs), note))
     return stage

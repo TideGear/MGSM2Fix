@@ -29,6 +29,7 @@ import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 import sys
 from audit_text import game_text
+import widths
 from vrlib import (INT_STAGE, USA_STAGE, int_disc, stage_lba, stage_bytes, stage_gcx, repack_stage,
                    parse_arg, emit_arg, inplace_records, write_ppf, deploy, be16, WORK, CMD_CHARA, Gcx)
 
@@ -84,6 +85,8 @@ def main():
                 new = rec(ubody, urecs[mapping[i]])
                 assert new != b'\0', 'USA record %d is empty' % mapping[i]
                 assert game_text(new[:-1])[0] and not game_text(new[:-1])[1], 'USA record %d is not plain English' % i
+                widths.check_ceiling([new[:-1]], '%s record %d' % (name, i),
+                                     widths.font(INT_STAGE))
                 replace[id(irecs[i])] = bytes((7, len(new))) + new
                 print('  %2d %-46s <- %s' % (i, readable(src)[:46], readable(new)))
             else:

@@ -142,22 +142,30 @@ void M2Config::Load()
     inipp::get_value(ini.sections["Game"], "EnglishText", bGameEnglishText);
     inipp::get_value(ini.sections["Game"], "UnlockBriefing", bGameUnlockBriefing);
     {
-        // Comma-separated item ids, MGS1's IT_* numbering (Camera is 12).
-        std::string list;
-        if (inipp::get_value(ini.sections["Game"], "GiveItems", list)) {
+        // Comma-separated ids: items are MGS1's IT_* numbering (Camera is 12),
+        // weapons its WP_* numbering, which is its own list of ten and not the
+        // order the menu shows.
+        auto ids = [](const std::string &list, const char *what, int limit,
+                      std::vector<int> &out) {
             std::stringstream ss(list);
             std::string tok;
             while (std::getline(ss, tok, ',')) {
                 try {
                     int id = std::stoi(tok);
-                    if (id >= 0 && id < 24) vGameGiveItems.push_back(id);
-                    else spdlog::warn("[Config] GiveItems: {} is not an item id (0..23), ignored.", id);
+                    if (id >= 0 && id < limit) out.push_back(id);
+                    else spdlog::warn("[Config] {}: {} is not an id (0..{}), ignored.", what, id, limit - 1);
                 } catch (...) {
                     if (!tok.empty() && tok.find_first_not_of(" \t") != std::string::npos)
-                        spdlog::warn("[Config] GiveItems: '{}' is not a number, ignored.", tok);
+                        spdlog::warn("[Config] {}: '{}' is not a number, ignored.", what, tok);
                 }
             }
-        }
+        };
+        std::string list;
+        if (inipp::get_value(ini.sections["Game"], "GiveItems", list))
+            ids(list, "GiveItems", 24, vGameGiveItems);
+        list.clear();
+        if (inipp::get_value(ini.sections["Game"], "GiveWeapons", list))
+            ids(list, "GiveWeapons", 10, vGameGiveWeapons);
     }
 
     inipp::get_value(ini.sections["Update Notifications"], "CheckForUpdates", bShouldCheckForUpdates);
@@ -229,6 +237,11 @@ void M2Config::Load()
     spdlog::info("[Config] bGameStageSelect: {} ({})", bGameStageSelect, sGameStageSelect);
     spdlog::info("[Config] bGameEnglishText: {}", bGameEnglishText);
     spdlog::info("[Config] bGameUnlockBriefing: {}", bGameUnlockBriefing);
+    if (!vGameGiveWeapons.empty()) {
+        std::string ids;
+        for (int id : vGameGiveWeapons) ids += (ids.empty() ? "" : ",") + std::to_string(id);
+        spdlog::info("[Config] vGameGiveWeapons: {}", ids);
+    }
     if (!vGameGiveItems.empty()) {
         std::string ids;
         for (int id : vGameGiveItems) ids += (ids.empty() ? "" : ",") + std::to_string(id);

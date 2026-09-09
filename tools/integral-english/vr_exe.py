@@ -94,7 +94,18 @@ def records_for(new, orig):
 
 
 def pack_pool(new, arena, strings_in_order):
-    """zero the arena, lay the strings out 4-aligned in the given order; -> addresses"""
+    """zero the arena, lay the strings out 4-aligned in the given order; -> addresses
+
+    No width check here, on purpose. `widths.check_ceiling` is applied to the
+    VR menus and the mission windows, where one stored string is one drawn
+    line. These pools are not like that: a description holds several lines with
+    an embedded separator, and while the English ones break on 0x807C ('|'),
+    RETAIL Integral's own Japanese entries in this very arena measure 540 px
+    unsplit - so they must break on something else that has not been
+    established. Asserting a ceiling here would fail on bytes the game ships
+    and works with, which makes it a wrong check rather than a strict one.
+    Establishing the Japanese break code is what would make this checkable.
+    """
     lo, hi = arena
     for a in range(fofs(lo), fofs(hi)):
         new[a] = 0

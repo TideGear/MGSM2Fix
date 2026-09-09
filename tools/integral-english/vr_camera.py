@@ -40,6 +40,7 @@ import struct, sys
 import portio
 from audit_text import game_text
 from vrlib import INT_STAGE, USA_STAGE, int_disc, stage_lba, stage_bytes, inplace_records, write_ppf, deploy, WORK
+import widths
 
 PPF_NAME = 'INTEGRAL_vr_en_camsave.ppf'
 DESC = 'MGS Integral VR-DISC: English photo album text'
@@ -115,6 +116,13 @@ def main():
         want[('prompts', i)] = I['prompts'][i][1]
     for i in range(N_PHOTO):
         want[('photo', i)] = U['photo'][i][1]
+
+    # These are single drawn lines, so the one width limit that always holds
+    # applies: kcb->max_width is a u8 read with lbu, and the renderer cannot
+    # measure past 255 px. The per-window budget is deliberately not asserted
+    # anywhere in this port - retail exceeds it - see widths.py.
+    widths.check_ceiling([s for s in want.values() if s],
+                         'camera pool', widths.font(INT_STAGE))
 
     new = bytearray(iov)
     for a in range(lo, hi):

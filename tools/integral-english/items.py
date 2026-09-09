@@ -23,6 +23,35 @@ N_ITEM, N_WEAP           = 26, 10            # the item table's last two entries
 ARENA_A = (0x0016AC, 0x001E74)               # item description pool
 ARENA_B = (0x001EE8, 0x002304)               # weapon description pool
 
+# The inventory's side column shows an ABBREVIATION, and those are a different
+# set of strings from the descriptions above - a block of NUL-terminated names
+# on an 8-byte stride, items 23 down to 0, already Latin on both discs. The port
+# leaves the whole block alone because it is already English and already
+# identical... except for one entry.
+#
+#   Integral  0x9BCC0  'SCARF\0\0\0'
+#   USA       0x9E448  'HANDKER\0'
+#
+# Integral's own Japanese for that item calls it ハンカチ - a handkerchief - and
+# its own description, which this patch replaces with USA's, says so in both
+# languages. So its short label disagreed with its own text while USA's agreed
+# with both. **Changed on the user's instruction, 2026-09-07** (NextSteps §5.9:
+# Integral's own English is outside the no-translation rule as written, so it is
+# asked for rather than assumed).
+#
+# It is USA's `HANDKER` that goes in, not the full word: the slot is 8 bytes, so
+# seven characters is the ceiling, and abbreviating "Handkerchief" any other way
+# would be inventing text rather than porting it. Seven is exactly what USA
+# ships, so the string lands in the existing slot and nothing moves.
+#
+# Two entries of that block are NOT in it: Cold Medicine and Diazepam are
+# 8 characters, one too many for a slot that must also hold a terminator, so
+# both games keep those two names elsewhere. And Integral's weapon block has one
+# name USA has no equivalent for at all, `MP 5 SD`.
+IN_SHORTNAME = 0x09BCC0                      # 8-byte slot, item 22's abbreviation
+US_SHORTNAME = 0x09E448
+SHORTNAME_LEN = 8
+
 # Code in menu/item.c and menu/weapon.c that edits the descriptions in place,
 # with byte offsets laid out for the Japanese strings (found 2026-09-05 from the
 # user's screenshots and Ketchup's audit lines):
@@ -139,6 +168,15 @@ def main():
         struct.pack_into('<I', new, fofs(a), 0)          # nop
     assert len(us_weaps[0]) < 0x70, 'USA SOCOM description reaches the suppressor offsets'
 
+    # item 22's side-column abbreviation: USA's, in Integral's own slot
+    was  = bytes(ino[IN_SHORTNAME:IN_SHORTNAME + SHORTNAME_LEN])
+    want = bytes(us[US_SHORTNAME:US_SHORTNAME + SHORTNAME_LEN])
+    assert was == b'SCARF\0\0\0', 'Integral short name is not SCARF: %r' % was
+    assert want == b'HANDKER\0', 'USA short name is not HANDKER: %r' % want
+    assert want.count(b'\0') >= 1 and want[-1] == 0, 'USA short name is not terminated in its slot'
+    new[IN_SHORTNAME:IN_SHORTNAME + SHORTNAME_LEN] = want
+    print('item 22 abbreviation: %r -> %r' % (was.rstrip(b'\0'), want.rstrip(b'\0')))
+
     open(os.path.join(WORK, 'int1_en.exe'), 'wb').write(new)
     print('arena A slack: %d bytes   arena B slack: %d bytes' % (slack_a, slack_b))
     print('HARD/EXTREME message relocated to %08X' % out_ram)
@@ -154,7 +192,8 @@ def main():
                (fofs(IN_ITEM_TAB), fofs(IN_ITEM_TAB) + 4 * N_ITEM),
                (fofs(IN_WEAP_TAB), fofs(IN_WEAP_TAB) + 4 * N_WEAP),
                (IN_OUTLIER_LUI, IN_OUTLIER_LUI + 4), (IN_OUTLIER_ADDIU, IN_OUTLIER_ADDIU + 4),
-               (fofs(IN_CARD_LEVEL_SB), fofs(IN_CARD_LEVEL_SB) + 4)]
+               (fofs(IN_CARD_LEVEL_SB), fofs(IN_CARD_LEVEL_SB) + 4),
+               (IN_SHORTNAME, IN_SHORTNAME + SHORTNAME_LEN)]
     regions += [(fofs(a), fofs(a) + 4) for a in IN_SOCOM_SB]
     regions.sort()
     for (a, b), (c, d) in zip(regions, regions[1:]):

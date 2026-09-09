@@ -244,29 +244,71 @@ void MGS1::SQOnUpdateGadgets()
         }
     }
 
-    // [Game] GiveItems: a test aid. GM_Items is linkvarbuf[37..60] and
-    // GM_ItemsMax linkvarbuf[61..84], shorts (include/linkvar.h: "0x4a Items",
-    // "0x7a Items max capacity"), and linkvarbuf sits 0x10 above the scene_name
-    // define - the same relation UnlockBriefing already relies on. Granted once
-    // per gameplay stage, only while one is running (names are sNNx / dNNx, read
-    // from the mirrored MGS1_LastStageName; the
-    // menus, title and the developer select are left alone), and only where the
-    // count is still zero, so a real inventory is never reduced. linkvarbuf is
-    // saved with the game, so a save made afterwards keeps the item.
-    if (!M2Config::vGameGiveItems.empty() && MGS1_GlobalsPTR != 0
+    // [Game] GiveItems: a test aid. GM_Items is linkvarbuf[37..60], shorts
+    // (include/linkvar.h "0x4a Items"), and linkvarbuf sits 0x10 above the
+    // scene_name define - the same relation UnlockBriefing already relies on.
+    // Granted once per gameplay stage, only while one is running (names are
+    // sNNx / dNNx, read from the mirrored MGS1_LastStageName; the menus, title
+    // and the developer select are left alone). linkvarbuf is saved with the
+    // game, so a save made afterwards keeps the item.
+    //
+    // AN ITEM YOU DO NOT HAVE IS -1, NOT 0. game/g_define.h has it in one line,
+    // `IT_None = -1`, and game/item.c tests `GM_Items[IT_Ketchup] == -1`. This
+    // first granted nothing for exactly that reason: it looked for a count of
+    // zero, every absent item read 0xFFFF, and the log dutifully reported
+    // "count 65535 -> 65535" twenty-four times while the inventory stayed
+    // empty. Owned-but-disabled is a separate state - disable_equipment() ORs
+    // IT_TYPE_DISABLED (0x8000) into the entry - and 0x8001 is deliberately
+    // left alone here, so a sequence that took an item away on purpose is not
+    // quietly undone.
+    //
+    // Nothing writes GM_ItemsMax any more. It was being set to 1 wherever it
+    // read 0, which helped nothing: for the three consumables the max the game
+    // actually consults is GM_Items[id + 11] (item.c add_item), not
+    // GM_ItemsMax[id], and for everything else add_item just assigns. Writing a
+    // slot whose meaning is not established is not a safe default.
+    if ((!M2Config::vGameGiveItems.empty() || !M2Config::vGameGiveWeapons.empty()) && MGS1_GlobalsPTR != 0
         && strlen(MGS1_LastStageName) == 4 && (MGS1_LastStageName[0] == 's' || MGS1_LastStageName[0] == 'd')
         && isdigit((unsigned char)MGS1_LastStageName[1]) && isdigit((unsigned char)MGS1_LastStageName[2])
         && strcmp(MGS1_GaveItemsIn, MGS1_LastStageName) != 0) {
         strcpy(MGS1_GaveItemsIn, MGS1_LastStageName);
         uintptr_t items = MGS1_GlobalsPTR + 0x10 + 0x4A;     // linkvarbuf + GM_Items
-        uintptr_t maxes = items + 24 * 2;                     // GM_ItemsMax
         for (int id : M2Config::vGameGiveItems) {
             SQInteger have = SQEmuTask<Squirk::Standard>::GetRamValue(16, items + id * 2) & 0xFFFF;
-            SQInteger max  = SQEmuTask<Squirk::Standard>::GetRamValue(16, maxes + id * 2) & 0xFFFF;
-            if (have == 0) SQEmuTask<Squirk::Standard>::SetRamValue(16, items + id * 2, 1);
-            if (max == 0)  SQEmuTask<Squirk::Standard>::SetRamValue(16, maxes + id * 2, 1);
-            spdlog::info("[MGS 1] GiveItems: item {} in stage \"{}\" - count {} -> {}, max {} -> {}.",
-                id, MGS1_LastStageName, have, have == 0 ? 1 : have, max, max == 0 ? 1 : max);
+            bool absent = (have == 0xFFFF || have == 0);
+            if (absent) SQEmuTask<Squirk::Standard>::SetRamValue(16, items + id * 2, 1);
+            spdlog::info("[MGS 1] GiveItems: item {} in stage \"{}\" - {} ({} -> {}).",
+                id, MGS1_LastStageName, absent ? "granted" : "already held, left alone",
+                have, absent ? 1 : have);
+        }
+
+        // [Game] GiveWeapons. A weapon is a different shape from an item: two
+        // arrays, GM_Weapons at linkvarbuf[17..26] holding the CURRENT AMMO and
+        // GM_WeaponsMax at [27..36] holding the capacity, ten of each. The
+        // menu's own ownership test is `GM_Weapons[i] >= 0` (menu/weapon.c), so
+        // -1 is "not carried" here exactly as it is for items.
+        //
+        // What to put in it is taken from the game rather than invented. Its
+        // own add_weapon (game/item.c) lifts a negative entry to 0 and then
+        // fills toward GM_WeaponsMax, so that is what happens here: a weapon
+        // Snake does not have is given its recorded full magazine, and where
+        // the capacity is not set it is granted empty rather than having a
+        // number made up for it. Nothing writes GM_WeaponsMax - no capacity
+        // table exists in the decompiled source to write a truthful one from.
+        uintptr_t weapons = MGS1_GlobalsPTR + 0x10 + 0x22;   // linkvarbuf + GM_Weapons
+        uintptr_t wmax    = MGS1_GlobalsPTR + 0x10 + 0x36;   // linkvarbuf + GM_WeaponsMax
+        for (int id : M2Config::vGameGiveWeapons) {
+            short ammo = (short)(SQEmuTask<Squirk::Standard>::GetRamValue(16, weapons + id * 2) & 0xFFFF);
+            short cap  = (short)(SQEmuTask<Squirk::Standard>::GetRamValue(16, wmax    + id * 2) & 0xFFFF);
+            if (ammo >= 0) {
+                spdlog::info("[MGS 1] GiveWeapons: weapon {} in stage \"{}\" - already carried,"
+                    " left alone (ammo {} of {}).", id, MGS1_LastStageName, ammo, cap);
+                continue;
+            }
+            short give = cap > 0 ? cap : 0;
+            SQEmuTask<Squirk::Standard>::SetRamValue(16, weapons + id * 2, give);
+            spdlog::info("[MGS 1] GiveWeapons: weapon {} in stage \"{}\" - granted with {} of {}"
+                " ammo ({} -> {}).", id, MGS1_LastStageName, give, cap, ammo, give);
         }
     }
 

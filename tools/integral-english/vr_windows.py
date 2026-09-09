@@ -38,6 +38,12 @@ from audit_text import game_text
 from vrlib import (INT_STAGE, USA_STAGE, int_disc, stage_lba, stage_bytes, stage_gcx, repack_stage,
                    parse_arg, emit_arg, windows_in, walk_commands, option_bytes, ENGLISH,
                    inplace_records, write_ppf, deploy, Bad, Gcx, WORK, fit_in_place)
+import widths
+
+# Integral's own advances, because Integral's font is what draws these windows.
+# Measured 2026-09-07: identical to Integral's main-game font for all 96 ASCII
+# glyphs, which is what lets the main game's on-screen measurements carry over.
+FONT = widths.font(INT_STAGE)
 
 PPF_NAME = 'INTEGRAL_vr_en_missions.ppf'
 DESC = 'MGS Integral VR-DISC: English mission text'
@@ -265,9 +271,33 @@ def rebuild_window(body, win, taken):
     return bytes((0x60,)) + struct.pack('>H', len(hdr) + 2) + hdr
 
 
-def substitute_numbers(records, inums, unums):
+def fit_to_usa(new, old, W):
+    """Never let a substituted line render wider than USA's own.
+
+    The column-keeping rule below pads or eats whole *spaces*, and a space is
+    not the width of the digit it stands in for - this font is proportional. On
+    one line that left the result 4 px wider than the line USA ships in the very
+    same window (`vr_sud09`, 193 px against 189). USA's width is the only budget
+    here that is known to be safe, because USA drew it and shipped it; the
+    engine's own budget cannot be the test, since retail Integral itself has 107
+    lines over that and works. So take a space back until the line is no wider
+    than its donor.
+    """
+    target = widths.width(old[:-1], W)
+    body = bytearray(new[:-1])
+    while widths.width(bytes(body), W) > target:
+        run = max(re.finditer(rb'  +', bytes(body)), key=lambda m: m.end() - m.start(),
+                  default=None)
+        if run is None:
+            break                       # nothing left to give; the assert reports it
+        del body[run.start()]
+    return bytes(body) + b'\0'
+
+
+def substitute_numbers(records, inums, unums, W=None):
     """USA's lines with Integral's numbers where the two differ (same count of
-    numbers; a right-aligned number keeps its column by eating or adding spaces)"""
+    numbers; a right-aligned number keeps its column by eating or adding spaces,
+    and `fit_to_usa` then keeps the pixel width no greater than USA's)"""
     out = []
     k = 0
     for i, r in enumerate(records):
@@ -291,7 +321,15 @@ def substitute_numbers(records, inums, unums):
             pieces.append(want)
             pos = m.end()
         pieces.append(t[pos:])
-        out.append(b''.join(pieces) + b'\0' if changed else r)
+        if not changed:
+            out.append(r)
+            continue
+        rec = b''.join(pieces) + b'\0'
+        if W is not None:
+            rec = fit_to_usa(rec, r, W)
+            assert widths.width(rec[:-1], W) <= widths.width(r[:-1], W), \
+                'substitution widened a line past USA\'s own: %r -> %r' % (r, rec)
+        out.append(rec)
     assert k == len(unums), (k, unums)
     return out
 
@@ -353,7 +391,7 @@ def port_stage(name, int_sd, pool, per_stage, usa_strings, usa_font):
                 rep['numdiff'].append((k, inums, unums, how))
                 if k is not None and len(inums) == len(unums) and not SUBSTITUTE_NUMBERS_OFF:
                     parts = split_taken(cbytes)
-                    recs = substitute_numbers(b_records(parts['b']), inums, unums)
+                    recs = substitute_numbers(b_records(parts['b']), inums, unums, FONT)
                     parts['b'] = b_option(recs)
                     cbytes = b''.join(parts[l] for l in TAKE)
                     rep['subst'].append((k, inums, unums))
@@ -373,6 +411,14 @@ def port_stage(name, int_sd, pool, per_stage, usa_strings, usa_font):
                 igcx.procs[igcx.proc(key)][1] = newbody
     if rep['ported'] == 0:
         return rep, None
+    # The budget no window can lift: kcb->max_width is a u8 read with lbu, so a
+    # line wider than 255 px cannot even be measured by the renderer. The
+    # per-window budget is deliberately NOT asserted here - retail Integral
+    # itself has 107 lines over it and works, so it is not the invariant it
+    # looks like (widths.py says why). What IS enforced is that the port never
+    # renders a line wider than USA does, which substitute_numbers guarantees.
+    rep['widest_px'] = widths.check_ceiling(
+        [r[:-1] for r in ported_records], name, FONT)
     # the script-local font. Integral's holds the Japanese descriptions' glyphs;
     # USA's the typographic quotes its English uses. Every remaining string decides:
     # Integral glyphs still referenced by strings that are not ported text keep
@@ -428,6 +474,17 @@ def port_stage(name, int_sd, pool, per_stage, usa_strings, usa_font):
 
 SUBSTITUTE_NUMBERS_OFF = False
 
+# The `movie` stage is ported here like any other - its clip descriptions are
+# mission windows - but its RECORDS are left to vr_movie.py, which also rewrites
+# the captions and the overlay in the same stage. Two patches writing one stage
+# with different layouts is decided by nothing better than Ketchup's file-name
+# order, and that is a silent dependency: rename a file, or leave the older
+# _movie_e3 fallback beside them, and the result changes with no error anywhere.
+# So this hands the ported stage over as a file and writes none of its bytes,
+# leaving vr_movie the stage's only owner. The two PPFs are then disjoint by
+# construction rather than by convention.
+HANDOVER = {'movie': 'vr_movie_base.bin'}
+
 
 def main():
     build = '--build' in sys.argv or '--deploy' in sys.argv
@@ -462,7 +519,12 @@ def main():
             if rep['sectors_after'] < rep['sectors_before']:
                 flag = '  (padded to the original count)'
             lba = stage_lba(disc, int_sd, name)
-            records += inplace_records(lba, result[0], fit_in_place(result[0], result[1]))
+            fitted = fit_in_place(result[0], result[1])
+            if name in HANDOVER:
+                open(_os.path.join(WORK, HANDOVER[name]), 'wb').write(fitted)
+                flag += '  -> %s (vr_movie owns this stage)' % HANDOVER[name]
+            else:
+                records += inplace_records(lba, result[0], fitted)
         numdiffs.extend((name,) + t for t in rep['numdiff'])
         substs.extend((name,) + t for t in rep['subst'])
         print('%-9s windows %3d ported %3d %-22s gcx %6d -> %6d font %-8s sectors %3d -> %3d%s' % (
