@@ -169,7 +169,22 @@ location names in the MISSION LOG now read USA's (`USA_LOCATION_NAMES` in
 88 sectors. The same command in `D:/mgsbuild/repro18` built 27 PPFs and every
 one matched the deployed set, both `en_abst` files byte-identical. ZIP SHA-256
 `0044ed814c81d18308e3969b5f342aa10ba4d3b17561881efc399300216eda3e`, 2,797,997
-bytes, 30 manifest entries. This is the deployed state.
+bytes, 30 manifest entries.
+
+**Clean runs 2026-09-08 (repro19 and repro20: the packaged README corrected).**
+No patch changed in either; `PACKAGE-README.txt` did, and it ships in the ZIP as
+`README.txt`, so the recorded hash had to be re-made to stay reproducible. It had
+said each main disc holds *nine* PPFs (it is ten since `en_pad2`), repeated that
+in its uninstall instructions, and still told the installer that
+`INTEGRAL_vr_en_movie.ppf` is built on top of `INTEGRAL_vr_en_missions.ppf`,
+which stopped being true when those two were given one stage each. `repro19`
+carried the first two fixes and `repro20` the uninstall line; both built 27 PPFs
+matching the deployed set, and **`repro20` is the reproducible one**. ZIP SHA-256
+`9dff48498d2be474685f490b12df77f301dc107b5a49e5790898639bb459bce3`,
+2,798,169 bytes, 30 manifest entries. This is the deployed state.
+
+The lesson is small and cost two runs: **the packaged README is an input to the
+artefact, not a note beside it.** Read it whole before rebuilding for a doc fix.
 
 `--variant raw` flips the two constants and adds `en_menu3`. Since 2026-09-07 it
 also does the two things a real disc needs, which the collection never did:
@@ -200,6 +215,8 @@ extents. `NextSteps.md` §5.4, §5.10 and §5.13.
 
 | run | date | what changed since the previous run | matched the deployed set | ZIP SHA-256 |
 |---|---|---|---|---|
+| `repro20` | 2026-09-08 | packaged README: the uninstall count too | 27 of 27 | `9dff48498d2be474685f490b12df77f301dc107b5a49e5790898639bb459bce3` |
+| `repro19` | 2026-09-08 | packaged README corrected (ten PPFs a disc; the split VR pair) | 27 of 27 | `c8df6f1e…556a` (superseded by repro20) |
 | `repro18` | 2026-09-08 | USA's four `abst` location names | 27 of 27 | `0044ed814c81d18308e3969b5f342aa10ba4d3b17561881efc399300216eda3e` |
 | `repro17` | 2026-09-08 | `en_pad2` added (`pad2.py`), ten families | 27 of 27 (20 main + 7 VR) | `3eb2e1058486fceb3f0aa866f3194bc7c07ed70987fc2eea439259d5e8e8a6fb` |
 | `repro8` | 2026-09-07 16:08 | VR disc folded in, VR executable built from the decomp, `--variant` switch | 25 of 25 (18 main + 7 VR) | `a13eefc08fa93b61adcb7c0524d57e6d7e913e0f313262e961c293d13bd5faef` |

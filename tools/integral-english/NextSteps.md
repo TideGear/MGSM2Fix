@@ -5,9 +5,11 @@ reproducible-build pass (§9), through 2026-09-05 as the MISSION LOG port,
 the item-text fixes and their on-screen checks landed (§10), on 2026-09-06
 when the **VR disc** was ported (§11), and through 2026-09-07, the day the VR
 disc was tested on screen and the three items that were still open all closed:
-the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12), and on
-2026-09-08 when the sweep's one uncovered finding became the `en_pad2`
-family (§5.11, §15). Written for whoever
+the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12), and through
+2026-09-08, when the housekeeping was cleared, the sweep's one uncovered
+finding became the `en_pad2` family, the three sweeps §5 had filed under "to
+investigate" were all run, and the four `abst` location names were decided
+(§5.11, §5.9, §5.14, §15). Written for whoever
 picks this up cold: a later session of the same assistant, a different model, or
 a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
@@ -36,7 +38,7 @@ authoritative**; if they disagree with a memory file, the memory file is stale.
 | working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, the four retail executables, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, `map_pristine.map` (the pristine exe's symbol map), ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `workdir.py` also exports `GAME` (`INTEGRAL_ENGLISH_GAME`, default the Steam folder) and `DECOMP` (`INTEGRAL_ENGLISH_DECOMP`, default `D:\mgsbuild\d`); the builders and `rebuild.py` take every path from it; a few standalone helpers still carry their own — `ppfcheck.py`'s `MODS`, `audit_text.py`'s argparse defaults, and the repo path that `jpsweep.py`, `kcplace.py`, `kcquads.py` and `kcrects.py` insert into `sys.path`. `py workdir.py` prints what it resolved |
 | VR working data | `work\vrint_stage.dir`, `work\vrus_stage.dir` (the two VR STAGE.DIRs), `work\vrint.exe` (rebuilt from the decomp, `build.py --variant vr_exe`, SHA-256 `c370f8e4…`), `work\vrus.exe` (real `SLUS-00957`), `work\INTEGRAL_vr_*.ppf` | `vrlib.py` finds the two VR ISOs inside the containers itself (`0x57592000` and `0xD39B7000`) and computes stage LBAs from STAGE.DIR |
 | retail executables | `work\int1.exe`, `int2.exe` (641,024 bytes each), `us1.exe`, `us2.exe` (651,264) — hashes in `BUILDING.md`; `rebuild.py` rejects any other | **the collection's ISO executable extents are zero-filled**, so extracting an exe from `alldata.bin`/`dlc_japan.bin` yields no code — the first clean-build attempt failed on exactly that. These four files are the only source of executable bytes |
-| reproducible build | `py rebuild.py --output <fresh dir> [--variant raw] [--compare-deployed]` (see `BUILDING.md`) | never installs anything. Builds **everything**: ten families × two main discs plus the VR disc's seven. Last artefact `D:/mgsbuild/repro18/Integral-English-collection.zip`, SHA-256 `0044ed81…da3e` (2026-09-08), **all 27 PPFs equal to the deployed set's effective bytes**. `--variant raw` builds the raw-disc variant instead (§5.4) |
+| reproducible build | `py rebuild.py --output <fresh dir> [--variant raw] [--compare-deployed]` (see `BUILDING.md`) | never installs anything. Builds **everything**: ten families × two main discs plus the VR disc's seven. Last artefact `D:/mgsbuild/repro20/Integral-English-collection.zip`, SHA-256 `9dff4849…bce3` (2026-09-08), **all 27 PPFs equal to the deployed set's effective bytes**. `--variant raw` builds the raw-disc variant instead (§5.4) |
 | game | `D:\Steam\SteamApps\common\MGS1` (Master Collection Vol. 1, Steam app **2131630**) | launch: `Start-Process steam://rungameid/2131630`; process name `METAL GEAR SOLID`; **kill by PID only, never `taskkill /IM`** |
 | Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2); the VR disc is `mods\INTEGRAL\VR-DISK\` and the USA VR disc `mods\VR-DISK_US\` | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually. Its `RootPath` adds a version folder only when a title has more than one version and a disk folder only when a version has more than one disk, which is why the two VR folders have no numbered subdirectory |
 | deployed ini | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.ini` is a **Vortex symlink**; edit the target: `%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-5-3-6-0-1774482213\MGSM2Fix.ini` | edit with Python or via `realpath`; `sed -i` on the link would replace the link with a file. The repo's `MGSM2Fix.ini` is the committed default, not what the game reads |
@@ -122,7 +124,7 @@ paraphrase them away.
 | `en_brf` | briefing labels, quads, row arithmetic | in game, 26 shot pairs, 0.00% right-column diff |
 | `en_savemsg` | memory-card captions in the executable | in game 2026-09-04: save + load; kept slots idx 1/9 Japanese by rule. Since 2026-09-05 the PPF owns every byte of the pool and tables, so the collection's six writes cannot survive at retail-equal bytes (the mechanism that broke the SOCOM line) |
 | `en_camsave` | the PHOTO ALBUM's own captions (`camera` overlay) | **fully verified 2026-09-04**: all 23 English on screen / by slot comparison; the six USA-blank slots stay Japanese (`ロード中です`, `ロードが完了しました`, `変更内容を上書き保存しますか？` are those) |
-| `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built 2026-09-05 and seen on screen the same day**: both pages of the Heliport and Comm Tower A logs, the controls and the slide (the one fault, stale-VRAM fragments during the slide, fixed at 13:05 and confirmed clean at 13:50). Statically, pages re-parse and equal USA's byte for byte and the PPF records rebuild the relocated 88-sector stage exactly on both discs. Stage in DUMMY3M slots 462..549. Not yet seen: a demo.gcx page (disc-2 saves) and a count-7 page |
+| `en_abst` | the MISSION LOG: all 122 pages in USA's two-screen model (7 lines a screen, page counter, ◄ ► EXIT, USA's input and slide), plus the disc-change abstract's eight strings — the fourth disc-swap copy | **built 2026-09-05 and seen on screen the same day**: both pages of the Heliport and Comm Tower A logs, the controls and the slide (the one fault, stale-VRAM fragments during the slide, fixed at 13:05 and confirmed clean at 13:50). Statically, pages re-parse and equal USA's byte for byte and the PPF records rebuild the relocated 88-sector stage exactly on both discs. Stage in DUMMY3M slots 462..549. **Since 2026-09-08 it also carries USA's four location-name spellings** (`USA_LOCATION_NAMES`, §5.9): +12 bytes, still 88 sectors, and the verifier re-parses the 31-record list and asserts it equals USA's record for record. Not yet seen: a demo.gcx page (disc-2 saves), a count-7 page, and the four location names |
 | `en_menu3` | the `title` disc-swap copy — the fourth and last | **built and verified 2026-09-07, RAW DISC ONLY, not deployed.** The collection patches the same block (`disc1_1822B55D_patch`, at the address of our record 0), and the two layouts do not mix: the title stage dies with a `GCL:WRONG CODE` run. Staged as `INTEGRAL_disc{1,2}_en_menu3_raw.ppf` for the raw variant; `menu3.py --deploy` refuses. §5.3 |
 | `en_pad2` | the controller-port subtitle `second.c` draws in the Psycho Mantis room, at all three of its call sites per disc | **built and deployed 2026-09-08**, 159 bytes a disc. Statically verified by effect: the archive keeps its length, both stages re-walk to the same command structure, every changed byte is inside the three slots, and each slot re-parses at length 55 with USA's English at the front. Disjoint from all nine other PPFs on each disc. **Never seen on screen** — it needs the Mantis room *and* a controller in port 2. §5.11 |
 | unlock PPFs | title-screen extras | **parked**, `unlocks_parked\`, not deployed |
@@ -150,15 +152,20 @@ and the EXIT box after its move — §5.5's list 1 and §5.4a.
 | `vr_unlock_movies` | the EXTRA movies unlocked (test aid) | **verified in game 2026-09-06: all three thumbnails appear.** One instruction in the `movie` overlay: its own `count / 3` score gate, separate from the mission one. Writes no progress; delete the PPF to relock |
 | `vr_unlock` | the **mission menu** unlocked (test aid) | **verified in game 2026-09-06: every mission unlocked.** Emulation predicted 46 → 361 of 373 items on Integral (45 → 357 on USA) and its three words were verified in place against the deployed PPF. It does **not** open the EXTRA movies — that is a separate retail gate, `???` in USA's VR disc too. Saving with it in place is safe (it writes no progress) and deleting the PPF relocks; the standing rule still holds — achievements off (`DisableRAM`/`DisableCDROM` true) while any unlock aid is deployed |
 
-`ppfcheck.py --deployed` is clean over all 29 deployed files. The nine VR PPFs
-are disjoint but for **one deliberate overlap**: `vr_en_movie` shares 686 of
-its 753 bytes with `vr_en_missions`, which already owns the `movie` stage, so it
-is built on top of it and must land last — Ketchup applies a folder in name
-order and `...missions` sorts before `...movie` (README "The composite
-trap"). For the same reason the superseded `vr_en_movie_e3` must **not** sit in
-the folder beside it: it sorts last of the two and would overwrite part of the
-full build. `vr_movie.py --deploy` moves it to `work/` with a `.was-deployed`
-suffix. `vr_sweep.py` rebuilds every stage as the
+`ppfcheck.py --deployed` is clean over all **27** deployed files (20 main, the
+ten families × two discs, and the VR disc's seven), and **every one of them is
+disjoint from every other** as of 2026-09-08.
+
+That last part is new, and it is what §5.10 item 1 bought. Until then
+`vr_en_movie` shared 686 of its 753 bytes with `vr_en_missions` and worked only
+because Ketchup applies a folder in name order and `...missions` sorts before
+`...movie` — a dependency nothing enforced and nothing would have reported. The
+two now own one stage each and share **0 bytes**; the split was proved equal in
+effect before it was kept, and `rebuild.py` refuses *any* VR overlap. The
+deployed pair was still the old one until 2026-09-08, when the VR seven were
+redeployed from `repro17` together. The superseded `vr_en_movie_e3` still must
+**not** sit in the folder — it writes the same stage — and `vr_movie.py
+--deploy` moves it to `work/` with a `.was-deployed` suffix. `vr_sweep.py` rebuilds every stage as the
 game will see it and finds **222 game-encoded records against 10 809 English**
 (USA's own disc: 940 against 10 344); 181 of the 222 are English with
 local-font glyphs, and the rest are exactly the list the README calls
@@ -172,7 +179,7 @@ exported at `7964de7` plus `decomp-overlay-changes.patch`, three overlays
 recompiled (byte-identical to the shipped ones) — and all 20 PPFs match the
 deployed set's effective changed bytes. **Since 2026-09-07 the VR disc's seven
 are in the same run** (its executable built from the decomp, not copied), so the
-last clean run, `repro18` (2026-09-08), reproduces **27 of 27** against what is deployed. So the deployed patches are
+last clean run, `repro20` (2026-09-08), reproduces **27 of 27** against what is deployed. So the deployed patches are
 no longer artefacts of a lost scratchpad: they can be regenerated. `BUILDING.md`
 has the inputs, hashes, command, outputs and the ZIP's hash. This is static
 equivalence, not a new gameplay test.
@@ -214,30 +221,35 @@ the 82 stage names both discs share, so the same string in the
 Integral-only `s07br` was invisible to it. That is recorded in
 `COVERAGE.md` now.
 
-**State of play, 2026-09-08.** Nine items in this section are now
-DONE and kept only for their reasoning: 5.1a (the six conditional descriptions,
-all seen), 5.3 (`en_menu3`, raw-disc only), 5.4 (the raw-disc build switch),
-5.4a (the MOVIE captions), 5.5's items 2 and 6, 5.9's `SCARF` -> `HANDKER`, and
-5.10 (the whole patch-side review) and, since 2026-09-08, 5.11. **Nothing with
-a USA counterpart is known to be Japanese any more, on any of the three
-discs.** What is left is of five kinds — and none of it is text to port:
+**State of play, end of 2026-09-08.** Most of this section is now DONE and kept
+only for its reasoning: 5.1a (the six conditional descriptions, all seen), 5.3
+(`en_menu3`, raw-disc only), 5.4 (the raw-disc build switch), 5.4a (the MOVIE
+captions), 5.5's items 2 and 6, 5.10 (the whole patch-side review), and — all on
+2026-09-08 — 5.8 (the census closed, 0 unaccounted), 5.11 (`en_pad2`), 5.14
+(swept; a fourth `abst` spelling found), and both of 5.9's decided cases,
+`SCARF` -> `HANDKER` and the four `abst` location names.
+
+**Nothing with a USA counterpart is known to be Japanese any more, on any of the
+three discs**, and every Japanese GCL string on the main discs is accounted for
+by name (5.8). What is left is of five kinds — and none of it is text to port:
 
 | kind | items |
 |---|---|
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
-| **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, and the new `en_pad2` subtitle (5.11) |
+| **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
 | **real engineering** | the raw variant's first boot on a real disc image (end of 5.4, and 5.13), 5.6 the upstream sync |
-| **to investigate** | ~~5.14~~ swept 2026-09-08 (a fourth `abst` spelling found; the VR disc needs deployed-bytes input, 5.14 step 3). What is left to investigate is what the `*r` stages **are**, and the two sweeps' remaining input gap |
-| **held open on purpose** | §6's four **[open 2026-09-07]** items, and 5.9. Raised, considered beside the `SCARF` case decided the same evening, and deliberately not decided — see the note at the head of §6 |
+| **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08. What is left: what the 13 Integral-only `*r` stages **are** (`s07br`'s overlay source is byte-identical to `s07b`'s, so it is the same code over different data); and **per-family verifiers where they are missing** — 5.14 step 3 revised the plan, and a deployed-stage reconstruction is explicitly NOT the answer |
+| **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
 | **loose ends** | 5.7's remaining untested runtime features, 5.5's items 4 and 5, and the `us1.exe` parity mismatch in 5.13 |
 
 ### 5.1 Still to be seen (needs the user; nothing to build)
 Everything built so far has been seen on screen except: a mission-log page from
 demo.gcx (a disc-2 save) and a count-7 page (USA's `1/2` with an empty second
 screen — reproduced on purpose, §5.9); the other weapon descriptions besides the
-SOCOM; the disc-swap screens, which only 5.2 can reach; and the controller-port
-subtitle of §5.11, which needs the Mantis room and a pad in port 2. If
-anything looks
+SOCOM; the disc-swap screens, which only 5.2 can reach; the controller-port
+subtitle of §5.11, which needs the Mantis room and a pad in port 2; and the four
+`abst` location names now reading USA's (§5.9), which show in the MISSION LOG's
+own location column and so come free with the 5.2 run. If anything looks
 wrong, bisect first: move the family's two PPFs out of the mods folders and
 confirm the retail text comes back. No debug shortcut exists for any of it —
 the collection's launcher waits for a game to be chosen before anything loads
@@ -1172,8 +1184,10 @@ own English is not wrong, it is just not USA's.
 
 ## 6. Decisions that are the user's — ask, do not assume
 
-**Four of these were put to the user on 2026-09-07 and DELIBERATELY LEFT OPEN.**
-They are marked **[open 2026-09-07]** below. That is a decision in itself, not an
+**Four of these were put to the user on 2026-09-07 and deliberately left open;
+one of the four - the `abst` location names - was then decided on 2026-09-08,
+so THREE remain.** The three are marked **[open 2026-09-07]** below. Being held
+is a decision in itself, not an
 oversight: they were raised, considered alongside the `SCARF` case that was
 decided the same evening, and held. Do not re-raise them as though they were
 newly noticed, and do not read the passage of time as consent - each still needs
@@ -1312,6 +1326,8 @@ everything", "Unlock every VR mission", "Unlocking the EXTRA movies",
 captions", "The white caption font differs between the two VR discs",
 "Sweep: is any VR text still Japanese?" · tests → "Not tested" (struck-through items are
 done, with dates) · decomp → "Audit against the decomp" ·
+text found late → "The controller-port subtitle (`en_pad2`, 2026-09-08)",
+"The `abst` location names (Integral's own English -> USA's, 2026-09-08)" ·
 the collection's own patches → "Where the collection's own disc patches land",
 "What the collection's named-file patches say" (what they contain, read
 2026-09-07) · raw disc → "Raw-disc error correction, and what it proved on the
