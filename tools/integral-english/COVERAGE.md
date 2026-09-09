@@ -123,10 +123,107 @@ What it still does not cover is texture lettering, executable UI beyond the
 probes below, and runtime language branches.
 
 
+## The file-level blind spot, and what it hid (2026-09-09)
+
+**Every sweep in this project until 2026-09-09 read exactly one file: `STAGE.DIR`**
+(plus the four executables). Nothing had ever looked inside the other seven
+files on a disc. The figures above - "153 Japanese strings a disc" and the rest -
+are therefore true *of the stage archives* and were presented as though they were
+true of the disc. They are not.
+
+The prompt was a question from the user about an Integral-exclusive Japanese
+developer-commentary codec channel. There is one, it is enormous, and no tool
+here could see it.
+
+### Every file on a disc, and whether anything had read it
+
+Integral disc 1 against USA disc 1, whole-file scans (not samples):
+
+| file | Integral d1 | delta vs USA | Japanese found | swept before today |
+|---|---:|---:|---|---|
+| `/MGS/DEMO.DAT` | 258,744,320 | +141,312 | ~1.8 KB, real text | no |
+| `/MGS/VOX.DAT` | 196,173,824 | +159,744 | ~1.0 KB, real text | no |
+| `/MGS/STAGE.DIR` | 75,132,928 | +3,239,936 | 153 strings deployed | **yes - the only one** |
+| `/MGS/ZMOVIE.STR` | 47,517,696 | +10,240 | none | no (FMV stream) |
+| `/DUMMY3M.DAT` | 27,648,001 | 0 | none | as relocation scratch only |
+| `/MGS/RADIO.DAT` | 11,198,464 | **+9,421,613** | **megabytes** | **no** |
+| `/MGS/BRF.DAT` | 5,724,160 | −73,728 | none | no - now verified clean |
+| `/MGS/FACE.DAT` | 3,508,224 | 0 | none | no - byte-identical stats |
+| `SLPM_862.47` | 641,024 | — | 5 strings | yes |
+
+`BRF.DAT` and `FACE.DAT` are the reassuring rows: 380,941 bytes of English text
+in Integral's `BRF.DAT` against USA's 382,771, and `FACE.DAT` identical on both
+counts, so the briefing data and the codec portraits carry nothing Japanese.
+That was assumed before and is measured now.
+
+### `RADIO.DAT`: the codec, and the commentary
+
+Codec dialogue is not in `STAGE.DIR` at all. `menu/radiomes.c` loads it from
+`RADIO.DAT` by sector, with a fragment size packed into the radio code, so no
+GCL sweep could ever have reached it.
+
+**Integral's `RADIO.DAT` is 6.3x the size of USA's** - 11,198,464 bytes against
+1,776,851 - and it splits cleanly in two:
+
+| region | bytes | content |
+|---|---:|---|
+| `0x0000000`–`0x042C54C` | 4,375,884 | the story codec, **English and Japanese together** |
+| `0x042C54C`–`0x0AAC050` | **6,814,468** | **Japanese only - no English dialogue line anywhere in 6.5 MB** |
+
+The English half is USA's script, complete and essentially unchanged: 35,273
+dialogue lines / 1,145,926 bytes in Integral against USA's 35,193 / 1,143,269.
+**So Integral's codec is already in English** - it is the runtime language
+setting that chooses, which is exactly what `[Game] EnglishText` exists to hold
+(README, "Unlocks"; the collection's language race). Nothing there needs porting.
+
+The Japanese-only half is the developer commentary. It was read by rendering it
+with the game's own font (`rendertext.py`), because none of it is Shift-JIS:
+
+* 「ニンジャにつづきスネークも　装衣えを用意すること」
+* 「、デモはゲーム中とは別モデルでやる予定だったので」 - the cutscenes were
+  planned to use a different model from the in-game one
+* 「さらにこのインテグラル　では」 - *furthermore, in this Integral…*
+* 「られたメモリをどうやりくりするか」 - juggling the memory they were given;
+  this exact 32-byte run occurs **328 times**, so conversations share boilerplate
+
+95.1% of that region's 2 KB blocks are distinct, so it is real content and not a
+repeated pattern. `d0 03`, a Japanese text control code, appears **64,087** times
+in Integral's file against **4** in USA's.
+
+### The two small pockets
+
+Both are Integral-only and both are real text, rendered to confirm it:
+
+* **`DEMO.DAT`**, ~1.8 KB across 258 MB, 0 in USA's: 「そしてテロリストの」 -
+  story narration.
+* **`VOX.DAT`**, ~1.0 KB across 196 MB, 0 in USA's: 「エンジンやプロペラのノイズ」
+  - sound-design commentary, sitting beside the audio it describes.
+
+### What this does and does not mean for the port
+
+It is **not** a porting gap. The commentary, the Japanese codec track and both
+small pockets are Integral-exclusive: USA never shipped any of it, so there is no
+English to copy and the standing rule (port English where English exists, never
+invent) leaves every byte of it alone. The port's scope - menus, screens and the
+executable's own strings - is unchanged.
+
+What it changes is what this document may claim. The honest statement is:
+
+> Of the text this port covers, nothing with a USA counterpart is still
+> Japanese. Of the text on the disc, several megabytes are Japanese, almost all
+> of it Integral-exclusive commentary that has no English source and would be
+> **translation** rather than porting.
+
+That second sentence had never been written down, and the first had been
+standing in for it.
+
 ## What Japanese is still there, and why (measured 2026-09-08)
 
 Every figure above is about what the port *covers*. This is the complement: what
-a player still meets on the deployed discs. `py jpremain.py` produces it, and it
+a player still meets on the deployed discs - **in the stage archives.** It does
+not cover `RADIO.DAT`, `DEMO.DAT` or `VOX.DAT`; the section above this one is
+where those are counted, and `RADIO.DAT` alone holds more Japanese than every
+figure in this section put together. `py jpremain.py` produces it, and it
 is the only tool here that reads **deployed** bytes rather than retail - retail
 sectors with every deployed PPF overlaid, and the STAGE.DIR entry followed for
 the four families that relocate their stage into DUMMY3M (`en_abst`, `en_brf`,
