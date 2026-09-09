@@ -75,13 +75,37 @@ its Japanese (README, "Amendment, 2026-09-07"). The rest of the block already
 matched. Integral's weapon names carry one entry USA does not have at all,
 `MP 5 SD`.
 
-**A blind spot this file shares with every sweep in the project.** All of them -
-`mainsweep.py`, `vr_sweep.py`, `jpsweep.py`, `audit_text.py` - look for
-*Japanese*. A string that is already English on both discs and simply **says
-something different** passes all of them unremarked. Two such cases are known,
-`SCARF` against USA's `HANDKER` and the `abst` location spellings, and **both
-were found by accident rather than by looking**. `NextSteps.md` §5.14 sketches
-the sweep that would find the rest; until it is run, no claim here covers them.
+**The blind spot this file used to share with every sweep - now swept, on the
+main discs.** All of them - `mainsweep.py`, `vr_sweep.py`, `jpsweep.py`,
+`audit_text.py` - look for *Japanese*, so a string that is already English on
+both discs and simply **says something different** passed all of them
+unremarked. `mainsweep.py --diff-english` asks that question directly
+(2026-09-08): 15 replace hunks over disc 1's 82 shared stages, 8 with
+player-readable text, and one residue after triage - the `abst` location names,
+where **four** pairs differ and not the three the documents listed. The new one
+is `Cmnd rm` against USA's `Cmnd room`. Disc 2 is identical.
+
+| Integral | USA |
+|---|---|
+| `Tank Hanger` | `Tank Hangar` |
+| `Medi rm` | `Medi room` |
+| `Cmnder rm` | `Cmnder room` |
+| `Cmnd rm` | `Cmnd room` |
+
+All four are live on the deployed disc - `abst_build.py` rewrites only the
+`0x9906` pages and the disc-change block, so the location list is copied through
+as Integral wrote it. Whether to change them is the user's call and is still
+open (`NextSteps.md` §6). `SCARF` against `HANDKER` was the same shape in the
+executable and was decided on 2026-09-07.
+
+**The VR disc has not been swept this way, and one input has to change first.**
+USA's VR disc carries five languages, so the diff must take only the English arm
+of a language branch. With that done, a per-owner fuzzy match reports `FAMAS`
+against USA's `FA-MAS` in the mission titles - and that is a **non-finding**,
+because the deployed `vr_en_missions.ppf` holds 142 `FA-MAS` and no `FAMAS`: the
+port already writes USA's spelling. The English-against-English question must
+therefore be asked of the **deployed** bytes, the opposite of the discipline the
+Japanese question needs, or a sweep rediscovers the port's own work.
 
 **So the claim this file can now make** is that on the main discs, every string
 whose owning command has English on the USA release is either already ported or
@@ -108,6 +132,14 @@ It writes only the requested report. Run it again after changing deployed PPFs.
 | Main disc 1 | 95 | 96 | 0 |
 | Main disc 2 | 95 | 96 | 0 |
 | VR | 105 | 105 | 0 |
+
+**The Integral-only stages are swept now too** (`mainsweep.py --integral-only`,
+2026-09-08). Each of the 13 pairs onto the USA stage it is a variant of - the
+base name without the trailing `r`, or `init` for `init_ve` - and across all 13,
+on both discs, there is **exactly one** Japanese string whose base-stage owner
+has English on the USA disc: the `s07br` copy of the controller-port line, which
+`en_pad2` ports. So the hole this tool's shared-name universe left is measured
+and closed rather than merely known.
 
 Each main disc has 82 shared stage names and 13 Integral-only names:
 `d18ar`, `endingr`, `init_ve`, `s03ar`, `s03dr`, `s03er`, `s07br`, `s07cr`,

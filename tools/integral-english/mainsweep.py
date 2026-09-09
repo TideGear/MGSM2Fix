@@ -48,7 +48,9 @@ layout (that assertion is right for the VR disc and is what lets a rebuilt
 script grow there).
 """
 import argparse
+import difflib
 import os as _os
+import re
 import sys as _sys
 from collections import defaultdict
 
@@ -143,15 +145,223 @@ def blank():
     return defaultdict(lambda: {'jp': 0, 'en': 0, 'odd': 0, 'stages': set()})
 
 
+ASSET_ID = re.compile(r'^(vc|vr|d|s)[0-9a-z_]*[0-9]$', re.I)
+
+
+def base_stage(name, usa_names):
+    """the USA stage an Integral-only stage is a variant of.
+
+    Every one of the 13 Integral-only names is a base name plus a trailing `r`
+    except `init_ve`, which is `init` plus a suffix. Without this pairing the
+    Integral-only stages are invisible to this tool, because its universe is
+    the names the two discs share - which is how the third copy of the
+    controller-port string in `s07br` went unnoticed until 2026-09-08.
+    """
+    for candidate in (name[:-1], name.split('_')[0]):
+        if candidate != name and candidate in usa_names:
+            return candidate
+    return None
+
+
+def integral_only(isd, usd, samples=False):
+    """The Japanese-where-USA-has-English question, asked of the stages this
+    sweep's own pairing cannot reach."""
+    ints, usas = set(portio.entries(isd)), set(portio.entries(usd))
+    names = sorted(ints - usas)
+    print('%d Integral-only stage(s); each compared against the USA stage it '
+          'is a variant of\n' % len(names))
+    print('%-9s %-7s %s' % ('stage', 'base', 'owners with Japanese where the base has English'))
+    total, unpaired = 0, []
+    for name in names:
+        base = base_stage(name, usas)
+        if base is None:
+            unpaired.append(name)
+            print('%-9s %-7s (no base stage found - not compared)' % (name, '?'))
+            continue
+        I, U = blank(), blank()
+        tally(_stage_bytes(isd, name), I, name)
+        tally(_stage_bytes(usd, base), U, base)
+        hits = []
+        for who in sorted(set(I) | set(U)):
+            i, u = I[who], U[who]
+            if i['jp'] and u['en']:
+                covered = PORTED.get(name)
+                hits.append('%s %djp/%den vs %djp/%den%s'
+                            % (who, i['jp'], i['en'], u['jp'], u['en'],
+                               '  [covered by %s]' % covered if covered else
+                               '  <-- NOT covered by any patch family'))
+                total += i['jp']
+                if samples and i.get('sample'):
+                    hits.append('e.g. ' + i['sample'][:60])
+        print('%-9s %-7s %s' % (name, base, '; '.join(hits) if hits else '-'))
+    print('\nJapanese strings in Integral-only stages whose base-stage owner has'
+          ' English on the USA disc: %d' % total)
+    if unpaired:
+        print('NOT compared (no base stage): %s' % ', '.join(unpaired))
+    return total
+
+
+def _ui_text(text):
+    """text a player could read, as opposed to an asset id the script names"""
+    if ASSET_ID.match(text):
+        return False
+    return bool(re.search('[A-Za-z]', text)) and (
+        ' ' in text or len(text) > 12 or text.endswith('.'))
+
+
+def english_strings(stage_data):
+    """(owner, text) for every plain-English string, in script walk order"""
+    out = []
+    for gcx in scripts(stage_data):
+        for who, raw in strings(gcx):
+            text, japanese = game_text(raw[:-1])
+            if text is not None and not japanese and text.strip():
+                out.append((who, text))
+    return out
+
+
+def diff_english(isd, usd):
+    """Where both discs are already English and merely SAY something different.
+
+    Every other sweep in this project hunts Japanese, so a string that is
+    English on both discs and worded differently passes all of them unremarked
+    - the blind spot `NextSteps.md` 5.14 records, and the shape of both cases
+    that were found by accident (`SCARF` against `HANDKER`, and the `abst`
+    location spellings). A positional diff is meaningless because the two
+    builds lay their data out differently, but both known cases sit in a
+    SEQUENCE whose neighbours match, which is what a diff is for: equal runs
+    align themselves and a `replace` hunk with matching context either side is
+    exactly the shape being looked for.
+
+    Expect noise and know its shape: voice-clip and stage ids (`vc319010`,
+    `vr01`), and any hunk where one side's counterpart is Japanese and so never
+    entered an English list at all. The useful output is the residue - the same
+    UI element, worded differently.
+    """
+    names = sorted(set(portio.entries(isd)) & set(portio.entries(usd)))
+    print('%d stage(s) present on both discs\n' % len(names))
+    hunks = readable = 0
+    for name in names:
+        a = english_strings(_stage_bytes(isd, name))
+        b = english_strings(_stage_bytes(usd, name))
+        at, bt = [t for _, t in a], [t for _, t in b]
+        matcher = difflib.SequenceMatcher(a=at, b=bt, autojunk=False)
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag != 'replace':
+                continue
+            hunks += 1
+            interesting = [t for t in at[i1:i2] + bt[j1:j2] if _ui_text(t)]
+            owner = a[i1][0] if i1 < len(a) else (b[j1][0] if j1 < len(b) else '?')
+            print('%-8s %-9s replace %2d<->%-3d owner %s'
+                  % (name, 'UI-TEXT' if interesting else 'asset ids',
+                     i2 - i1, j2 - j1, owner))
+            if not interesting:
+                continue
+            readable += 1
+            for text in at[i1:i2][:24]:
+                print('     INT: %r' % text[:78])
+            for text in bt[j1:j2][:24]:
+                print('     USA: %r' % text[:78])
+            if max(i2 - i1, j2 - j1) > 24:
+                print('     ... hunk truncated')
+    print('\n%d replace hunk(s); %d hold player-readable text. A one-against-one'
+          ' hunk of\nreadable text is the case worth deciding; everything else'
+          ' is context.' % (hunks, readable))
+    return hunks
+
+
+def census(isd, usd):
+    """Account for EVERY Japanese GCL string, not just the flagged ones.
+
+    `audit_text.py` inventories candidates by framing and cannot say whether a
+    candidate has an English counterpart, which is what left about 160 of disc
+    1's unclassified in `COVERAGE.md`. This asks a question that has a complete
+    answer instead: for each Japanese string Integral has, what is at the same
+    owner on the USA disc? Every string lands in exactly one bucket and the
+    buckets sum to the total, so a residue cannot hide in the framing.
+
+    The Integral-only stages are folded in through `base_stage`, so this covers
+    every stage on the disc rather than the shared names alone.
+    """
+    ints, usas = set(portio.entries(isd)), set(portio.entries(usd))
+    I, U = blank(), blank()
+    for name in sorted(ints & usas):
+        tally(_stage_bytes(isd, name), I, name)
+        tally(_stage_bytes(usd, name), U, name)
+    for name in sorted(ints - usas):
+        base = base_stage(name, usas)
+        tally(_stage_bytes(isd, name), I, name)
+        if base:
+            tally(_stage_bytes(usd, base), U, base)
+
+    owned = usa_jp = absent = open_ = 0
+    open_owners = []
+    for who, i in I.items():
+        if not i['jp']:
+            continue
+        u = U[who] if who in U else None
+        if u is None or not (u['jp'] or u['en']):
+            absent += i['jp']
+        elif not u['en']:
+            usa_jp += i['jp']
+        elif all(s in PORTED for s in i['stages']):
+            owned += i['jp']
+        elif u['jp'] >= i['jp'] * 0.8:
+            usa_jp += i['jp']
+        else:
+            open_ += i['jp']
+            open_owners.append('%s (%s)' % (who, ', '.join(sorted(i['stages'])[:4])))
+    total = sum(v['jp'] for v in I.values())
+    print('%d Japanese GCL string(s) in Integral, every one accounted for:' % total)
+    print('   inside a stage a patch family owns ............ %4d' % owned)
+    print('   USA is Japanese there too (never translated) .. %4d' % usa_jp)
+    print('   the owner does not exist on the USA disc ...... %4d' % absent)
+    print('   UNACCOUNTED - a porting target ................ %4d' % open_)
+    for line in open_owners:
+        print('      %s' % line)
+    assert owned + usa_jp + absent + open_ == total, 'buckets must sum to the total'
+    print()
+    print('The first bucket is "accounted for there", not "ported": it includes the'
+          ' strings')
+    print('kept Japanese by rule (the READ MISSION LOG? caption, preope\'s unread'
+          ' recap')
+    print('bytes) as well as the ported ones. The last bucket is the one that must'
+          ' be 0.')
+    return open_
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--disc', type=int, choices=(1, 2), default=1)
     parser.add_argument('--samples', action='store_true')
+    parser.add_argument('--integral-only', action='store_true',
+                        help="the 13 Integral-only stages, against the USA stage each"
+                             " is a variant of - outside the shared-name universe")
+    parser.add_argument('--diff-english', action='store_true',
+                        help='where both discs are English and merely say something'
+                             ' different (5.14 step 2)')
+    parser.add_argument('--census', action='store_true',
+                        help='account for every Japanese GCL string; the last'
+                             ' bucket must be 0 (5.8)')
     args = parser.parse_args()
 
     isd = open('%s/int%d_stage.dir' % (WORK, args.disc), 'rb').read()
     usd = open('%s/usa%d_stage.dir' % (WORK, args.disc), 'rb').read()
+    if args.integral_only:
+        print('disc %d, Integral-only stages' % args.disc)
+        print()
+        integral_only(isd, usd, args.samples)
+        return 0
+    if args.diff_english:
+        print('disc %d, English against English' % args.disc)
+        print()
+        diff_english(isd, usd)
+        return 0
+    if args.census:
+        print('disc %d, the census' % args.disc)
+        print()
+        return 1 if census(isd, usd) else 0
     names = sorted(set(portio.entries(isd)) & set(portio.entries(usd)))
     print('disc %d: %d stage(s) present on both discs\n' % (args.disc, len(names)))
 
