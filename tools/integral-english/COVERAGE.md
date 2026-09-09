@@ -298,6 +298,77 @@ Texture lettering - Japanese drawn as art rather than stored as text - is
 outside every tool here. The VR camera's EXORCISE textures are the known case
 and are deferred; nothing else has been inventoried.
 
+## The list itself: `jplist.py` (2026-09-09)
+
+The two sections above describe what is left and where; neither was a *list*.
+`py jplist.py` writes one - every untranslated Japanese string on all three
+discs, one per line, to `work/japanese-inventory.tsv`:
+
+    disc  source                      offset      bytes glyphs kana_kanji  text
+    disc1 STAGE.DIR/abst/chara 566F   0x0            48     24         10  #{<9090><90CC>...
+    disc1 RADIO.DAT                   0x90287F      152     76         70  <8113><812E>...
+
+**190,180 strings, 3,318,254 kana/kanji glyph slots**, in a 32 MB file. It is
+regenerated rather than committed - the repository keeps the counts, the method
+and the tool.
+
+| disc | source | strings | kana/kanji |
+|---|---|---:|---:|
+| disc 1 | `RADIO.DAT` | 94,246 | 1,652,457 |
+| disc 1 | `DEMO.DAT` | 576 | 4,612 |
+| disc 1 | `VOX.DAT` | 338 | 2,674 |
+| disc 1 | `STAGE.DIR` | 98 | 764 |
+| disc 2 | `RADIO.DAT` | 94,246 | 1,652,457 |
+| disc 2 | `DEMO.DAT` | 318 | 2,538 |
+| disc 2 | `VOX.DAT` | 229 | 1,798 |
+| disc 2 | `STAGE.DIR` | 98 | 764 |
+| VR | `STAGE.DIR` | 31 | 190 |
+| | **total** | **190,180** | **3,318,254** |
+
+`BRF.DAT` and `FACE.DAT` appear nowhere, and that is a result rather than an
+omission - see below.
+
+### What makes it a list of *Japanese* and not of bytes
+
+Three tests, each of which was forced by a wrong answer earlier in this project:
+
+1. **A run needs kana or kanji, not just high bytes.** `CORE` is the `0x81`,
+   `0x82` and `0x96` banks; `0x80`, `0x90`, `0x9A`, `0xC1`, `0xC2` and `0xD0`
+   are allowed *inside* a run without counting toward its length, because Latin
+   letters, punctuation, button glyphs and text control codes all appear inside
+   Japanese strings. That is what keeps the MP5 SD description (Latin name,
+   Japanese body) in the list and pure-Latin `Tank Hanger` out of it.
+2. **Repeated glyphs are not prose.** `BRF.DAT` matched 56 runs, every one a
+   single code repeated - `<8283><8283><8283>…`. A run needs four distinct
+   glyphs and no glyph taking more than half of it.
+3. **Anything the USA disc also has is dropped.** This is the test that does the
+   real work: it removed all 56 of `BRF.DAT`'s runs and all of `FACE.DAT`'s,
+   because they are image data present on both releases. It would equally remove
+   text USA left Japanese - a different category from Integral-exclusive
+   content, and one the stage-archive sections above track separately.
+
+### Where it disagrees with `jpremain.py`, and which to believe
+
+`jplist.py` lists 98 stage-archive strings a disc where `jpremain.py` reports
+153. The difference is `0x9Axx`: it holds real glyphs, but it is also where
+Integral keeps its typographic quotes, so counting it would classify
+`<9A0E>Tokyo Game Show, Spring '98<9A0F>` as Japanese. `jplist.py` therefore
+excludes it and loses strings built only from that bank, such as the `cmd 4AD9`
+location titles.
+
+**For the stage archives, `jpremain.py` is the authority** - it works on complete
+parsed records and weighs glyphs against Latin letters, which is the better test
+where there is no binary to guard against. `jplist.py` earns its place on the
+raw files, which nothing else reads at all.
+
+### What the list is for
+
+Not porting. Every string in it is Integral-exclusive, so there is no USA English
+to copy and the standing rule leaves all of it alone. The list exists because
+"how much untranslated Japanese is on this disc, and where exactly" had no answer
+here until now, and because anyone who ever wants that commentary in English
+needs a starting point - which is a translation project, not this one.
+
 ## Reproduce the inventory
 
 ```powershell
