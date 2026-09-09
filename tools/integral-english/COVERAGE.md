@@ -122,6 +122,85 @@ names the two discs share (see the limit noted above).
 What it still does not cover is texture lettering, executable UI beyond the
 probes below, and runtime language branches.
 
+
+## What Japanese is still there, and why (measured 2026-09-08)
+
+Every figure above is about what the port *covers*. This is the complement: what
+a player still meets on the deployed discs. `py jpremain.py` produces it, and it
+is the only tool here that reads **deployed** bytes rather than retail - retail
+sectors with every deployed PPF overlaid, and the STAGE.DIR entry followed for
+the four families that relocate their stage into DUMMY3M (`en_abst`, `en_brf`,
+`en_option`, `en_preope`). Reading the retail LBA would return the unpatched
+stage and quietly overstate what is left.
+
+**Totals, stage scripts:**
+
+| | plain English | mixed | **Japanese** |
+|---|---:|---:|---:|
+| disc 1 | 3,282 | 4 | **153** |
+| disc 2 | 3,282 | 4 | **153** |
+| VR disc | 10,809 | 183 | **38** |
+| all three | 24,373 | 191 | **344** |
+
+`mixed` means letters and glyph codes together, and it is a bucket rather than a
+verdict because both cases occur: `<9A0E>Tokyo Game Show, Spring '98<9A0F>` is
+English in Integral's own typographic quotes (most of the VR disc's 183), while
+`<9009>...<900B>NORMAL<9...>` is Japanese with an English word inside it.
+
+### Disc 1 and disc 2 (identical), 153 each
+
+| owner | stage | n | what it is | why it stays |
+|---|---|---:|---|---|
+| `chara 53C7` | `abst` | 31 | Integral's **Japanese** location list in `demo.gcx` | Integral-only; its English list is the one the port now gives USA's spellings |
+| `chara D44E` | `rank` | 30 | the ranking screen's commentary | Integral-only feature; no USA counterpart (§5.9) |
+| `chara D3C0` | `rank` | 16 | more of the same | as above |
+| `chara 04F2` | `rank` | 2 | as above | as above |
+| `chara CF79` | `title` | 22 | title-stage text, including the disc-swap block | `en_menu3` ports the swap strings but is **raw-disc only** - the collection patches those same bytes (§5.3) |
+| `chara D44E` | `title` | 21 | the **1P MODE** pages | Integral-only; 21 Japanese pages before the mode starts |
+| `chara B757` | `roll` | 12 | the staff roll | credits, Integral's own |
+| `cmd 4AD9` | 12 gameplay stages | 12 | location titles, one per stage | **Japanese on the USA disc too** - USA never translated them |
+| `cmd EC9D` | `ending`, `endingr`, `s12a` | 4 | debug/ending strings | Japanese on the USA disc too |
+| `chara 566F` | `abst` | 2 | the caption under READ MISSION LOG? | kept by rule - USA draws nothing there; `KEEP_PROMPT_CAPTION` (§5.9, still open) |
+| `chara 81C7` | `camera` | 1 | a PHOTO ALBUM prompt | USA leaves the slot empty |
+
+Nothing in that table has a USA English counterpart that the port is refusing to
+use. The two categories that could ever change are the `title` rows, which need
+the raw-disc variant, and the `abst` caption, which is an open question.
+
+### VR disc, 38
+
+| owner | stage | n | what it is |
+|---|---|---:|---|
+| `chara 976C` | `option` | 22 | Integral-only option rows; USA's seven help lines are ported, the rest have no counterpart |
+| `chara D44E` | `vrsave`, `vrtitle` | 9 | debug windows; USA carries the identical Japanese |
+| `chara 5667` | `vrtitle` | 4 | the PocketStation help line, its prompt and はい/いいえ - USA's fifth EXTRA item is STAFF CREDIT, a different feature (§6) |
+| `chara 81C7` | `camera` | 1 | the same PHOTOGRAPHING prompt as the main discs |
+
+### The executables
+
+Measured the same way, on the deployed executable:
+
+* **item and weapon descriptions: 0 Japanese.** 26 item and 11 weapon strings,
+  all English. The frozen Ration/Ketchup pair reads `Frozen.|Melt it before|you
+  use.` - USA has its own text for those, so they were ported after all.
+* **the MP5 SD description: 1 Japanese**, at file `0x2304`, immediately past
+  `ARENA_B`'s exclusive end so the repack never touches it. Integral-only weapon
+  on VERY EASY only; USA has neither (README, "Descriptions that change with the
+  game state").
+* **the memory-card message pool: 4 of 17 Japanese** - the four progress lines
+  USA draws nothing for (now saving, save complete, now loading, load complete).
+  The other 13 are English.
+
+So per main disc the true total is **153 + 5 = 158**, and the VR disc's own
+executable pools hold the same shape of leftovers (`vr_en_savemsg`'s two
+untranslated indices, the MP5, the mine-detector difficulty line).
+
+### Not covered by any of this
+
+Texture lettering - Japanese drawn as art rather than stored as text - is
+outside every tool here. The VR camera's EXORCISE textures are the known case
+and are deferred; nothing else has been inventoried.
+
 ## Reproduce the inventory
 
 ```powershell
