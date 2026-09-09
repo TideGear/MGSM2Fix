@@ -4215,6 +4215,80 @@ Shift-JIS, so `《ハンカチ》` reaches `game_text` as `<9014><822F><8253><82
 and can only be read by drawing it with the game's own font.
 
 
+## `RADIO.DAT`, the codec, and Integral's developer commentary (2026-09-09)
+
+The codec script is not in `STAGE.DIR`. `menu/radiomes.c` loads it out of
+`RADIO.DAT` by sector, with the fragment size packed into the top byte of the
+radio code (`size = (pRadioCode / 0x1000000) * 2048`), so every GCL sweep this
+project owns was structurally incapable of seeing a word of it. That is how
+6.5 MB of Japanese went unnoticed while four documents said the port was
+complete. `discaudit.py` exists so the next such file cannot hide the same way.
+
+### Two halves
+
+`RADIO.DAT` is 11,198,464 bytes on Integral and 1,776,851 on USA - 6.3x - and
+the difference is not a translation:
+
+| region | bytes | content |
+|---|---:|---|
+| `0x0000000`–`0x042C54C` | 4,375,884 | the story codec, English and Japanese together |
+| `0x042C54C`–`0x0AAC050` | 6,814,468 | Japanese only; not one dialogue-length English run in 6.5 MB |
+
+The boundary is found by taking the largest gap between consecutive
+dialogue-length ASCII runs - 6,814,468 bytes, which is the region itself.
+
+**The English half is USA's script, whole.** 35,273 dialogue lines / 1,145,926
+bytes against USA's 35,193 / 1,143,269. Integral therefore already *has* English
+codec text and picks it with the runtime language setting - the same setting
+`[Game] EnglishText` holds through title setup and the collection's own writes
+race against. There is nothing to port here, and that is worth stating plainly
+because the file's size invites the opposite conclusion.
+
+### Reading the other half
+
+None of it is Shift-JIS - it is font indices, like every other string in this
+game - so it was read by drawing it with the game's own font (`rendertext.py`):
+
+* 「ニンジャにつづきスネークも　装衣えを用意すること」
+* 「、デモはゲーム中とは別モデルでやる予定だったので」 — the cutscenes were
+  planned to use a different model from the in-game one
+* 「さらにこのインテグラル　では」 — *furthermore, in this Integral…*, which is
+  the line that settles what this content is
+* 「られたメモリをどうやりくりするか」 — juggling the memory they were given
+
+Structural corroboration: `d0 03`, a Japanese text control code, occurs **64,087**
+times in Integral's file and **4** times in USA's; 95.1% of the region's 2 KB
+blocks are distinct, so it is not a repeated pattern; and that memory line's
+32-byte run recurs 328 times, so the conversations share boilerplate.
+
+### Two false starts worth keeping
+
+**A byte-range regex cannot classify binary.** Counting runs of lead bytes
+`0x81`–`0x9F` said 31.7% of the file was Japanese and put "Japanese" in windows
+whose hex contains almost no kana at all. Restricting to the kana banks and then
+corroborating with the record structure (`d0 03` density) is what held up.
+
+**Volume ratios nearly hid it.** 964 KB of Japanese against 1,146 KB of English
+is 42% - precisely what a faithful translation of the same script gives, since
+Japanese needs fewer characters. Read as a ratio it says "paired subtitle
+track, nothing extra". It was mapping *where* each language sits, window by
+window, that exposed a 6.5 MB block with no English in it. **A global ratio can
+be exactly right and still describe the wrong thing.**
+
+### It is translation, not porting
+
+USA never shipped any of this, so there is no English to copy, and the standing
+rule leaves it alone: porting means moving USA's own words, and there are none
+here. Anyone who wants this commentary in English is starting a translation
+project, which is a different undertaking with a different rule set - and the
+first thing it needs is not in this repository.
+
+The same applies to the two small pockets `discaudit.py` turned up, both
+Integral-only and both confirmed by rendering: ~1.8 KB in `DEMO.DAT`
+(「そしてテロリストの」, story narration) and ~1.0 KB in `VOX.DAT`
+(「エンジンやプロペラのノイズ」, sound-design commentary beside the audio it
+describes).
+
 ## Psycho Mantis's memory-card table, and the RAM-patch question (2026-09-08)
 
 Raised from outside the project: someone asked whether the collection's *vanilla

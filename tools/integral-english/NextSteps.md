@@ -238,7 +238,7 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
 | **real engineering** | the raw variant's first boot on a real disc image (end of 5.4, and 5.13), 5.6 the upstream sync |
-| **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08. What is left: what the 13 Integral-only `*r` stages **are** (`s07br`'s overlay source is byte-identical to `s07b`'s, so it is the same code over different data); and **per-family verifiers where they are missing** — 5.14 step 3 revised the plan, and a deployed-stage reconstruction is explicitly NOT the answer |
+| **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
 | **loose ends** | 5.7's remaining untested runtime features, 5.5's items 4 and 5, and the `us1.exe` parity mismatch in 5.13 |
 
@@ -1290,6 +1290,7 @@ an explicit answer before anything changes.
 | `rawdisc.py` | the raw-disc EDC/ECC pass. As a library `rebuild.py --variant raw` uses it to emit each disc's `*_zz_ecc.ppf`; as a command, `py rawdisc.py <package>` applies a finished raw set in memory and confirms every touched sector verifies |
 | `widths.py` | how wide a ported line renders and how wide it may be: the `vrwindow` budget derived step by step from the decomp, the 255-px `max_width` ceiling, and the pool line separator. Read its docstring before adding a width assert — the per-window budget is **not** an invariant, retail exceeds it |
 | `mainsweep.py` | the main discs' answer to `vr_sweep.py`: pairs every GCL string with the USA disc's by owning command, so "Integral Japanese where USA has English" is measured. `py mainsweep.py [--disc 2] [--samples]`. Its one uncovered finding is §5.11, ported 2026-09-08. Three modes were added the same day: `--integral-only` pairs each of the 13 Integral-only stages with the USA stage it is a variant of (the shared-name universe's hole — 1 string, already ported); `--diff-english` sequence-diffs the two discs' English for wording differences (§5.14 step 2 — found the fourth `abst` spelling); `--census` accounts for every Japanese GCL string and **exits non-zero unless the unaccounted bucket is 0** (§5.8) |
+| `discaudit.py` | **every file on every disc**: size, the Integral-vs-USA delta and a crude text probe. Written 2026-09-09 because every other sweep here reads only `STAGE.DIR`; the delta is the diagnostic (`RADIO.DAT` is +9.4 MB on Integral, and that is the developer commentary). `py discaudit.py` |
 | `jpremain.py` | **what Japanese is still on the three DEPLOYED discs** — the only tool here that reads deployed bytes (retail + every deployed PPF, following the relocated STAGE.DIR entry for `abst`/`brf`/`option`/`preope`). 153 Japanese strings a disc, 38 on the VR disc, all itemised with reasons in `COVERAGE.md`. `py jpremain.py` |
 | `pad2.py` | `en_pad2`: USA's controller-port subtitle into all three of the sites `second.c` is spawned at, on both discs. Length-preserving — the English goes in at the front of Integral's longer slot and the length byte never changes. `py pad2.py` |
 | `rendertext.py` | **reads the game's own Japanese, by drawing it.** The scripts store font indices, not Shift-JIS, so no table turns a Japanese string into characters - `game_text` can only print `<822F><8253>...`. This looks the glyphs up the way `font.c` does and renders them to a PNG: `py rendertext.py --item 22`, `--weapon N`, `--hex ...`, `--exe us1.exe`. Two things in it were settled by rendering a word whose reading was known, not by reasoning - the bit order, and a one-glyph bank offset - because either mistake produces plausible-looking Japanese that is simply the wrong Japanese |
@@ -1755,3 +1756,37 @@ reconstructing it from PPF records would re-derive that by the hardest route and
 need extending for every relocation. The authority for owned bytes is the
 family's own verifier, the sweep's authority stops at the boundary, and the `!!`
 flag marks where. §5.14 step 3 carries the table.
+
+## 16. The 2026-09-09 pass: the file nobody had opened
+
+A question from outside the project - is there an Integral-exclusive Japanese
+developer-commentary codec channel? - turned out to have an answer no tool here
+could reach. There is, it is **6.5 MB**, and the reason it was invisible is
+structural rather than careless.
+
+- **Every sweep read one file.** `mainsweep.py`, `vr_sweep.py`, `jpsweep.py`,
+  `audit_text.py` and the day-old `jpremain.py` all walk `STAGE.DIR` and the
+  executables. A disc has nine files. Codec dialogue lives in `RADIO.DAT`,
+  loaded by sector out of `menu/radiomes.c`, so no GCL walker could ever have
+  seen a word of it - and four documents said the port was complete without
+  naming the file their claim was about. `discaudit.py` now audits all nine.
+- **The diagnostic was a size delta, not a sweep.** Integral's `RADIO.DAT` is
+  6.3x USA's. That single number is what located the commentary; the same
+  measure clears `BRF.DAT` (381 KB of English on both) and `FACE.DAT`
+  (identical), which had been assumed rather than checked.
+- **A correct ratio described the wrong thing.** 964 KB of Japanese against
+  1,146 KB of English is 42%, exactly what a faithful translation of the same
+  script gives - so the totals said "paired subtitle track, nothing extra".
+  Mapping *where* each language sat, window by window, is what exposed a 6.5 MB
+  block containing no English at all. Aggregate ratios can be right and still
+  answer a different question.
+- **The port's scope did not change.** USA never shipped the commentary, so
+  there is no English to copy and the standing rule leaves it alone. What
+  changed is what the documents may claim: "nothing with a USA counterpart is
+  still Japanese" is true of the text this port covers, and was being read as
+  true of the disc. `COVERAGE.md` now states both sentences.
+- **The general lesson, and it is the same one as §13's.** When a claim of
+  completeness is made, say what it ranges over. Every sweep here answered its
+  question correctly inside a universe none of them named - shared stage names
+  for `mainsweep`, one archive for all of them - and each time the gap was found
+  by someone asking about a thing outside it rather than by the tools.
