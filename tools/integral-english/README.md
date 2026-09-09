@@ -1911,8 +1911,10 @@ Checks that passed on the deployed result: the merged local font is **identical*
 in length and differs in the 4 remapped glyph bytes; the overlay differs from
 retail in exactly five words (the `jal` and four position-table halfwords) plus
 the appended stub; the stage stays 251,904 bytes and 123 sectors;
-`ppfcheck --deployed` is clean over 29 files; the only cross-PPF overlap is the
-deliberate one with `vr_en_missions`; and applying every deployed PPF in
+`ppfcheck --deployed` is clean over 27 files and no two of them overlap at all
+since the ownership split of 2026-09-08 (this patch shared 686 bytes with
+`vr_en_missions` until then, and depended on Ketchup's name ordering); and
+applying every deployed PPF in
 Ketchup's own order and disassembling the result gives `+F464 jal 0x800DF158`,
 the stub verbatim, `addiu a3, zero, 66` at `+F128` for the EXIT box, and the six
 records at y 196/208/196/208/196/208 - clip A lines 0 and 1, clip B lines 0 and
@@ -4340,6 +4342,110 @@ difficulty (`NextSteps.md` §5.7):
   on-screen proof that the relocation and the repointed `lui`/`addiu` pair work;
 * the FA-MAS slot on VERY EASY, drawing Integral's Japanese MP5 SD text under an
   `MP 5 SD` label, which is correct and not a fault.
+
+## Sweep: the main discs, and the three questions it answers (`mainsweep.py`)
+
+`jpsweep.py` above scans for Japanese-looking pointer slots and `audit_text.py`
+inventories string candidates by framing; both say what they cannot conclude.
+`mainsweep.py` (2026-09-07, extended 2026-09-08) does for discs 1 and 2 what
+`vr_sweep.py` does for the VR disc: it pairs every GCL string with the USA
+disc's **by the command that owns it**, so a judgement about bytes becomes a
+comparison between two discs.
+
+    py mainsweep.py [--disc 2] [--samples]     is anything still Japanese?
+    py mainsweep.py --integral-only            the 13 stages the pairing misses
+    py mainsweep.py --diff-english             both English, worded differently
+    py mainsweep.py --census                   account for every Japanese string
+
+It reads **retail** on both sides, deliberately: the point of the default mode
+is to enumerate everything USA has in English and then subtract what the port
+covers, so a gap cannot hide behind a patch that is already deployed. That
+choice is right for three of the four modes and wrong for the fourth - see
+"the input is part of the result" below.
+
+### The default mode: tallying by owner
+
+    owner X:  Integral 40 Japanese, 0 English | USA 0 Japanese, 41 English   <- port it
+    owner Y:  Integral 12 Japanese, 0 English | USA 12 Japanese, 0 English   <- USA never did either
+    owner Z:  Integral  0 Japanese, 30 English | USA 0 Japanese, 30 English  <- done
+
+Disc 1 reports twelve owners holding Japanese where USA's counterpart has
+English. Nine are inside stages a patch family already owns; two are Japanese in
+identical numbers on the USA disc (`cmd 4AD9`, the location titles; `chara 9302`
+in `rank`). The twelfth was `chara 2D0A` in `s07b` and is now `en_pad2`.
+
+### `--integral-only`: a pairing's universe is part of its answer
+
+The default mode compares the **82 stage names the two discs share**, which puts
+all 13 Integral-only stages outside it - and that is how the third copy of the
+controller-port string, in `s07br`, went unnoticed while the section describing
+it claimed to have found everything. Each Integral-only name pairs onto the USA
+stage it is a variant of (the base name without its trailing `r`, or `init` for
+`init_ve`), and across all 13 on both discs there is **exactly one** Japanese
+string whose base-stage owner has English: that `s07br` copy. The hole was worth
+closing and it was empty.
+
+### `--census`: buckets that must sum
+
+`COVERAGE.md` used to say "about 160 remain across gameplay stages and need
+verification against their callers", which is what a framing heuristic can
+honestly say. This asks a question with a complete answer instead: for every
+Japanese string Integral has, what is at the same owner on the USA disc? Both
+discs give the same figures.
+
+| bucket | disc 1 | disc 2 |
+|---|---:|---:|
+| inside a stage a patch family owns | 1,260 | 1,260 |
+| USA is Japanese there too | 17 | 17 |
+| the owner does not exist on the USA disc | 83 | 83 |
+| **unaccounted - a porting target** | **0** | **0** |
+| total | 1,360 | 1,360 |
+
+The buckets are asserted to sum to the total, so the tool cannot report a clean
+result by losing a string, and it **exits non-zero** if the last bucket is ever
+not zero: a regression guard, not a report. The first bucket is "accounted for
+there", not "ported" - it includes the strings kept Japanese by rule.
+
+### `--diff-english`: the blind spot every sweep shared
+
+All four of this project's sweeps hunt *Japanese*, so a string that is already
+English on both discs and merely **says something different** passed all of them
+unremarked. Both cases known before 2026-09-08 were found by accident. A
+positional diff is meaningless because the two builds lay their data out
+differently, but both known cases sat in a *sequence* whose neighbours matched,
+which is what a diff is for: the two discs' ordered English strings per stage,
+through `difflib`, so equal runs align themselves and a `replace` hunk is the
+shape being hunted.
+
+Disc 1: **15 replace hunks over 82 stages, 8 holding player-readable text**, and
+after triage one family - the `abst` location names, where four pairs differ and
+not the three three documents listed. Know the noise before starting: voice-clip
+and stage asset ids (`vc319010`, `vr01`), and hunks where one side's counterpart
+is *Japanese* and so never entered an English list at all.
+
+### The input is part of the result
+
+Run against the VR disc, a per-owner fuzzy match reported `FAMAS` against USA's
+`FA-MAS` across the mission titles. It is a **non-finding**: the port takes USA's
+window text verbatim, and the deployed `vr_en_missions.ppf` holds 142 `FA-MAS`
+and no `FAMAS`. The sweep had rediscovered the port's own work.
+
+Retail input is right for the Japanese question and backwards for this one,
+because here the port's own replacements are exactly what must be subtracted. So
+`--diff-english` now prints `!! <stage> is owned by <family> and these are
+RETAIL bytes` beside any finding in a `PORTED` stage, and names them again in
+its summary. Three stages flag today: `abst`, `option`, `title`.
+
+**The fix is not a deployed-stage reconstruction**, which was the first plan and
+would re-derive by the hardest available route what the builders already build in
+memory - parse the PPF, apply it, follow `en_abst`'s and `en_brf`'s relocation
+into `DUMMY3M`, re-parse - and would need extending for every family that starts
+relocating. Authority belongs where the bytes do: a family's own builder verifies
+its own output (`abst_build.py` checks its location list against USA record for
+record; `vr_windows.py` checks every window), the sweep's authority stops at the
+boundary, and the flag marks where it stops. Two of USA's five VR languages will
+also confuse any diff there: take only the English arm of a language branch
+(`lang in (None, ENGLISH)`) or the alignment collapses.
 
 ## The controller-port subtitle (`en_pad2`, 2026-09-08)
 

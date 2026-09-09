@@ -1,4 +1,4 @@
-# Text coverage evidence (2026-09-04, VR section added 2026-09-06, updated 2026-09-07)
+# Text coverage evidence (2026-09-04, VR section added 2026-09-06, updated 2026-09-08)
 
 The current patch is not a complete English port. The title's disc-swap copy
 (`en_menu3`) is ported but raw-disc only - the collection patches that block
@@ -7,6 +7,11 @@ the Mission
 Log and the disc-change abstract (both in `abst`) were ported on 2026-09-05
 (`en_abst`, seen on screen the same day), and the VR disc on 2026-09-06
 (seven PPFs since the MOVIE captions on 2026-09-07; see "The VR disc" below and the README section of the same name).
+Two more things landed on 2026-09-08: `en_pad2`, the controller-port subtitle in
+the Psycho Mantis room, which was the last main-disc string with a USA
+counterpart and no family (all five of its call sites, across `s07b` and the
+Integral-only `s07br`); and USA's four MISSION LOG location-name spellings,
+inside `en_abst`. **Ten families now, 20 main-disc PPFs and 27 in all.**
 The expanded scan closes the old tool's disc-1-only coverage gap for stage
 inventory; it does not establish that every visible string has been audited.
 
