@@ -1290,6 +1290,7 @@ an explicit answer before anything changes.
 | `rawdisc.py` | the raw-disc EDC/ECC pass. As a library `rebuild.py --variant raw` uses it to emit each disc's `*_zz_ecc.ppf`; as a command, `py rawdisc.py <package>` applies a finished raw set in memory and confirms every touched sector verifies |
 | `widths.py` | how wide a ported line renders and how wide it may be: the `vrwindow` budget derived step by step from the decomp, the 255-px `max_width` ceiling, and the pool line separator. Read its docstring before adding a width assert — the per-window budget is **not** an invariant, retail exceeds it |
 | `mainsweep.py` | the main discs' answer to `vr_sweep.py`: pairs every GCL string with the USA disc's by owning command, so "Integral Japanese where USA has English" is measured. `py mainsweep.py [--disc 2] [--samples]`. Its one uncovered finding is §5.11, ported 2026-09-08. Three modes were added the same day: `--integral-only` pairs each of the 13 Integral-only stages with the USA stage it is a variant of (the shared-name universe's hole — 1 string, already ported); `--diff-english` sequence-diffs the two discs' English for wording differences (§5.14 step 2 — found the fourth `abst` spelling); `--census` accounts for every Japanese GCL string and **exits non-zero unless the unaccounted bucket is 0** (§5.8) |
+| `jpremain.py` | **what Japanese is still on the three DEPLOYED discs** — the only tool here that reads deployed bytes (retail + every deployed PPF, following the relocated STAGE.DIR entry for `abst`/`brf`/`option`/`preope`). 153 Japanese strings a disc, 38 on the VR disc, all itemised with reasons in `COVERAGE.md`. `py jpremain.py` |
 | `pad2.py` | `en_pad2`: USA's controller-port subtitle into all three of the sites `second.c` is spawned at, on both discs. Length-preserving — the English goes in at the front of Integral's longer slot and the length byte never changes. `py pad2.py` |
 | `rendertext.py` | **reads the game's own Japanese, by drawing it.** The scripts store font indices, not Shift-JIS, so no table turns a Japanese string into characters - `game_text` can only print `<822F><8253>...`. This looks the glyphs up the way `font.c` does and renders them to a PNG: `py rendertext.py --item 22`, `--weapon N`, `--hex ...`, `--exe us1.exe`. Two things in it were settled by rendering a word whose reading was known, not by reasoning - the bit order, and a one-glyph bank offset - because either mistake produces plausible-looking Japanese that is simply the wrong Japanese |
 | `m2archive.py` | reads the collection's own archive: `--roms` the disc images and bases, `--list 099/patch` what it patches, `--patches` every Integral disc-1 CD-ROM patch decoded against retail, `--extract` one member. This is what answered §5.12 |
@@ -1328,6 +1329,9 @@ captions", "The white caption font differs between the two VR discs",
 done, with dates) · decomp → "Audit against the decomp" ·
 text found late → "The controller-port subtitle (`en_pad2`, 2026-09-08)",
 "The `abst` location names (Integral's own English -> USA's, 2026-09-08)" ·
+what Japanese is left → `COVERAGE.md`, "What Japanese is still there, and why"
+(`jpremain.py`) · asked from outside → "Psycho Mantis's memory-card table, and
+the RAM-patch question" ·
 the collection's own patches → "Where the collection's own disc patches land",
 "What the collection's named-file patches say" (what they contain, read
 2026-09-07) · raw disc → "Raw-disc error correction, and what it proved on the

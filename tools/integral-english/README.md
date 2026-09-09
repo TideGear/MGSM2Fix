@@ -4214,6 +4214,74 @@ which is what `rendertext.py` exists for: the strings are font indices, not
 Shift-JIS, so `《ハンカチ》` reaches `game_text` as `<9014><822F><8253><820B><8221><9015>`
 and can only be read by drawing it with the game's own font.
 
+
+## Psycho Mantis's memory-card table, and the RAM-patch question (2026-09-08)
+
+Raised from outside the project: someone asked whether the collection's *vanilla
+RAM patches* are documented anywhere, mentioning a known USA MGS1 bug where "a
+byte is off by 0x20 and it breaks one of Mantis's memory card game voicelines",
+and guessing that a RAM patch would be lighter than a PPF for it. Two separate
+questions, and this port can answer one of them outright.
+
+### Where the table is
+
+Mantis reads the memory card and names other Konami games he finds. The list he
+matches against is a flat table of product codes in the `s07b` stage archive -
+`s07b` being the Mantis room - stored as **12-byte records: a 10-character code
+then two NULs**, no count, terminated by the next string in the section.
+
+| disc | offset in `<x>_stage.dir` | entries | codes |
+|---|---|---:|---|
+| USA (`usa1`, `usa2`) and the collection's `us1` | `0x018A5FB8` | 24 | `SLUS-00707`, `00600`, `00674`, `00678`, `00614`, `00591`, `00445`, `00067`, `00296`, `00486`, `00293`, `00289`, `00295`, `00288`, `00447`, `00235`, `00292`, `00294`, `00045`, `00064`, `00238`, `00049`, `00055`, `00048` |
+| PAL (`pal1`) | `0x01898670` | 27 | `SLES-01535` … `SLES-00036` |
+| Integral | — | 221 | 185 `SLPM` + 36 `SLPS` |
+
+The `A` sitting immediately before the first USA code (`…02 e1 41` then
+`SLUS-00707`) is **not** part of it: the 12-byte stride puts entry 0 at
+`0x018A5FB8` on the `S`, and that byte belongs to the data before the table.
+A first reading of the hex called it a stray prefix and a broken first entry;
+the stride disproved it. Worth stating because it is the obvious wrong answer.
+
+### On the reported bug: not in this table
+
+All 24 USA codes are well-formed, uppercase, and **byte-identical across
+`usa1_stage.dir`, `usa2_stage.dir` and the collection's own `us1_stage.dir`** -
+so whatever the off-by-`0x20` byte is, it is not a case error in the code list,
+and the Master Collection has not introduced or inherited a difference here.
+That narrows it rather than finding it: the remaining candidates are the mapping
+from a matched code to a voice line, the card-directory read itself, or a
+comparison length - all of which live in the `psyco` overlay, which the decomp
+has not covered (`charalst.h` lists `CHARA_PSYCHOMANTIS` with `?`). Anyone
+chasing it should start from the overlay in `s07b`, not from the executable:
+there are no product codes in `SLPM_862.47` or `SLUS_005.94` at all.
+
+### On the documentation question: yes, and it is new
+
+The collection's patches for a title are **not** undocumented any more, and they
+are not RAM patches in the sense the question assumed - they are CD-ROM patches
+applied to the disc image, in two kinds:
+
+* **offset patches**, which carry their bytes inline; `SQHook::SetPatchWatch`
+  logs those, including their contents.
+* **named-file patches**, which carry only a name, the payload living in the
+  game's own archive. Those are what three documents here called unknowable, and
+  `m2archive.py` extracts them: `windata/alldata.bin` is a flat blob and
+  `alldata.psb.m` beside it is its index (an MDF-wrapped, XOR-obfuscated zlib
+  stream keyed by `MD5("25G/xpvTbsb+6" + the lowercased file name)` through
+  MT19937), inflating to a PSB v3 whose `file_info` maps 4,926 paths to
+  `[offset, size]`. `099/patch/` holds **176** of them. See "What the
+  collection's named-file patches say".
+
+So a full inventory of what the collection patches per title is a tool run away.
+And the instinct in the question is right on the other point: MGSM2Fix already
+has the lighter-weight mechanism, and it does not need a PPF. `Ketchup_DiskPatch`
+/ `SQKetchupPatches()` let a title ship disc-image bytes of its own from inside
+the ASI, `SQHook::SetPatchRangeBlacklist` drops the collection's own patches by
+offset range, and Ketchup defers executable writes to the RAM mirror. The
+brightness-text fix for USA MGS1 (title 981) is already built exactly that way
+and is the worked example - a handful of bytes in `.rdata`, no patch file. A
+Mantis fix would be the same shape, once the byte is located.
+
 ## The `abst` location names (Integral's own English -> USA's, 2026-09-08)
 
 The second application of amendment 4b, after `SCARF` -> `HANDKER` above, and
