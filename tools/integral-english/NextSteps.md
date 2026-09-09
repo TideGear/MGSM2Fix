@@ -73,7 +73,7 @@ paraphrase them away.
    English is left alone unless it is asked for, case by case, exactly like the
    art amendment above. Done so far: **one**, `SCARF` -> `HANDKER` (§5.9).
    Still outstanding under the same heading and NOT done: the `abst` location
-   spellings (`Tank Hanger` / `Medi rm` / `Cmnder rm`).
+   spellings (four of them — §5.9).
 
 5. **In the collection:** "in MC i prefer the circle message suppressed and key config intercepted" — the four-line brightness text (no ○-button line) and the collection's own Control Settings panel for KEY CONFIG.
 6. **The raw disc matters:** "\"They'd still matter for a raw PSX disc patch.\" that was the point of porting the text. I want the intercept still in mc." — Text the collection hides (KEY CONFIG labels, disc-swap prompts) is still ported for a future raw-PSX-disc patch, while the collection keeps its interception.
@@ -222,7 +222,7 @@ discs.** What is left is of five kinds — and none of it is text to port:
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, and the new `en_pad2` subtitle (5.11) |
 | **real engineering** | the raw variant's first boot on a real disc image (end of 5.4, and 5.13), 5.6 the upstream sync |
-| **to investigate** | 5.14, where else Integral's own English differs from USA's — the blind spot every existing sweep shares |
+| **to investigate** | ~~5.14~~ swept 2026-09-08 (a fourth `abst` spelling found; the VR disc needs deployed-bytes input, 5.14 step 3). What is left to investigate is what the `*r` stages **are**, and the two sweeps' remaining input gap |
 | **held open on purpose** | §6's four **[open 2026-09-07]** items, and 5.9. Raised, considered beside the `SCARF` case decided the same evening, and deliberately not decided — see the note at the head of §6 |
 | **loose ends** | 5.7's remaining untested runtime features, 5.5's items 4 and 5, and the `us1.exe` parity mismatch in 5.13 |
 
@@ -687,7 +687,23 @@ doing it twice. When it happens:
   `items.py`. Both pools are now owned byte for byte; a future audit line means
   the collection wrote *after* Ketchup's pass, which has not been seen.
 
-### 5.8 Finish the text census (`COVERAGE.md`)
+### 5.8 Finish the text census — CLOSED FOR GCL STRINGS 2026-09-08
+`mainsweep.py --census` accounts for **every** Japanese GCL string rather than
+classifying flagged candidates, and the buckets are asserted to sum to the
+total so a residue cannot hide in the framing. Both discs, identical: of
+**1,360** Japanese strings, 1,260 are inside a stage a patch family owns, 17 are
+Japanese on the USA disc too, 83 have no owner on the USA disc at all
+(Integral-only content), and **0 are unaccounted**. It exits non-zero if that
+last bucket is ever not 0, so it is a regression guard and not just a report.
+The Integral-only stages are folded in through `base_stage`, so this covers
+every stage on the disc and not only the shared names.
+
+That supersedes the paragraph below, which is kept because it says what the
+older tool measures and why its residue was never a defect list. Texture
+lettering, executable UI beyond the save-title probes, and runtime language
+branches remain outside both tools.
+
+**The older framing:**
 `audit_text.py` inventories GCL string candidates and address references
 across all three Integral images and USA's, but it is a framing heuristic.
 Of disc 1's 1,414 flagged Integral candidates, 1,025 were the mission log (now
@@ -708,9 +724,18 @@ oversights; §6 carries the same marker.
   USA draws nothing there; `KEEP_PROMPT_CAPTION = False` in `abst_build.py`
   gives USA's empty record. Also the `1/2` counter and empty second screen on
   count-7 pages — USA's own behaviour, reproduced.
-- **[open 2026-09-07]** Location-name spellings in `abst` (`Tank Hanger` / `Medi rm` / `Cmnder rm`
-  vs USA `Hangar` / `Medi room` / `Cmnder room`): Integral's own English, not
-  Japanese — outside the rule as written, so ask.
+- **[open 2026-09-07, and there are FOUR of them]** Location-name spellings in
+  `abst`: Integral's own English, not Japanese — outside the rule as written, so
+  ask. `mainsweep.py --diff-english` enumerated the table on 2026-09-08 and it is
+  `Tank Hanger`/`Tank Hangar`, `Medi rm`/`Medi room`, `Cmnder rm`/`Cmnder room`
+  and **`Cmnd rm`/`Cmnd room`** — the fourth was in no document. 30 English names
+  in each game, aligned 1:1, 4 differing, both discs identical, and all four live
+  on the deployed disc (`abst_build.py` rewrites only the `0x9906` pages, so the
+  list is copied through). **Cost, if the answer is yes:** three of the four grow
+  by 2 bytes, which `abst_build.py` already handles — it recomputes every command
+  size, proc length, table offset and script length and relocates the stage — so
+  it is a constant beside `KEEP_PROMPT_CAPTION`, not new machinery. The only
+  budget to watch is the DUMMY3M slot the stage already occupies.
 - **The item short-name table: `SCARF` -> `HANDKER`, ASKED AND DONE 2026-09-07.**
   **This is the port's first replacement of Integral's own English** rather than
   of its Japanese, and therefore the first case under amendment 4b in §2.
@@ -968,14 +993,16 @@ not established, and it is one more reason the port takes USA text from
 `usa1_stage.dir` (real USA discs) rather than from this image. It does not touch
 the Integral patches, which is why it is recorded rather than chased.
 
-### 5.14 Where else does Integral's own English differ from USA's? — TO INVESTIGATE
+### 5.14 Where else does Integral's own English differ from USA's? — SWEPT 2026-09-08
 Raised by the user 2026-09-07, immediately after the `SCARF` case: *"if there are
 other instances of existing English in Integral that differ from USA."*
 
-**Two are known, and both were found by accident.** `SCARF` against USA's
+**Three are known now. Two were found by accident; the third was found by the
+sweep this section asked for.** `SCARF` against USA's
 `HANDKER` turned up because it happened to sit in the corner of a screenshot
 taken for another purpose; the `abst` location spellings (`Tank Hanger`,
-`Medi rm`, `Cmnder rm`) turned up while porting the mission log. Neither was
+`Medi rm`, `Cmnder rm`) turned up while porting the mission log — and there is a
+fourth, `Cmnd rm`, that only the sweep found. Neither of the first two was
 found by looking. There is no reason to think two is the total.
 
 **Why nothing here would have caught them.** Every sweep this project owns hunts
@@ -1010,10 +1037,50 @@ known cases sit in a *sequence* whose neighbours match - `SCARF` is between
    an insert only because Integral's counterparts are Japanese and so never
    enter a Latin extraction - and a few short runs of MIPS code that read as
    ASCII.
-2. **Stage archives.** `mainsweep.py` already pairs GCL records by the command
-   that owns them. Extend it: where Integral's record and USA's are **both**
-   plain English and differ, report the pair. Today it only counts them.
-3. **Not textures.** Lettering drawn as art is out of scope for a text sweep and
+2. **Stage archives — DONE 2026-09-08.** `mainsweep.py --diff-english` sequence-
+   diffs the two discs' ordered English strings per stage, so equal runs align
+   themselves and a `replace` hunk is the shape being hunted. Disc 1 gives **15
+   replace hunks over 82 stages, 8 holding player-readable text**, and after
+   triage the residue is exactly one family: the `abst` location names
+   (`chara 53C7`), where **four** pairs differ, not the three every document
+   listed. The fourth is **`Cmnd rm` against USA's `Cmnd room`** — nobody had
+   noticed it, and it sits in the same table as the other three. Disc 2 is
+   identical. All four are live on the deployed disc: `abst_build.py` rewrites
+   only the `0x9906` pages and the disc-change block, so the location list is
+   copied through as Integral wrote it.
+
+   The other seven readable hunks are all explained, and the explanation is the
+   noise profile to expect: voice-clip and stage asset ids (`sound`, `selectd`,
+   `chara 4EFC` — `vc319010` and the like), and hunks where one side's
+   counterpart is *Japanese* and therefore never entered an English list at all
+   (`abst`'s 907 recap lines, `option`'s help lines, `title`'s disc-swap block,
+   and USA disc 1's `vr01`..`vr10` mission names, which Integral's disc has no
+   equivalent of).
+
+3. **The VR disc — asked, and it needs a different input.** Two things had to be
+   learned. USA's VR disc carries **five languages**, so the diff must take only
+   the English arm of a language branch (`lang in (None, ENGLISH)`, the test
+   `vr_windows.py` already uses); without that the alignment collapses — 548
+   hunks against 267 with it, and no one-against-one hunk either way. Then a
+   per-owner fuzzy match (Integral's English strings absent from USA's at the
+   same owner, with their nearest USA counterpart) turned up **`FAMAS` against
+   USA's `FA-MAS`** across the mission titles — and it is a **non-finding**: the
+   deployed `vr_en_missions.ppf` holds **142 `FA-MAS` and zero `FAMAS`**, because
+   the port takes USA's window text verbatim, so those windows already read
+   USA's spelling.
+
+   **That is the lesson, and it is the opposite of the Japanese question's.**
+   `mainsweep.py` reads *retail* on purpose, so a gap cannot hide behind a patch
+   that is already deployed. The English-against-English question must be asked
+   of the **deployed** bytes instead, because there the port's own replacements
+   are precisely what has to be subtracted — otherwise the sweep rediscovers the
+   port's own work and calls it a finding. Only `vr_sweep.py` has the plumbing to
+   reconstruct a deployed stage (`deployed()`); `mainsweep --diff-english` does
+   not, which is safe today only because the one family it finds sits in records
+   no patch rewrites. **Fold the deployed-bytes input into both before trusting
+   either on a stage a patch family owns.**
+
+4. **Not textures.** Lettering drawn as art is out of scope for a text sweep and
    stays that way.
 
 **Expect noise, and know its shape before starting.** Integral-only features
@@ -1046,8 +1113,9 @@ an explicit answer before anything changes.
   `DisableCDROM`); they are **on** now. Turning them off keeps SPECIAL / PHOTO
   ALBUM reachable without earning it and has never affected the PPFs.
 - **[open 2026-09-07]** Anything that touches Integral's own English (§5.9),
-  the `abst` location spellings first — `Tank Hanger` / `Medi rm` / `Cmnder rm`
-  against USA's `Hangar` / `Medi room` / `Cmnder room`. **This is exactly the
+  the `abst` location spellings first — **four** of them, not the three this
+  file used to list (§5.9 has the table and the cost; the fourth, `Cmnd rm`
+  against `Cmnd room`, was found by the 2026-09-08 sweep). **This is exactly the
   shape of the `SCARF` -> `HANDKER` case**, which was asked and done the same
   evening and created amendment 4b in §2; these were held rather than swept along
   with it. The precedent says how to decide them, not that they are decided.
@@ -1132,7 +1200,7 @@ an explicit answer before anything changes.
 | `cdecc.py` | EDC and P/Q parity for raw Mode 2 Form 1 sectors. `py cdecc.py` is the check that proves both the sums and the retail executables: it rebuilds each zero-filled executable extent from the supplied retail file and matches the parity the collection left behind (313/313, 313/313, 308/308) |
 | `rawdisc.py` | the raw-disc EDC/ECC pass. As a library `rebuild.py --variant raw` uses it to emit each disc's `*_zz_ecc.ppf`; as a command, `py rawdisc.py <package>` applies a finished raw set in memory and confirms every touched sector verifies |
 | `widths.py` | how wide a ported line renders and how wide it may be: the `vrwindow` budget derived step by step from the decomp, the 255-px `max_width` ceiling, and the pool line separator. Read its docstring before adding a width assert — the per-window budget is **not** an invariant, retail exceeds it |
-| `mainsweep.py` | the main discs' answer to `vr_sweep.py`: pairs every GCL string with the USA disc's by owning command, so "Integral Japanese where USA has English" is measured. `py mainsweep.py [--disc 2] [--samples]`. Its one uncovered finding is §5.11, ported 2026-09-08; note that it compares only the 82 stage names both discs share, so an Integral-only stage is outside its universe |
+| `mainsweep.py` | the main discs' answer to `vr_sweep.py`: pairs every GCL string with the USA disc's by owning command, so "Integral Japanese where USA has English" is measured. `py mainsweep.py [--disc 2] [--samples]`. Its one uncovered finding is §5.11, ported 2026-09-08. Three modes were added the same day: `--integral-only` pairs each of the 13 Integral-only stages with the USA stage it is a variant of (the shared-name universe's hole — 1 string, already ported); `--diff-english` sequence-diffs the two discs' English for wording differences (§5.14 step 2 — found the fourth `abst` spelling); `--census` accounts for every Japanese GCL string and **exits non-zero unless the unaccounted bucket is 0** (§5.8) |
 | `pad2.py` | `en_pad2`: USA's controller-port subtitle into all three of the sites `second.c` is spawned at, on both discs. Length-preserving — the English goes in at the front of Integral's longer slot and the length byte never changes. `py pad2.py` |
 | `rendertext.py` | **reads the game's own Japanese, by drawing it.** The scripts store font indices, not Shift-JIS, so no table turns a Japanese string into characters - `game_text` can only print `<822F><8253>...`. This looks the glyphs up the way `font.c` does and renders them to a PNG: `py rendertext.py --item 22`, `--weapon N`, `--hex ...`, `--exe us1.exe`. Two things in it were settled by rendering a word whose reading was known, not by reasoning - the bit order, and a one-glyph bank offset - because either mistake produces plausible-looking Japanese that is simply the wrong Japanese |
 | `m2archive.py` | reads the collection's own archive: `--roms` the disc images and bases, `--list 099/patch` what it patches, `--patches` every Integral disc-1 CD-ROM patch decoded against retail, `--extract` one member. This is what answered §5.12 |
@@ -1515,3 +1583,44 @@ slots, no container touched — and the interesting part is not the patch.
   the width it measures, so the line would drift off centre with nothing in the
   bytes to suggest why. `selftest.py` guards it, and the guard was proved by
   mutation, as §13 requires: four mutations, four failures.
+
+### The same day: the three sweeps that were owed, and one input that is wrong
+
+The housekeeping was done first (the four unlock aids deleted, the flags back to
+`false`, the disjoint VR pair finally deployed, the branch committed), and then
+the three items §5 filed under "to investigate" were all run. Two closed
+cleanly; the third found something and then taught the method a lesson.
+
+- **The Integral-only stages (`--integral-only`).** All 13 pair onto the USA
+  stage they are a variant of, and across all 13 on both discs there is
+  **exactly one** Japanese string whose base-stage owner has English:
+  the `s07br` copy `en_pad2` had just ported. So the hole in the sweep's
+  universe was worth closing and was empty. That is the good outcome, and it is
+  only knowable by looking.
+- **The census (`--census`).** All **1,360** Japanese GCL strings on each disc
+  now fall in one of three explained buckets with **0 unaccounted**, and the
+  buckets are asserted to sum to the total, so the tool cannot report a clean
+  result by dropping a string. It exits non-zero if the last bucket is ever not
+  0. This replaces "about 160 remain and need verification" with a number:
+  none.
+- **English against English (`--diff-english`), and the fourth spelling.** The
+  sweep §5.14 asked for found the `abst` location table has **four** differences
+  from USA's, where three documents listed three. `Cmnd rm` against USA's
+  `Cmnd room` had never been written down. The residue really is that small: 15
+  replace hunks over 82 stages, 8 with readable text, and after triage one
+  family.
+- **And the input is wrong for that question.** Run against the VR disc, a
+  per-owner fuzzy match reported `FAMAS` against USA's `FA-MAS` in the mission
+  titles - which the port had already fixed, because it takes USA's window text
+  verbatim: the deployed PPF holds 142 `FA-MAS` and no `FAMAS`. `mainsweep.py`
+  reads **retail** on purpose, so a Japanese gap cannot hide behind a deployed
+  patch. For English-against-English that discipline is exactly backwards: the
+  port's own replacements are what must be subtracted, so the question belongs
+  on the **deployed** bytes. It is safe today only because the one family it
+  finds sits in records no patch rewrites - which is a fact that was checked,
+  not a property of the tool. **The rule: match the input to the question, and
+  say which one the tool reads.**
+
+USA's VR disc also carries five languages, so any diff there must take only the
+English arm of a language branch (`lang in (None, ENGLISH)`); without it the
+alignment collapses and the output is 548 hunks of nothing.
