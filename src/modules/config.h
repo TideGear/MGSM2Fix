@@ -23,11 +23,11 @@ public:
 
 private:
 #ifdef _WIN64
-	static const char *GetCfgValue(uintptr_t *ctx, const M2InteropString id);
+	static const char *GetCfgValue(uintptr_t *ctx, const M2InteropString id, int index);
 	static int GetCfgValueEx(uintptr_t *ctx, const M2InteropString *id);
 
 #else
-	static const char * __fastcall GetCfgValue(uintptr_t *ctx, uintptr_t _EDX, const M2InteropString id, uintptr_t index);
+	static const char * __fastcall GetCfgValue(uintptr_t *ctx, uintptr_t _EDX, const M2InteropString id, int index);
 	static int __fastcall GetCfgValueEx(uintptr_t *ctx, uintptr_t _EDX, const M2InteropString *id);
 #endif
 };

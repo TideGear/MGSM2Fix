@@ -360,7 +360,7 @@ void * __cdecl M2Utils::memsetWait(void *str, int c, size_t n)
     return M2Hook::GetInstance().Invoke<void *>(memsetWait, str, c, n);
 }
 
-void * __cdecl M2Utils::newWait(size_t n)
+void * __cdecl M2Utils::stringWait(void *str, void *buf, size_t n)
 {
     std::lock_guard lock(startHookMutex);
     if (!startHookCalled)
@@ -375,7 +375,7 @@ void * __cdecl M2Utils::newWait(size_t n)
         }
     }
 
-    return M2Hook::GetInstance().Invoke<void *>(newWait, n);
+    return M2Hook::GetInstance().Invoke<void *>(stringWait, str, buf, n);
 }
 
 void M2Utils::startRelease()
@@ -391,7 +391,8 @@ void M2Utils::startHook()
 #ifndef _WIN64
     M2Hook::GetInstance().Hook("8B 4C 24 0C 0F B6 44 24 08 8B D7 8B 7C 24 04 85", 0, memsetWait);
 #else
-    M2Hook::GetInstance().Hook("40 53 48 83 EC 20 48 8B D9 EB 0F 48 8B CB E8 81", 0, newWait);
+    M2Hook::GetInstance().Hook("48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 "
+                               "56 48 83 EC 20 48 BD FF FF FF FF FF FF FF 7F",    0, stringWait);
     M2Hook::GetInstance().Hook("4C 8B D9 0F B6 D2 49 B9 01 01 01 01 01 01 01 01", 0, memsetWait);
 #endif
 }

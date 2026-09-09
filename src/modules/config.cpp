@@ -49,9 +49,9 @@ public:
 };
 
 #ifdef _WIN64
-const char *Config::GetCfgValue(uintptr_t *ctx, const M2InteropString id)
+const char *Config::GetCfgValue(uintptr_t *ctx, const M2InteropString id, int index)
 #else
-const char * __fastcall Config::GetCfgValue(uintptr_t *ctx, uintptr_t _EDX, const M2InteropString id, uintptr_t index)
+const char * __fastcall Config::GetCfgValue(uintptr_t *ctx, uintptr_t _EDX, const M2InteropString id, int index)
 #endif
 {
     std::string key(id.c_str());
@@ -85,7 +85,7 @@ const char * __fastcall Config::GetCfgValue(uintptr_t *ctx, uintptr_t _EDX, cons
     }
 
 #ifdef _WIN64
-    return M2Hook::GetInstance().Invoke<const char *>(GetCfgValue, ctx, id);
+    return M2Hook::GetInstance().Invoke<const char *>(GetCfgValue, ctx, id, index);
 #else
     return M2Hook::GetInstance().Invoke<const char *>(GetCfgValue, ctx, _EDX, id, index);
 #endif

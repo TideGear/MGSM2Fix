@@ -18,7 +18,7 @@ public:
 
 	static void startHook();
 	static void * __cdecl memsetWait(void *str, int c, size_t n);
-	static void * __cdecl newWait(size_t n);
+	static void * __cdecl stringWait(void *str, void *buf, size_t n);
 	static void startRelease();
 
 	static void nullsub();
