@@ -1,0 +1,81 @@
+# Credits and provenance — Integral English text port
+
+This port stands on other people's work. This file says whose, exactly what is
+used, and what is unresolved. It covers `tools/integral-english/` and the
+patches it builds; the rest of MGSM2Fix has its own `LICENSE` and
+`LICENSES.txt` at the repository root.
+
+## The MGS1 decompilation — FoxdieTeam/mgs_reversing
+
+**<https://github.com/FoxdieTeam/mgs_reversing>**
+
+Three of the port's nine main-disc patch families contain compiled code, and
+that code is built from this project's source:
+
+| patch | overlay | what the port changes there |
+|---|---|---|
+| `en_option` | `option.bin` | the `sc_text` brightness texture path, and the collection's KEY CONFIG doorbell |
+| `en_preope` | `preope.bin` | Previous Operations paginated the way the USA release paginates it |
+| `en_abst` | `abst.bin` | the MISSION LOG rebuilt to the USA release's two-screen model |
+
+Nothing else in the port compiles anything. The VR disc's code changes — the
+KEY CONFIG label transplant and the MOVIE captions' two-line stub — are
+hand-assembled instructions written as byte patches, and every other family is
+data.
+
+**Pinned revision:** `7964de7fd2e9e8276a6307d59fc7a0cdf96aae21` (2026-08-27).
+`rebuild.py` exports exactly that commit into an isolated directory, applies
+`decomp-overlay-changes.patch`, and compiles three targets. It never modifies
+the checkout it reads from.
+
+**What of theirs is in this repository.** No decomp source is vendored here and
+none ships in a release: a build requires a clone you supply with `--decomp`.
+But `decomp-overlay-changes.patch` is committed, and a unified diff quotes the
+code it changes — 534 context lines and 425 removed lines of their source,
+against 819 lines added by this port, across five files
+(`onoda/abst/abst.c`, `onoda/option/opt.c`, `onoda/preope/preope.c`,
+`pre_met1.c`, `pre_met2.c`).
+
+**Their work is byte-faithful, and that is measured, not assumed.** Integral's
+VR executable built from this decomp reproduces the retail disc's own EDC/ECC
+parity for all 308 of its sectors — a 280-byte sum over each 2048-byte block
+(`py cdecc.py`). Where the source is unchanged, their build *is* the disc.
+
+**Unresolved: the project states no licence.** There is no `LICENSE` or
+`COPYING` file at its root and its README carries no licence or credits
+section, so the terms under which its source may be modified, compiled and
+redistributed are not stated anywhere. This port therefore:
+
+* vendors none of it, and requires the builder to obtain their own copy;
+* pins and records the exact upstream commit in every build report;
+* credits the project here, in `README.md`, in the patch file itself and in the
+  README that ships inside every release ZIP.
+
+**That is credit, not permission.** Before this port is released widely, the
+right step is to ask FoxdieTeam directly how they want work derived from
+`mgs_reversing` handled, and to honour whatever they say. If they would rather
+their code were not compiled into a distributed patch, the fallback is to
+express these three overlays as byte patches against the retail overlays, the
+way the VR disc's code changes already are — larger work for `abst`, which is a
+reimplementation rather than a tweak, but possible.
+
+## Other people's work this port relies on
+
+| what | who | how it is used |
+|---|---|---|
+| MGSM2Fix and Ketchup | nuggslet — <https://github.com/nuggslet/MGSM2Fix> | the mod loader the collection build targets, and the host for this port's runtime changes. MIT; see `LICENSE` |
+| PSY-Q SDK | Sony Computer Entertainment | required to compile the three overlays. Not distributed here, and not distributable |
+| Metal Gear Solid, MGS Integral, VR Missions | Konami | every English string in this port is copied verbatim from the USA release. Nothing is translated and no game data is distributed in this repository |
+
+## What this port does not take
+
+* **No game data is in this repository.** Disc images, stage archives,
+  executables and textures are read from a local installation and from retail
+  discs the builder supplies; none is committed and none is redistributed.
+* **No new translation exists.** Every English string comes from a released
+  Konami build. Where the USA release has no counterpart, the Japanese is left
+  exactly as it is, on purpose. `COVERAGE.md` lists those cases.
+* **The collection's own patch data is read, never redistributed.**
+  `m2archive.py` decodes the archive in place so the collection's CD-ROM
+  patches can be compared with the port's; it extracts nothing into this
+  repository.

@@ -101,10 +101,30 @@ def map_runs(lba, runs):
             p += size
 
 
-def ppf(records, description):
+BLOCKCHECK_AT = 0x9320
+BLOCKCHECK_LEN = 1024
+
+
+def blockcheck_of(path, base=0):
+    """The 1024 bytes at 0x9320 of a disc image, which is what a PPF3's block
+    check holds: an applier compares them and refuses a patch aimed at a
+    different release. Ketchup skips the field, so this only matters for a raw
+    disc image, where an ordinary PPF tool does the applying."""
+    with open(path, 'rb') as handle:
+        handle.seek(base + BLOCKCHECK_AT)
+        block = handle.read(BLOCKCHECK_LEN)
+    assert len(block) == BLOCKCHECK_LEN, path
+    return block
+
+
+def ppf(records, description, blockcheck=None):
     desc = description.encode('ascii')
     assert len(desc) <= 50
     out = bytearray(b'PPF30\x02' + desc.ljust(50, b'\0') + bytes(4))
+    if blockcheck is not None:
+        assert len(blockcheck) == BLOCKCHECK_LEN, len(blockcheck)
+        out[57] = 1
+        out += blockcheck
     for offset, data in records:
         for p in range(0, len(data), 255):
             chunk = data[p:p+255]
@@ -113,10 +133,24 @@ def ppf(records, description):
     return bytes(out)
 
 
+def add_blockcheck(data, block):
+    """Put a block check into an already-built PPF without touching a record."""
+    assert data[:6] == b'PPF30\x02' and len(block) == BLOCKCHECK_LEN
+    assert not data[57], 'this PPF already carries a block check'
+    return bytes(data[:57]) + b'\x01' + bytes(data[58:60]) + block + bytes(data[60:])
+
+
 def read_ppf(path):
     data = Path(path).read_bytes()
-    assert len(data) >= 60 and data[:6] == b'PPF30\x02' and data[56:60] == bytes(4)
-    p, result = 60, []
+    assert len(data) >= 60 and data[:6] == b'PPF30\x02'
+    assert data[56] == 0 and data[58] == 0 and data[59] == 0, 'image type or undo data'
+    # Byte 57 says a 1024-byte block check sits between the header and the first
+    # record. Ketchup skips it the same way (ApplyPPF3 starts at 1084).
+    p = 60
+    if data[57]:
+        p = 60 + BLOCKCHECK_LEN
+        assert len(data) >= p, path
+    result = []
     while p < len(data):
         offset, length = struct.unpack_from('<QB', data, p)
         p += 9

@@ -19,10 +19,12 @@ import tarfile
 import zipfile
 from iso import Disc
 from portio import (INTEGRAL_IMAGES, USA_IMAGES, stage, relocation, sha256,
-                    read_ppf)
+                    read_ppf, ppf as make_ppf, blockcheck_of, add_blockcheck)
+import rawdisc
 
 TOOLS = Path(__file__).resolve().parent
-FAMILIES = ('items', 'menu', 'menu2', 'preope', 'brf', 'option', 'savemsg', 'camsave', 'abst')
+FAMILIES = ('items', 'menu', 'menu2', 'preope', 'brf', 'option', 'savemsg', 'camsave',
+            'abst', 'pad2')
 # The VR disc's own port (2026-09-06/07). Its tools are separate because the disc
 # is a separate game - its own executable, overlays and containers - but the
 # build is the same discipline, so it belongs in the same isolated run.
@@ -98,6 +100,35 @@ def extract(game, work, executables):
     return inputs
 
 
+def place(target, data, block):
+    """Write one PPF into the package, giving a raw-disc build its block check.
+
+    The block check is 1024 bytes of the original image at 0x9320. Ketchup skips
+    the field, so it buys the collection nothing; on a raw disc an ordinary PPF
+    tool compares it and refuses a patch aimed at a different release, which is
+    worth having when the patch is being handed to strangers with their own
+    dumps."""
+    if block is not None:
+        data = add_blockcheck(data, block)
+    target.write_bytes(data)
+    return data
+
+
+def raw_tails(name, description, image_path, base, folder, substitutes, block, report):
+    """The one extra PPF a raw disc needs: every touched sector's EDC/ECC.
+
+    Built from the family patches already in `folder`, so it must come last -
+    and it makes the set all-or-nothing, because a tail is computed from the
+    final payload of the whole set. See rawdisc.py."""
+    stats = {}
+    records = rawdisc.tails(image_path, base, sorted(folder.glob('*.ppf')),
+                            substitutes, stats)
+    data = place(folder/name, make_ppf(records, description), block)
+    report['outputs'][name] = dict(sha256=sha256(data), bytes=len(data),
+                                   records=len(records), **stats)
+    return stats
+
+
 def effects(path, image):
     """Effective changed bytes, independent of PPF descriptions/run boundaries."""
     result = {}
@@ -148,6 +179,11 @@ def main():
                PYTHONIOENCODING='utf-8', PYTHONUTF8='1')
     report = dict(variant=args.variant, base_commit=subprocess.check_output(
         ['git','-C',str(source),'rev-parse',BASE],text=True).strip(),
+        # Whose source this is, recorded in every build rather than assumed.
+        # The three overlays are compiled from it; see CREDITS.md.
+        decomp_origin=subprocess.run(['git','-C',str(source),'remote','get-url','origin'],
+                                     capture_output=True,text=True).stdout.strip()
+                      or 'unknown',
         python=sys.version, packages={n:importlib.metadata.version(n)
                                     for n in ('Pillow','ninja')}, inputs={}, outputs={})
     report['sources'] = {p.name:sha256(p.read_bytes()) for p in sorted(TOOLS.iterdir())
@@ -205,7 +241,7 @@ def main():
     # Only source geometry is copied; all derived placements are regenerated.
     (work/'brf_quads_all.json').write_bytes((TOOLS/'brf_quads_all.json').read_bytes())
     scripts = ['items.py','menu2.py','preope_usa.py','brf_build.py','optsctext.py',
-               'savemsg.py','camsave.py','abst_build.py']
+               'savemsg.py','camsave.py','abst_build.py','pad2.py']
     families = list(FAMILIES)
     if args.variant == 'raw':
         # en_menu3 exists only here: the collection patches that same block, so
@@ -219,13 +255,17 @@ def main():
     print('Building the VR disc: seven patches (vr_windows rebuilds 92 stages)...',flush=True)
     for script in VR_SCRIPTS:
         parts = script.split()
-        # vr_movie composes on the PPFs this run just made, not on a deployed set
-        run([sys.executable,TOOLS/parts[0]]+parts[1:],TOOLS,
-            dict(env,INTEGRAL_ENGLISH_VR_PPF_DIR=str(work)),log)
+        # Order matters: vr_windows ports the `movie` stage and hands it to
+        # vr_movie as work/vr_movie_base.bin rather than writing its records,
+        # so that one patch owns that stage. vr_movie runs last in VR_SCRIPTS.
+        run([sys.executable,TOOLS/parts[0]]+parts[1:],TOOLS,env,log)
     dist = output/'package'
     mods = dist/'mods/INTEGRAL/INTEGRAL'
+    container = game/'windata/dlc/dlc_japan.bin'
+    raw = args.variant == 'raw'
     for disc, base in enumerate(INTEGRAL_IMAGES):
-        image = Disc(game/'windata/dlc/dlc_japan.bin',base)
+        block = blockcheck_of(container,base) if raw else None
+        image = Disc(container,base)
         target = mods/str(disc)
         target.mkdir(parents=True)
         try:
@@ -239,12 +279,12 @@ def main():
                     built = work/('option_sctext_disc%d.ppf' % (disc+1))
                 elif family == 'menu3':
                     built = work/('INTEGRAL_disc%d_en_menu3_raw.ppf' % (disc+1))
-                (target/name).write_bytes(built.read_bytes())
+                data = place(target/name,built.read_bytes(),block)
                 from ppfcheck import check
                 problems,n,span,desc = check(target/name)
                 assert not problems, (name,problems)
                 effective = effects(target/name,image)
-                item = dict(sha256=sha256(built.read_bytes()),bytes=built.stat().st_size,
+                item = dict(sha256=sha256(data),bytes=len(data),
                             records=n,changed_bytes=len(effective))
                 if args.compare_deployed:
                     reference = game/'mods/INTEGRAL/INTEGRAL'/str(disc)/name
@@ -255,6 +295,19 @@ def main():
                     item['difference_count'] = len(mismatch)
                     item['difference_addresses'] = [hex(p) for p in sorted(mismatch)[:12]]
                 report['outputs'][name] = item
+            if raw:
+                # The executable's ISO extent is zero-filled in the collection's
+                # image, so the retail file goes back before any sum is taken;
+                # rawdisc then refuses to emit a tail for any sector that does
+                # not first verify against its own stored parity.
+                exe = 'int%d.exe' % (disc+1)
+                substitutes = rawdisc.Substitutes()
+                substitutes.add(report['inputs'][exe]['lba'],(work/exe).read_bytes(),exe)
+                stats = raw_tails('INTEGRAL_disc%d_zz_ecc.ppf' % (disc+1),
+                                  'MGS Integral disc %d: raw-disc EDC/ECC' % (disc+1),
+                                  container,base,target,substitutes,block,report)
+                print('  disc %d: EDC/ECC recomputed for %d sector(s)'
+                      % (disc+1,stats['sectors']),flush=True)
         finally:
             image.f.close()
     # The VR disc's own folder. Ketchup gives it no numbered subdirectory (one
@@ -263,17 +316,18 @@ def main():
     from vrlib import INT_VR_BASE
     vrmods = dist/'mods/INTEGRAL/VR-DISK'
     vrmods.mkdir(parents=True)
-    vrimage = Disc(game/'windata/dlc/dlc_japan.bin',INT_VR_BASE)
+    vrblock = blockcheck_of(container,INT_VR_BASE) if raw else None
+    vrimage = Disc(container,INT_VR_BASE)
     try:
         for family in VR_FAMILIES:
             name = 'INTEGRAL_vr_en_%s.ppf' % family
             built = work/name
-            (vrmods/name).write_bytes(built.read_bytes())
+            data = place(vrmods/name,built.read_bytes(),vrblock)
             from ppfcheck import check
             problems,n,span,desc = check(vrmods/name)
             assert not problems, (name,problems)
-            report['outputs'][name] = dict(sha256=sha256(built.read_bytes()),
-                                           bytes=built.stat().st_size,records=n,
+            report['outputs'][name] = dict(sha256=sha256(data),
+                                           bytes=len(data),records=n,
                                            changed_bytes=len(effects(vrmods/name,vrimage)))
             if args.compare_deployed:
                 reference = game/'mods/INTEGRAL/VR-DISK'/name
@@ -283,33 +337,94 @@ def main():
                 report['outputs'][name]['reference_effect_equal'] = not mismatch
                 report['outputs'][name]['difference_count'] = len(mismatch)
                 report['outputs'][name]['difference_addresses'] = [hex(p) for p in sorted(mismatch)[:12]]
+        if raw:
+            vrlba,_ = next((l,s) for n,l,s,d in vrimage.walk()
+                           if not d and n.upper() == '/MGS/SLPM_862.49;1')
+            substitutes = rawdisc.Substitutes()
+            substitutes.add(vrlba,(work/'vrint.exe').read_bytes(),'vrint.exe')
+            stats = raw_tails('INTEGRAL_vr_zz_ecc.ppf',
+                              'MGS Integral VR disc: raw-disc EDC/ECC',
+                              container,INT_VR_BASE,vrmods,substitutes,vrblock,report)
+            print('  VR disc: EDC/ECC recomputed for %d sector(s)'
+                  % stats['sectors'],flush=True)
     finally:
         vrimage.f.close()
-    # vr_en_movie deliberately overlaps vr_en_missions - it is built on top of it
-    # and must land last, which Ketchup's name order gives (README, "The
-    # composite trap"). So the VR set is checked for overlaps EXCEPT that pair.
+    # No VR patch may write a byte another one writes. Until 2026-09-07 exactly
+    # one pair was allowed to - vr_en_movie was built on top of vr_en_missions
+    # and had to load after it, which nothing enforced but Ketchup's file-name
+    # order. vr_windows now hands the whole `movie` stage to vr_movie instead
+    # (vr_windows.HANDOVER), so the set is disjoint and this is absolute.
     vrwrites = {}
-    for path in sorted(vrmods.glob('*.ppf')):
+    for path in sorted(vrmods.glob('*en_*.ppf')):
         for off,data in read_ppf(path):
             for k,value in enumerate(data):
                 prior = vrwrites.get(off+k)
-                if prior and prior[1] != path.name:
-                    pair = {prior[1],path.name}
-                    assert pair == {'INTEGRAL_vr_en_missions.ppf','INTEGRAL_vr_en_movie.ppf'},                         (path.name,hex(off+k),prior[1])
+                assert not (prior and prior[1] != path.name), \
+                    ('two VR patches write the same byte',path.name,hex(off+k),prior and prior[1])
                 vrwrites[off+k] = (value,path.name)
     # Check overlapping writes in the actual packaged set, before offering it.
     for disc in (0,1):
         writes = {}
-        for path in sorted((mods/str(disc)).glob('*.ppf')):
+        for path in sorted((mods/str(disc)).glob('*en_*.ppf')):
             for off,data in read_ppf(path):
                 for k,value in enumerate(data):
                     assert off+k not in writes or writes[off+k][0] == value, (path.name,hex(off+k),writes[off+k][1])
                     writes[off+k] = (value,path.name)
+    if args.compare_deployed:
+        # `vr_en_missions` and `vr_en_movie` were repartitioned on 2026-09-07:
+        # the same disc bytes, split between the two files differently. Compared
+        # one file at a time that reads as two failures; compared as the set
+        # Ketchup actually applies, it is what it is - identical.
+        def vr_effect(folder):
+            state = {}
+            for path in sorted(Path(folder).glob('INTEGRAL_vr_en_*.ppf')):
+                for off,data in read_ppf(path):
+                    for k,value in enumerate(data):
+                        state[off+k] = value
+            return state
+        mine, theirs = vr_effect(vrmods), vr_effect(game/'mods/INTEGRAL/VR-DISK')
+        vrimage = Disc(container,INT_VR_BASE)
+        try:
+            differs = []
+            for at in mine.keys() | theirs.keys():
+                if mine.get(at) == theirs.get(at):
+                    continue
+                vrimage.f.seek(vrimage.base+at)
+                retail = vrimage.f.read(1)[0]
+                if mine.get(at,retail) != theirs.get(at,retail):
+                    differs.append(at)
+        finally:
+            vrimage.f.close()
+        report['vr_set_effect_equal'] = not differs
+        report['vr_set_differences'] = [hex(a) for a in sorted(differs)[:12]]
+        if not differs:
+            for name in ('INTEGRAL_vr_en_missions.ppf','INTEGRAL_vr_en_movie.ppf'):
+                item = report['outputs'].get(name)
+                if item and item.get('reference_effect_equal') is False:
+                    item['reference_effect_equal'] = 'equal as a set (repartitioned 2026-09-07)'
     (output/'build-report.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     bad = [n for n,v in report['outputs'].items() if v.get('reference_effect_equal') is False]
+    if report.get('vr_set_effect_equal') is False:
+        bad.append('the VR set as a whole')
     if bad:
         raise RuntimeError('Deployed comparison differs: '+', '.join(bad)+'; see build-report.json. No ZIP created.')
-    (dist/'README.txt').write_bytes((TOOLS/'PACKAGE-README.txt').read_bytes())
+    # The packaged README is per variant, and gets the build stamped into it -
+    # a hand-kept one drifted out of date every time the port gained a patch.
+    readme = TOOLS/('PACKAGE-README-raw.txt' if raw else 'PACKAGE-README.txt')
+    stamp = ['', '-- This build ' + '-'*54, '',
+             'Variant: %s.  Patches: %d.' % (args.variant, len(report['outputs'])),
+             'SC_KEEP_LINES %d, OPTION_MC_CONTROL_SETTINGS %d, en_menu3 %s.'
+             % (report['variant_constants']['SC_KEEP_LINES'],
+                report['variant_constants']['OPTION_MC_CONTROL_SETTINGS'],
+                'included' if raw else 'excluded'),
+             'Decomp %s.  See SHA256SUMS.txt and build-report.json.'
+             % report['base_commit'][:12], '']
+    for name in sorted(report['outputs']):
+        item = report['outputs'][name]
+        stamp.append('  %-38s %8d bytes  %5d records'
+                     % (name, item['bytes'], item['records']))
+    (dist/'README.txt').write_bytes(readme.read_bytes()
+                                    + '\n'.join(stamp).replace('\n','\r\n').encode())
     (dist/'build-report.json').write_bytes((output/'build-report.json').read_bytes())
     manifest = {str(p.relative_to(dist)).replace('\\','/'):sha256(p.read_bytes())
                 for p in sorted(dist.rglob('*')) if p.is_file()}
@@ -323,7 +438,9 @@ def main():
                 info.compress_type = zipfile.ZIP_DEFLATED
                 archive.writestr(info,path.read_bytes())
     print('Verified %d PPFs (%s variant, %d main + %d VR); %s'
-          % (2*len(families)+len(VR_FAMILIES), args.variant, 2*len(families), len(VR_FAMILIES), zip_path),flush=True)
+          % (len(report['outputs']), args.variant,
+             sum(1 for n in report['outputs'] if '_disc' in n),
+             sum(1 for n in report['outputs'] if '_vr_' in n), zip_path),flush=True)
 
 
 if __name__ == '__main__':

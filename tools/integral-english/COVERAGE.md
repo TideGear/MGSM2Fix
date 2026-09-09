@@ -6,9 +6,90 @@ itself, so it is not deployed here (README, "Why `en_menu3` is raw-disc only");
 the Mission
 Log and the disc-change abstract (both in `abst`) were ported on 2026-09-05
 (`en_abst`, seen on screen the same day), and the VR disc on 2026-09-06
-(six PPFs; see "The VR disc" below and the README section of the same name).
+(seven PPFs since the MOVIE captions on 2026-09-07; see "The VR disc" below and the README section of the same name).
 The expanded scan closes the old tool's disc-1-only coverage gap for stage
 inventory; it does not establish that every visible string has been audited.
+
+**Since 2026-09-07 there is a stronger tool for the main discs: `mainsweep.py`.**
+`audit_text.py` inventories *candidates* by framing and says so; it cannot tell
+whether a candidate has an English counterpart, which is why about 160 of them
+sat unclassified here. `mainsweep.py` does for discs 1 and 2 what `vr_sweep.py`
+does for the VR disc: it pairs every GCL string with the USA disc's by the
+command that owns it, so "Integral is Japanese here and USA has English" becomes
+a comparison between two discs rather than a judgement about bytes. Run on
+retail on both sides, deliberately, so a gap cannot hide behind a patch that is
+already deployed.
+
+**Result, both discs, identical:** twelve owners hold Japanese strings whose
+owner has English on the USA disc. Nine are inside stages a patch family already
+owns (`abst`, `preope`, `option`, `title`, `change`, `demosel`). Two are Japanese
+on the USA disc in identical numbers, so there is nothing to port: `cmd 4AD9`,
+the location titles, 12 Japanese and 58 English on **both** discs, and
+`chara 9302` in `rank`, 1 and 30 on both. One was neither, and it is now the
+`en_pad2` family, **built and deployed 2026-09-08**:
+
+| | |
+|---|---|
+| stage | `s07b` on both discs, and `s07br` |
+| owner | `chara 2D0A` — `CHARA_2D0A_2ND` → `NewSecond`, `game/second.c` |
+| what it is | the subtitle drawn when the controller moves to port 2 for the Psycho Mantis fight: コントローラ端子1のコントローラを｜使用してください。 |
+| Integral | 55 bytes of Japanese at **two** call sites in `s07b` and one in `s07br` |
+| USA | English at the second `s07b` site, `PLUG CONTROLLER INTO \| CONTROLLER PORT 1.` (42 bytes); the first site is the identical Japanese |
+
+**The table this replaces was wrong in two ways, and reading the caller is what
+showed it.** `second.c` takes one string per spawn, so there is no record 0 and
+record 1 to index: `s07b` holds two separate *spawns*, in two branches of its
+script, and USA translated the **later** one. USA's English is shorter than the
+slot, so the port is length-preserving — no container resized, no stage
+relocated. All five sites are ported on the user's instruction, because both
+branches hand the same message to the same actor and shipping USA's
+inconsistency would leave Japanese on screen. `NextSteps.md` §5.11 has the
+reasoning and the verification.
+
+**A second limit of this sweep, found the same day.** `mainsweep.py` compares
+the **82 stage names both discs share**, so every one of the 13 Integral-only
+stages is outside its universe. The third copy of that string, in `s07br`, was
+therefore invisible to it and was found only by looking for the same owner in
+the Integral-only stages by hand. A count from this tool means "among shared
+stages"; Integral-only stages need their own pass, and none has been done.
+
+**A description is not always the string its table points at.** Six item and
+weapon slots swap or rewrite their text with the game state, mapped 2026-09-07
+from the only two functions that print one (README, "Descriptions that change
+with the game state"). Five are ported or deliberately matched to USA. The
+sixth has no counterpart and **stays Japanese**: on VERY EASY the FA-MAS slot
+becomes the MP5 SD outright - label and description both - and USA has neither
+that weapon nor that difficulty. The description is 103 bytes at RAM 0x80011B04;
+the label is an inline literal in the menu code, not a table entry. Confirmed on
+screen 2026-09-07. Note that neither sweep could have
+found it - it is an executable string, so `mainsweep.py` does not see it, and
+`audit_text.py` reads the executables only for the save-title probes.
+
+**One more text set, found and partly ported 2026-09-07.** The inventory's
+side-column abbreviations are a separate block of names in the executable,
+already Latin on both discs, which is why no sweep or audit had flagged them.
+Comparing Integral's against USA's entry by entry, one differed: item 22 was
+`SCARF` where USA has `HANDKER`. That one was changed on the user's instruction
+and is the port's first replacement of Integral's **own English** rather than of
+its Japanese (README, "Amendment, 2026-09-07"). The rest of the block already
+matched. Integral's weapon names carry one entry USA does not have at all,
+`MP 5 SD`.
+
+**A blind spot this file shares with every sweep in the project.** All of them -
+`mainsweep.py`, `vr_sweep.py`, `jpsweep.py`, `audit_text.py` - look for
+*Japanese*. A string that is already English on both discs and simply **says
+something different** passes all of them unremarked. Two such cases are known,
+`SCARF` against USA's `HANDKER` and the `abst` location spellings, and **both
+were found by accident rather than by looking**. `NextSteps.md` §5.14 sketches
+the sweep that would find the rest; until it is run, no claim here covers them.
+
+**So the claim this file can now make** is that on the main discs, every string
+whose owning command has English on the USA release is either already ported or
+Japanese on the USA disc too — the last exception, `s07b`, was ported on
+2026-09-08. That is a measurement, and it is a measurement over the 82 stage
+names the two discs share (see the limit noted above).
+What it still does not cover is texture lettering, executable UI beyond the
+probes below, and runtime language branches.
 
 ## Reproduce the inventory
 
@@ -30,7 +111,10 @@ It writes only the requested report. Run it again after changing deployed PPFs.
 
 Each main disc has 82 shared stage names and 13 Integral-only names:
 `d18ar`, `endingr`, `init_ve`, `s03ar`, `s03dr`, `s03er`, `s07br`, `s07cr`,
-`s09ar`, `s18ar`, `s19ar`, `s19br`, `s20ar`.
+`s09ar`, `s18ar`, `s19ar`, `s19br`, `s20ar`. **These are outside `mainsweep.py`'s
+universe**, which is the two discs' shared names; `s07br` is the one so far known
+to hold portable text, and `en_pad2` covers it. What the `*r` stages are for has
+not been established - `s07br`'s overlay source is byte-identical to `s07b`'s.
 Integral's VR ISO was located by its PVD and `SLPM_862.49` path at container
 base `0x57592000`; USA VR is at `0xD39B7000`. The older 106-stage count included
 one more than the 105 named entries actually enumerated; use 105 for inventory.
@@ -94,7 +178,7 @@ encoded strings in the file overstates what remains visible in Japanese.
 
 ## The VR disc (inventoried and ported 2026-09-06)
 
-Read from the VR binaries by `vrlib.py` and the five `vr_*.py` builders, not by
+Read from the VR binaries by `vrlib.py` and the six `vr_*.py` builders, not by
 `audit_text.py`. Every figure is what the builders report on a clean run.
 
 | where the text is | how it is stored | Integral | ported |

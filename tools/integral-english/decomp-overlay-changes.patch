@@ -1,3 +1,20 @@
+This patch belongs to the MGS Integral English text port
+(MGSM2Fix, tools/integral-english/). It applies to:
+
+    FoxdieTeam/mgs_reversing            https://github.com/FoxdieTeam/mgs_reversing
+    at commit 7964de7fd2e9e8276a6307d59fc7a0cdf96aae21  (2026-08-27)
+
+The MGS1 decompilation is that project's work, not this one's. The lines below
+marked with a leading space or minus are theirs, quoted so the change can be
+applied; the added lines are this port's. Building the three overlays this
+patch changes - option.bin, preope.bin and abst.bin - requires a clone of their
+repository, which this repository does not vendor.
+
+That project states no licence. See CREDITS.md beside this file for what that
+means and what has not been settled.
+
+(git apply ignores this header and starts at the first "diff --git" line.)
+
 diff --git a/source/onoda/abst/abst.c b/source/onoda/abst/abst.c
 index 50afa69..dd4ee40 100644
 --- a/source/onoda/abst/abst.c

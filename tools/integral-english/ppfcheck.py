@@ -12,7 +12,9 @@ of 60 bytes in a 50-byte slot - `ljust(50, b'\\x00')` pads but never truncates,
 so every offset after it was 10 bytes out. The tools now assert their
 description length; this checks the artifact itself.
 
-Header is 60 bytes: b'PPF30', version byte, 50-byte description, 4 reserved.
+Header is 60 bytes: b'PPF30', version byte, 50-byte description, then image
+type, block check, undo and a spare byte. A block check adds 1024 bytes of the
+original image before the first record, which Ketchup skips and this follows.
 Records are u64 offset, u8 length, then that many bytes, to end of file.
 """
 import glob, os, struct, sys
@@ -32,7 +34,17 @@ def check(path):
     if b'\x00' in d[6:56].rstrip(b'\x00'):
         problems.append('description contains an embedded NUL')
 
-    n, q, lo, hi = 0, 60, None, 0
+    if d[56]:
+        problems.append('image type is %d, not 0 (BIN)' % d[56])
+    if d[58]:
+        problems.append('undo data is declared; Ketchup would misread the records')
+    q = 60
+    if d[57]:
+        q = 60 + 1024
+        if len(d) < q:
+            return problems + ['block check declared but the file ends inside it'], 0, None, desc
+
+    n, lo, hi = 0, None, 0
     while q + 9 <= len(d):
         off, ln = struct.unpack_from('<QB', d, q)
         if q + 9 + ln > len(d):
