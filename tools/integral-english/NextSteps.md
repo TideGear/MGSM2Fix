@@ -36,7 +36,7 @@ authoritative**; if they disagree with a memory file, the memory file is stale.
 | working data | `D:\mgsbuild\integral-english-work\` — `work\` (extracted STAGE.DIRs, the four retail executables, built binaries, baselines), `unlocks_parked\` (the four unlock PPFs, not deployed), `keyconfig_test\`, `map_pristine.map` (the pristine exe's symbol map), ini/log/`opt.c` snapshots | every tool imports `WORK` from `workdir.py`: `INTEGRAL_ENGLISH_WORK` env var → `D:\mgsbuild\integral-english-work` → cwd. `workdir.py` also exports `GAME` (`INTEGRAL_ENGLISH_GAME`, default the Steam folder) and `DECOMP` (`INTEGRAL_ENGLISH_DECOMP`, default `D:\mgsbuild\d`); the builders and `rebuild.py` take every path from it; a few standalone helpers still carry their own — `ppfcheck.py`'s `MODS`, `audit_text.py`'s argparse defaults, and the repo path that `jpsweep.py`, `kcplace.py`, `kcquads.py` and `kcrects.py` insert into `sys.path`. `py workdir.py` prints what it resolved |
 | VR working data | `work\vrint_stage.dir`, `work\vrus_stage.dir` (the two VR STAGE.DIRs), `work\vrint.exe` (rebuilt from the decomp, `build.py --variant vr_exe`, SHA-256 `c370f8e4…`), `work\vrus.exe` (real `SLUS-00957`), `work\INTEGRAL_vr_*.ppf` | `vrlib.py` finds the two VR ISOs inside the containers itself (`0x57592000` and `0xD39B7000`) and computes stage LBAs from STAGE.DIR |
 | retail executables | `work\int1.exe`, `int2.exe` (641,024 bytes each), `us1.exe`, `us2.exe` (651,264) — hashes in `BUILDING.md`; `rebuild.py` rejects any other | **the collection's ISO executable extents are zero-filled**, so extracting an exe from `alldata.bin`/`dlc_japan.bin` yields no code — the first clean-build attempt failed on exactly that. These four files are the only source of executable bytes |
-| reproducible build | `py rebuild.py --output <fresh dir> [--variant raw] [--compare-deployed]` (see `BUILDING.md`) | never installs anything. Builds **everything**: ten families × two main discs plus the VR disc's seven. Last artefact `D:/mgsbuild/repro17/Integral-English-collection.zip`, SHA-256 `3eb2e105…a6fb` (2026-09-08), **all 27 PPFs equal to the deployed set's effective bytes**. `--variant raw` builds the raw-disc variant instead (§5.4) |
+| reproducible build | `py rebuild.py --output <fresh dir> [--variant raw] [--compare-deployed]` (see `BUILDING.md`) | never installs anything. Builds **everything**: ten families × two main discs plus the VR disc's seven. Last artefact `D:/mgsbuild/repro18/Integral-English-collection.zip`, SHA-256 `0044ed81…da3e` (2026-09-08), **all 27 PPFs equal to the deployed set's effective bytes**. `--variant raw` builds the raw-disc variant instead (§5.4) |
 | game | `D:\Steam\SteamApps\common\MGS1` (Master Collection Vol. 1, Steam app **2131630**) | launch: `Start-Process steam://rungameid/2131630`; process name `METAL GEAR SOLID`; **kill by PID only, never `taskkill /IM`** |
 | Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2); the VR disc is `mods\INTEGRAL\VR-DISK\` and the USA VR disc `mods\VR-DISK_US\` | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually. Its `RootPath` adds a version folder only when a title has more than one version and a disk folder only when a version has more than one disk, which is why the two VR folders have no numbered subdirectory |
 | deployed ini | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.ini` is a **Vortex symlink**; edit the target: `%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-5-3-6-0-1774482213\MGSM2Fix.ini` | edit with Python or via `realpath`; `sed -i` on the link would replace the link with a file. The repo's `MGSM2Fix.ini` is the committed default, not what the game reads |
@@ -68,6 +68,11 @@ paraphrase them away.
    settled it, of the item side-column abbreviation: *"this is a case where we
    are replacing existing english in integral instead of japanese, so it's an
    exception to our rule."*
+
+   **Applied twice so far, and each time it was asked first.** `SCARF` ->
+   `HANDKER` (2026-09-07, §5.9) and the four `abst` location names (2026-09-08,
+   §5.9). The amendment is a licence to ask, not a default: where Integral's own
+   English merely reads differently and nobody has asked, it stays.
 
    So it is an exception, not a new default: an Integral string that is already
    English is left alone unless it is asked for, case by case, exactly like the
@@ -167,7 +172,7 @@ exported at `7964de7` plus `decomp-overlay-changes.patch`, three overlays
 recompiled (byte-identical to the shipped ones) — and all 20 PPFs match the
 deployed set's effective changed bytes. **Since 2026-09-07 the VR disc's seven
 are in the same run** (its executable built from the decomp, not copied), so the
-last clean run, `repro17` (2026-09-08), reproduces **27 of 27** against what is deployed. So the deployed patches are
+last clean run, `repro18` (2026-09-08), reproduces **27 of 27** against what is deployed. So the deployed patches are
 no longer artefacts of a lost scratchpad: they can be regenerated. `BUILDING.md`
 has the inputs, hashes, command, outputs and the ZIP's hash. This is static
 equivalence, not a new gameplay test.
@@ -724,18 +729,55 @@ oversights; §6 carries the same marker.
   USA draws nothing there; `KEEP_PROMPT_CAPTION = False` in `abst_build.py`
   gives USA's empty record. Also the `1/2` counter and empty second screen on
   count-7 pages — USA's own behaviour, reproduced.
-- **[open 2026-09-07, and there are FOUR of them]** Location-name spellings in
-  `abst`: Integral's own English, not Japanese — outside the rule as written, so
-  ask. `mainsweep.py --diff-english` enumerated the table on 2026-09-08 and it is
-  `Tank Hanger`/`Tank Hangar`, `Medi rm`/`Medi room`, `Cmnder rm`/`Cmnder room`
-  and **`Cmnd rm`/`Cmnd room`** — the fourth was in no document. 30 English names
-  in each game, aligned 1:1, 4 differing, both discs identical, and all four live
-  on the deployed disc (`abst_build.py` rewrites only the `0x9906` pages, so the
-  list is copied through). **Cost, if the answer is yes:** three of the four grow
-  by 2 bytes, which `abst_build.py` already handles — it recomputes every command
-  size, proc length, table offset and script length and relocates the stage — so
-  it is a constant beside `KEEP_PROMPT_CAPTION`, not new machinery. The only
-  budget to watch is the DUMMY3M slot the stage already occupies.
+- **The `abst` location names: USA's, ASKED AND DONE 2026-09-08.** The second
+  application of amendment 4b, and the first one that needed a container to
+  grow. `mainsweep.py --diff-english` enumerated the table: 30 English names in
+  each game, aligned 1:1, and **four** differ - the three the documents listed
+  plus `Cmnd rm`, which was in none of them.
+
+  | Integral | USA |
+  |---|---|
+  | `Tank Hanger` | `Tank Hangar` |
+  | `Medi rm` | `Medi room` |
+  | `Cmnder rm` | `Cmnder room` |
+  | `Cmnd rm` | `Cmnd room` |
+
+  *What it is.* One `0x9906` command in `scenerio.gcx`'s script body -
+  `mainsweep.py` calls it `chara 53C7` after the actor its first STRID spawns -
+  carrying 31 records directly in its value list with **no option list at all**,
+  which is why `page_of` returns None for it and `rebuild_body` used to skip it.
+  The names are **two-byte font codes**, not ASCII (`0x80xx` Latin, `0x9001` a
+  space), which is why no ASCII search of the PPFs had ever turned them up. Both
+  games use the same encoding, so USA's bytes drop straight in.
+
+  *How it was done.* `USA_LOCATION_NAMES` in `abst_build.py`, beside
+  `KEEP_PROMPT_CAPTION`. USA's **whole command** is taken rather than its four
+  records, and that is the point: the block carries **two** derived length fields
+  - the COMMAND's BE16 size and a **u8 at `start+5`** that `option_starts` uses
+  to reach the option list - and both are 12 bytes larger on USA's disc. Patching
+  the records and forgetting the u8 would leave a block whose size says one thing
+  and whose offset byte says another. Taking the block whole keeps them in step
+  by construction. `abst_build.py` already recomputes every enclosing container
+  (command size, proc body ARG length, proc table offsets, proclen, script
+  length) and relocates the stage, so nothing else was needed.
+
+  *Cost.* One name is length-neutral (`e` -> `a`), three grow by 4 bytes each -
+  two extra glyphs at 2 bytes a glyph - so **+12 bytes**, measured both ways:
+  the rebuilt chunk is 104,600 bytes with the constant off and 104,612 with it
+  on. The stage is still **88 sectors** and still lands in DUMMY3M slots
+  462..549, so no budget moved.
+
+  *Verified.* The builder's own verifier now re-parses the location list out of
+  the rebuilt script and asserts it equals its source record for record, and that
+  the constant is honoured exactly once - `verified: the 31-record location list
+  equals USA's exactly; 4 record(s) differ from retail Integral`. Both directions
+  were run: with the constant off it reports Integral's own list and 0 differing.
+  Deployed to both discs 2026-09-08; `ppfcheck.py --deployed` clean over 27
+  files. **Not yet seen on screen.**
+
+  *The Japanese location list is untouched.* `demo.gcx` carries Integral's own,
+  31 records USA has no counterpart for, and it is not offered to the
+  substitution at all.
 - **The item short-name table: `SCARF` -> `HANDKER`, ASKED AND DONE 2026-09-07.**
   **This is the port's first replacement of Integral's own English** rather than
   of its Japanese, and therefore the first case under amendment 4b in §2.
@@ -1077,8 +1119,42 @@ known cases sit in a *sequence* whose neighbours match - `SCARF` is between
    port's own work and calls it a finding. Only `vr_sweep.py` has the plumbing to
    reconstruct a deployed stage (`deployed()`); `mainsweep --diff-english` does
    not, which is safe today only because the one family it finds sits in records
-   no patch rewrites. **Fold the deployed-bytes input into both before trusting
-   either on a stage a patch family owns.**
+   no patch rewrites.
+
+   **Half of that is fixed as of 2026-09-08, the cheap half.**
+   `--diff-english` now checks each finding's stage against `PORTED` and prints
+   `!! <stage> is owned by <family> and these are RETAIL bytes` beside it, with
+   a closing summary naming every flagged stage. It cannot tell you what the
+   patch writes - it turns a silent trap into a printed one, which is what was
+   actually dangerous. Three stages flag today: `abst`, `option`, `title`. The
+   `abst` four are flagged and *were* real, and are now ported, so from here the
+   flag is what stops someone porting them twice.
+
+   **And the expensive half should NOT be built.** The first plan here was a
+   deployed-stage reconstruction like `vr_sweep.deployed()`, extended to follow
+   `en_abst`'s and `en_brf`'s relocation into DUMMY3M. That was the wrong
+   answer, and the reason is worth keeping: it re-derives by the hardest
+   available route something the project already has. **The builders construct
+   the ported stage in memory.** Reconstructing it from PPF records means
+   parsing the patch, applying it, following a relocated directory entry and
+   re-parsing the result - and needing an extension every time another family
+   starts relocating.
+
+   **The right division of authority, and it is mostly already in place:**
+
+   | bytes | authority | mechanism |
+   |---|---|---|
+   | a family owns them | that family's builder | a verifier over its own built output |
+   | nobody owns them | the sweep, reading retail | retail *is* deployed there, so it is already right |
+   | the boundary between | the `!!` flag | "a patch owns this, go read its builder" |
+
+   So the cheap fix is not a stopgap; it is the correct thing at the boundary.
+   `abst_build.py` now verifies its location list against USA record for record,
+   and `vr_windows.py` has always checked every window against USA's. **What is
+   actually left is per-family verifiers where they are missing** - small, local,
+   testable, and they fail at build time instead of waiting for a sweep to be
+   run. Note also that the Japanese sweep and `--census` must keep reading
+   **retail**, so the input is a per-question choice and never a global switch.
 
 4. **Not textures.** Lettering drawn as art is out of scope for a text sweep and
    stays that way.
@@ -1112,13 +1188,12 @@ an explicit answer before anything changes.
 - Achievements on or off for a given test session (`DisableRAM` /
   `DisableCDROM`); they are **on** now. Turning them off keeps SPECIAL / PHOTO
   ALBUM reachable without earning it and has never affected the PPFs.
-- **[open 2026-09-07]** Anything that touches Integral's own English (§5.9),
-  the `abst` location spellings first — **four** of them, not the three this
-  file used to list (§5.9 has the table and the cost; the fourth, `Cmnd rm`
-  against `Cmnd room`, was found by the 2026-09-08 sweep). **This is exactly the
-  shape of the `SCARF` -> `HANDKER` case**, which was asked and done the same
-  evening and created amendment 4b in §2; these were held rather than swept along
-  with it. The precedent says how to decide them, not that they are decided.
+- **The `abst` location names — ASKED AND ANSWERED 2026-09-08: use USA's.**
+  Four of them, not the three this file used to list; §5.9 has the table, the
+  mechanism and the measurements. The **second** application of amendment 4b,
+  after `SCARF` -> `HANDKER`, and the first that made a container grow (+12
+  bytes, absorbed by `abst_build.py`'s existing re-stamping). Built, verified
+  both ways and deployed the same day; not yet seen on screen.
 - **[open 2026-09-07] The VR disc's three number substitutions.** Where Integral and USA state
   different values, USA's sentence was taken with **Integral's** numbers put
   into it, so the text matches the disc it runs on: SNEAKING MODE / NO WEAPON
@@ -1624,3 +1699,39 @@ cleanly; the third found something and then taught the method a lesson.
 USA's VR disc also carries five languages, so any diff there must take only the
 English arm of a language branch (`lang in (None, ENGLISH)`); without it the
 alignment collapses and the output is 548 hunks of nothing.
+
+### And then the location names were decided
+
+The four `abst` spellings the sweep turned up were put to the user the same
+evening and the answer was **use USA's**. That makes two applications of
+amendment 4b in two days, and this one had teeth the `SCARF` case did not: the
+text grows, so a container had to move.
+
+- **The block carries two derived lengths, not one.** A COMMAND's BE16 size is
+  the obvious one; the u8 at `start+5` that `option_starts` reads to reach the
+  option list is the one that would have been missed - `0xAD` against USA's
+  `0xB9`, exactly the 12 bytes of growth. Patching the four records and
+  re-stamping only the BE16 would have produced a block that disagreed with
+  itself. Taking USA's **whole command** keeps both in step by construction, and
+  is also the most literal reading of the rule.
+- **The names are font codes, not ASCII.** `0x80xx` Latin, `0x9001` space. An
+  ASCII search of the PPFs for `Tank Hangar` finds nothing, which briefly looked
+  like evidence the port already owned them. `rendertext.py` exists for exactly
+  this reason and the same trap is recorded in §14.
+- **The constant was run both ways.** Off: 104,600-byte chunk, list equals
+  Integral's own, 0 records differing. On: 104,612, equals USA's, 4 differing.
+  A measurement of the cost rather than a claim about it - and the 12-byte delta
+  is the arithmetic checking itself.
+- **The verifier catches the offset byte without testing it.** `location_block`
+  finds the command through `option_starts`, which reads that u8 and requires the
+  empty option list it points at, so a wrong value fails to find the block at all
+  instead of passing quietly. The best checks are the ones a wrong answer cannot
+  route around.
+
+And the input question the user pushed back on - whether the English-against-
+English sweep needed a deployed-bytes reconstruction - resolved the other way
+once it was thought through. The builders already construct the ported stage;
+reconstructing it from PPF records would re-derive that by the hardest route and
+need extending for every relocation. The authority for owned bytes is the
+family's own verifier, the sweep's authority stops at the boundary, and the `!!`
+flag marks where. §5.14 step 3 carries the table.

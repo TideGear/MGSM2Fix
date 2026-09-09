@@ -4212,6 +4212,89 @@ which is what `rendertext.py` exists for: the strings are font indices, not
 Shift-JIS, so `《ハンカチ》` reaches `game_text` as `<9014><822F><8253><820B><8221><9015>`
 and can only be read by drawing it with the game's own font.
 
+## The `abst` location names (Integral's own English -> USA's, 2026-09-08)
+
+The second application of amendment 4b, after `SCARF` -> `HANDKER` above, and
+the first one that made a container grow. Both games spell 30 location names in
+the MISSION LOG, they align 1:1, and **four** differ:
+
+| Integral | USA |
+|---|---|
+| `Tank Hanger` | `Tank Hangar` |
+| `Medi rm` | `Medi room` |
+| `Cmnder rm` | `Cmnder room` |
+| `Cmnd rm` | `Cmnd room` |
+
+Three of those were known - both found by accident while porting the mission
+log. The fourth, `Cmnd rm`, was found by `mainsweep.py --diff-english` on
+2026-09-08 and had been in no document. Asked and approved the same day.
+
+### Where they live, and why no search had found them
+
+One `0x9906` command in `scenerio.gcx`'s **script body**, which `mainsweep.py`
+calls `chara 53C7` after the actor its first STRID spawns. Its shape is unlike a
+mission-log page: it carries **no option list at all**, just 31 records directly
+in the value list, 30 of them the English names. That is why `page_of` returns
+None for it and why `rebuild_body` skipped it for as long as the builder existed.
+
+    60 <BE16 size> 99 06 <u8 ofs> 06 53 c7 06 c8 bb 08 5f d9 <31 records> 00
+
+And the names are **two-byte font codes, not ASCII** - `0x80xx` for Latin
+letters, `0x9001` for a space - so `Tank Hanger` is stored as
+`8054 8061 806e 806b 9001 8048 8061 806e 8067 8065 8072 00`. That is why
+searching the PPFs for the ASCII string found nothing and briefly suggested the
+port had already changed them. Both games use the same encoding, so USA's bytes
+transplant directly and no glyph work is needed.
+
+### Take the whole command, not the four records
+
+`USA_LOCATION_NAMES` in `abst_build.py`, beside `KEEP_PROMPT_CAPTION`, and it
+substitutes **USA's entire block**. That is deliberate, because the block carries
+*two* derived length fields:
+
+* the COMMAND's own BE16 size, which `resize_block` would have handled; and
+* a **u8 at `start+5`** that `option_starts` uses to reach the option list -
+  `0xAD` on Integral's disc against `0xB9` on USA's, exactly 12 apart.
+
+Patching the four records and re-stamping only the BE16 would leave a block whose
+size says one thing and whose offset byte says another. Taking the block whole
+keeps both in step by construction, and it is also the most literal reading of
+the rule: the bytes are USA's own. Everything above the command -
+the proc body's ARG length, the proc table offsets, the proclen, the script
+length - `abst_build.py` already recomputes for the mission-log pages, so
+nothing else had to change.
+
+`demo.gcx`'s location list is Integral's own **Japanese** one, 31 records USA has
+no counterpart for. It is not offered to the substitution and stays as it is.
+
+### What it cost, measured both ways
+
+One name is length-neutral (`e` -> `a`); three grow by two characters, which is
+4 bytes each at 2 bytes a glyph. **+12 bytes**, and the constant makes that
+checkable rather than asserted: the rebuilt chunk is **104,600** bytes with
+`USA_LOCATION_NAMES = False` and **104,612** with it true. The stage is still
+**88 sectors** and still lands in DUMMY3M slots 462..549, so no budget moved and
+no other patch's bytes were touched (`no overlap with 614384 other PPF bytes`).
+
+### The verifier that now guards it
+
+`verify_chunk` re-parses the location list **out of the rebuilt script** and
+asserts it equals its source record for record, that there are 31 of them, and
+that the constant was honoured exactly once:
+
+    verified: the 31-record location list equals USA's exactly; 4 record(s)
+    differ from retail Integral
+
+Its u8 offset byte is checked implicitly and that is the neat part: the verifier
+finds the block with `location_block`, which calls `option_starts` - which reads
+that u8 - and requires the empty option list it points at. A wrong offset byte
+therefore fails to find the block at all rather than passing quietly. Running
+with the constant off reports Integral's own list and 0 differing records, so
+both directions are exercised.
+
+**Not yet seen on screen.** The names appear in the MISSION LOG's own location
+column.
+
 ## Descriptions that change with the game state (mapped 2026-09-07)
 
 An item or weapon description is not always the string its table points at. Two

@@ -75,6 +75,15 @@ DLC = GAME + '/windata/dlc/dlc_japan.bin'
 MODS = GAME + '/mods/INTEGRAL/INTEGRAL'
 SLOT = 462
 KEEP_PROMPT_CAPTION = True     # False = USA's empty record 0 (no Japanese caption under READ MISSION LOG?)
+USA_LOCATION_NAMES = True      # False = keep Integral's own English location names
+# The location list is the port's SECOND replacement of Integral's own English
+# (amendment 4b in NextSteps.md 2; `SCARF` -> `HANDKER` was the first). Both
+# games spell 30 names, aligned 1:1, and four differ - `Tank Hanger`,
+# `Medi rm`, `Cmnder rm` and `Cmnd rm` against USA's `Tank Hangar`,
+# `Medi room`, `Cmnder room` and `Cmnd room`. The fourth was found only on
+# 2026-09-08, by `mainsweep.py --diff-english`; three documents had listed
+# three. Asked and approved the same day.
+LOCATION_STRIDS = bytes.fromhex('0653c706c8bb085fd9')
 PAGE_CMD = 0x9906
 DESC = 'MGS Integral: English abst (MISSION LOG)'
 assert len(DESC) <= 50
@@ -210,10 +219,20 @@ def resize_block(buf, start, size, new_tail_from, new_tail):
     return bytes(buf[:start]) + bytes(body) + bytes(buf[end:])
 
 
-def rebuild_body(int_body, usa_pages, disc_change, stats):
+def rebuild_body(int_body, usa_pages, disc_change, stats, location=None):
     """int_body: a proc body or the script body. usa_pages: iterator of USA page
-    (opts, count, recs). Edits every page block and the disc-change block."""
+    (opts, count, recs). Edits every page block, the disc-change block and - if
+    `location` is given and USA_LOCATION_NAMES is set - the location list."""
     out = bytes(int_body)
+    if location is not None and USA_LOCATION_NAMES:
+        found = location_block(out)
+        if found is not None:
+            start, size = found
+            recs = records(out, start + 15, start + size)
+            assert len(recs) == 31, 'Integral location list has %d records' % len(recs)
+            out = bytes(out[:start]) + location + bytes(out[start + 1 + size:])
+            stats['locations'] += 1
+            stats['bytes'] += len(location) - (1 + size)
     shift = 0
     for start, size in blocks_in(int_body):
         start += shift
@@ -261,6 +280,54 @@ def usa_disc_change(usa_body_list):
     raise AssertionError('USA disc-change block not found')
 
 
+def location_block(body):
+    """(start, size) of the English location-name command, or None.
+
+    It is a `0x9906` command like a mission-log page - `mainsweep.py` calls it
+    `chara 53C7` after the actor its first STRID spawns - but it carries no
+    option list at all: 31 records sit directly in the value list, 30 of them
+    the English names. It is matched on its STRID/PROCID chain rather than on
+    a position, because a stride is not a structure (NextSteps.md 14).
+    """
+    for start, size in blocks_in(body):
+        if body[start + 6:start + 6 + len(LOCATION_STRIDS)] != LOCATION_STRIDS:
+            continue
+        optl, end = option_starts(body, start, size)
+        if optl:
+            continue
+        return start, size
+    return None
+
+
+def location_records(script):
+    """the 31 records of a script body's location list"""
+    start, size = location_block(script)
+    return records(script, start + 15, start + size)
+
+
+def usa_location_block(usa_body_list):
+    """USA's command, taken whole.
+
+    Its two derived fields - the COMMAND's BE16 size and the u8 at start+5 that
+    `option_starts` uses to reach the option list - both encode the length of
+    the record region, and USA's are 12 bytes larger because three of its four
+    differing names are two characters longer. Taking the block whole is what
+    keeps those two in step: patching the records alone and forgetting the u8
+    would leave a block whose size says one thing and whose offset byte says
+    another.
+    """
+    for body in usa_body_list:
+        found = location_block(body)
+        if found is None:
+            continue
+        start, size = found
+        end = start + 1 + size
+        recs = records(body, start + 15, end - 1)
+        assert len(recs) == 31, 'USA location list has %d records' % len(recs)
+        return bytes(body[start:end])
+    raise AssertionError('USA location-name block not found')
+
+
 def usa_pages_of(bodies):
     for body in bodies:
         for start, size in blocks_in(body):
@@ -293,7 +360,7 @@ def rebuild_chunk(int_chunk, usa_chunk, int_tags, usa_tags):
     gu2, _ = parse_gcx(usa_chunk, u_demo)
     print('scenerio.gcx: %d procs, script %d, font %d | demo.gcx: %d procs, script %d, font %d (Integral)'
           % (len(gi1['procs']), len(gi1['script']), len(gi1['font']), len(gi2['procs']), len(gi2['script']), len(gi2['font'])))
-    stats = dict(pages=0, bytes=0, skipped=[], disc_change=0)
+    stats = dict(pages=0, bytes=0, skipped=[], disc_change=0, locations=0)
     out_scripts = []
     for gi, gu in ((gi1, gu1), (gi2, gu2)):
         # demo.gcx: Integral has one extra proc (0x5FD9, the Japanese location list's);
@@ -304,8 +371,12 @@ def rebuild_chunk(int_chunk, usa_chunk, int_tags, usa_tags):
         u_bodies = [b for p, b in gu['procs']] + [gu['script']]
         upages = usa_pages_of(u_bodies)
         dch = usa_disc_change(u_bodies) if gi is gi1 else None
-        procs = [(pid, rebuild_body(body, upages, dch, stats)) for pid, body in gi['procs']]
-        script = rebuild_body(gi['script'], upages, None, stats)
+        # The location list is in scenerio.gcx's script body; demo.gcx's own
+        # list is Integral's Japanese one and has no USA counterpart, so it is
+        # not offered here and stays as it is.
+        loc = usa_location_block(u_bodies) if gi is gi1 else None
+        procs = [(pid, rebuild_body(body, upages, dch, stats, loc)) for pid, body in gi['procs']]
+        script = rebuild_body(gi['script'], upages, None, stats, loc)
         leftover = sum(1 for _ in upages)
         assert leftover == 0, '%d USA pages unused' % leftover
         for pid, body in procs:                       # re-stamp ARG lengths
@@ -408,9 +479,25 @@ def verify_chunk(chunk, int_chunk, usa_chunk, demo_off):
                     continue
                 assert 32 <= r[i] < 127 or r[i] == 0, 'unexpected byte %02X in a USA line' % r[i]
                 i += 1
+    # The location list: re-parse it out of the rebuilt script and compare it
+    # record by record with the disc it was taken from, so a mis-stamped size
+    # or a lost record cannot pass. Its u8 offset byte is checked implicitly:
+    # `option_starts` reads it, and `location_block` requires the empty option
+    # list it points at.
+    assert location_block(g1['script']) is not None, 'the rebuilt script has no location list'
+    built = location_records(g1['script'])
+    source = location_records(parse_gcx(usa_chunk if USA_LOCATION_NAMES else int_chunk,
+                                       236)[0]['script'])
+    retail = location_records(gi1['script'])
+    assert len(built) == len(source) == len(retail) == 31, (len(built), len(source))
+    assert built == source, 'the location list does not equal its source'
+    ichanged = sum(1 for a, b in zip(built, retail) if a != b)
     counts = Counter(n[1] for n in new)
     print('verified: 122 pages re-parsed; counts %s; every line record equals USA; record 0 %s'
           % (dict(counts), 'kept (Integral caption)' if KEEP_PROMPT_CAPTION else "USA's (empty)"))
+    print('verified: the 31-record location list equals %s exactly; %d record(s)'
+          ' differ from retail Integral'
+          % ("USA's" if USA_LOCATION_NAMES else "Integral's own", ichanged))
     # the disc-change block
     for pid, body in g1['procs']:
         for s, z in blocks_in(body):
@@ -465,9 +552,13 @@ def main():
     usa_tags, usa_pay, _ = portio.stage(usa_dir, 'abst')
     assert int_pay[8] == usa_pay[8] and int_pay[9] == usa_pay[9], 'sound files differ'
     chunk, demo_off, stats = rebuild_chunk(int_pay[7], usa_pay[7], int_tags, usa_tags)
-    print('chunk: %d -> %d bytes (%+d); %d pages rewritten (%+d bytes), disc-change blocks %d, skipped %s'
+    print('chunk: %d -> %d bytes (%+d); %d pages rewritten (%+d bytes), disc-change blocks %d,'
+          ' location lists %d, skipped %s'
           % (len(int_pay[7]), len(chunk), len(chunk) - len(int_pay[7]), stats['pages'], stats['bytes'],
-             stats['disc_change'], Counter((c, tuple(o)) for c, o in stats['skipped']).most_common()))
+             stats['disc_change'], stats['locations'],
+             Counter((c, tuple(o)) for c, o in stats['skipped']).most_common()))
+    assert stats['locations'] == (1 if USA_LOCATION_NAMES else 0), \
+        'the location list was not rewritten exactly once'
     verify_chunk(chunk, int_pay[7], usa_pay[7], demo_off)
     nd = rebuild_dar(int_pay[1], usa_pay[1])
     sb = open(overlay, 'rb').read()

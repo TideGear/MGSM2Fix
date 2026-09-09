@@ -92,11 +92,13 @@ is `Cmnd rm` against USA's `Cmnd room`. Disc 2 is identical.
 | `Cmnder rm` | `Cmnder room` |
 | `Cmnd rm` | `Cmnd room` |
 
-All four are live on the deployed disc - `abst_build.py` rewrites only the
-`0x9906` pages and the disc-change block, so the location list is copied through
-as Integral wrote it. Whether to change them is the user's call and is still
-open (`NextSteps.md` §6). `SCARF` against `HANDKER` was the same shape in the
-executable and was decided on 2026-09-07.
+**All four now read USA's**, asked and answered 2026-09-08: `USA_LOCATION_NAMES`
+in `abst_build.py` takes USA's whole command, +12 bytes, the stage still 88
+sectors. That is the second application of amendment 4b after `SCARF` against
+`HANDKER`, and the builder's verifier now re-parses the list and asserts it
+equals its source record for record. Note that `mainsweep.py` reads **retail**,
+so it still reports these four - it now prints `!!` beside any finding in a
+stage a patch family owns, which is what stops them being ported twice.
 
 **The VR disc has not been swept this way, and one input has to change first.**
 USA's VR disc carries five languages, so the diff must take only the English arm

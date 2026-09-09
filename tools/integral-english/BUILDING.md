@@ -161,6 +161,14 @@ matched the deployed set's effective changed bytes; the two new
 `INTEGRAL_disc{1,2}_en_pad2.ppf` are byte-identical to what is deployed
 (SHA-256 `ff45bcea…448a` and `4a7af1d1…6f99`, 273 bytes and 159 changed
 bytes each). ZIP SHA-256 `3eb2e1058486fceb3f0aa866f3194bc7c07ed70987fc2eea439259d5e8e8a6fb`, 2,798,182
+bytes, 30 manifest entries.
+
+**Clean run 2026-09-08 (repro18: USA's `abst` location names).** The four
+location names in the MISSION LOG now read USA's (`USA_LOCATION_NAMES` in
+`abst_build.py`), which grows the abst chunk by 12 bytes and leaves the stage at
+88 sectors. The same command in `D:/mgsbuild/repro18` built 27 PPFs and every
+one matched the deployed set, both `en_abst` files byte-identical. ZIP SHA-256
+`0044ed814c81d18308e3969b5f342aa10ba4d3b17561881efc399300216eda3e`, 2,797,997
 bytes, 30 manifest entries. This is the deployed state.
 
 `--variant raw` flips the two constants and adds `en_menu3`. Since 2026-09-07 it
@@ -192,6 +200,7 @@ extents. `NextSteps.md` §5.4, §5.10 and §5.13.
 
 | run | date | what changed since the previous run | matched the deployed set | ZIP SHA-256 |
 |---|---|---|---|---|
+| `repro18` | 2026-09-08 | USA's four `abst` location names | 27 of 27 | `0044ed814c81d18308e3969b5f342aa10ba4d3b17561881efc399300216eda3e` |
 | `repro17` | 2026-09-08 | `en_pad2` added (`pad2.py`), ten families | 27 of 27 (20 main + 7 VR) | `3eb2e1058486fceb3f0aa866f3194bc7c07ed70987fc2eea439259d5e8e8a6fb` |
 | `repro8` | 2026-09-07 16:08 | VR disc folded in, VR executable built from the decomp, `--variant` switch | 25 of 25 (18 main + 7 VR) | `a13eefc08fa93b61adcb7c0524d57e6d7e913e0f313262e961c293d13bd5faef` |
 | `repro7` | 2026-09-05 13:06 | MISSION LOG slide fix (`abst.bin` 48,103 bytes) | 18 of 18 | `870a691a4782291c5e92d6a68f3035cb102ed132daf5ce478901a14dc8ec51ca` |

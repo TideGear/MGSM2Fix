@@ -241,6 +241,7 @@ def diff_english(isd, usd):
     names = sorted(set(portio.entries(isd)) & set(portio.entries(usd)))
     print('%d stage(s) present on both discs\n' % len(names))
     hunks = readable = 0
+    warned = set()
     for name in names:
         a = english_strings(_stage_bytes(isd, name))
         b = english_strings(_stage_bytes(usd, name))
@@ -258,15 +259,35 @@ def diff_english(isd, usd):
             if not interesting:
                 continue
             readable += 1
+            if name in PORTED:
+                # THIS TOOL READS RETAIL. For the Japanese question that is
+                # deliberate - a gap cannot then hide behind a deployed patch.
+                # For this question it is backwards: what the port itself
+                # rewrites is exactly what must be subtracted, or the sweep
+                # reports its own work as a finding. It did once, on the VR
+                # disc: `FAMAS` against USA's `FA-MAS`, which `vr_en_missions`
+                # had already replaced (NextSteps.md 5.14 step 3).
+                warned.add(name)
+                print('     !! %s is owned by %s and these are RETAIL bytes -'
+                      ' check what that patch writes here before believing it'
+                      % (name, PORTED[name]))
             for text in at[i1:i2][:24]:
                 print('     INT: %r' % text[:78])
             for text in bt[j1:j2][:24]:
                 print('     USA: %r' % text[:78])
             if max(i2 - i1, j2 - j1) > 24:
                 print('     ... hunk truncated')
-    print('\n%d replace hunk(s); %d hold player-readable text. A one-against-one'
-          ' hunk of\nreadable text is the case worth deciding; everything else'
-          ' is context.' % (hunks, readable))
+    print()
+    print('%d replace hunk(s); %d hold player-readable text. A one-against-one hunk'
+          % (hunks, readable))
+    print('of readable text is the case worth deciding; everything else is context.')
+    if warned:
+        print('%d stage(s) flagged !!: %s. Those bytes are RETAIL and a patch family'
+              % (len(warned), ', '.join(sorted(warned))))
+        print('owns them, so what a player sees may already differ. This tool cannot')
+        print('reconstruct a deployed stage - `en_abst` and `en_brf` relocate theirs')
+        print('into DUMMY3M - so read the builder or the PPF before believing a')
+        print('finding there (NextSteps.md 5.14 step 3).')
     return hunks
 
 
