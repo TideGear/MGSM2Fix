@@ -6,6 +6,9 @@ the item-text fixes and their on-screen checks landed (§10), on 2026-09-06
 when the **VR disc** was ported (§11), and through 2026-09-07, the day the VR
 disc was tested on screen and the three items that were still open all closed:
 the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12), and through
+2026-09-09, when the untranslated Japanese was dumped and the glyph
+identification was set up as the one open task (§17 has a START HERE block
+for it), and on
 2026-09-08, when the housekeeping was cleared, the sweep's one uncovered
 finding became the `en_pad2` family, the three sweeps §5 had filed under "to
 investigate" were all run, and the four `abst` location names were decided
@@ -238,6 +241,7 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
 | **real engineering** | the raw variant's first boot on a real disc image (end of 5.4, and 5.13), 5.6 the upstream sync |
+| **the one open task** | **name 1,813 glyph shapes** — §17's START HERE block. `work/glyphs-to-identify.pdf`, 38 pages, frequency-ordered; fill the TSV's `char` column; `py jptext.py` reports coverage climbing from 87.2%. Do it early in a session: reading images runs out after ~15-18 |
 | **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
 | **loose ends** | 5.7's remaining untested runtime features, 5.5's items 4 and 5, and the `us1.exe` parity mismatch in 5.13 |
@@ -1292,6 +1296,7 @@ an explicit answer before anything changes.
 | `mainsweep.py` | the main discs' answer to `vr_sweep.py`: pairs every GCL string with the USA disc's by owning command, so "Integral Japanese where USA has English" is measured. `py mainsweep.py [--disc 2] [--samples]`. Its one uncovered finding is §5.11, ported 2026-09-08. Three modes were added the same day: `--integral-only` pairs each of the 13 Integral-only stages with the USA stage it is a variant of (the shared-name universe's hole — 1 string, already ported); `--diff-english` sequence-diffs the two discs' English for wording differences (§5.14 step 2 — found the fourth `abst` spelling); `--census` accounts for every Japanese GCL string and **exits non-zero unless the unaccounted bucket is 0** (§5.8) |
 | `glyphsheets.py` | renders the 1,813 unidentified bank-1 glyphs to `work/glyphs-to-identify.pdf` (38 pages) and matching PNGs, ordered by frequency, with a TSV to transcribe into. Needs no table offsets: `shape -> character` is global. `py glyphsheets.py` |
 | `glyphocr.py` | identifies the game's 12x12 glyphs by matching them against a system Japanese font. **47% top-1 / 59% top-3**, measured against the 238 hand-transcribed `0x90` kanji — a shortlist tool, not an oracle; its errors are 鏡/鎌 and 線/緑, which at 12x12 are the same picture. `py glyphocr.py --validate` |
+| `dumpjp.py` | **the dump**: every in-scope Japanese line rendered from the game's own glyph bitmaps — 156,379 lines, 5,589 pages of PDF, plus `index.tsv` locating each one. `--scope unported` (default) keeps only Japanese USA has no counterpart for. Bank-1 bases come from the game's parser, and string-to-fragment attribution is 100.000%. `py dumpjp.py` |
 | `jptext.py` | **makes the list readable**: font codes -> Japanese, 87.2% of all glyphs (kana by arithmetic, the `0x90` kanji bank by a self-checking transcription). Writes `work/japanese-readable.tsv`; `--hex` decodes one run, `--sample N` prints the longest. Bank 1 is a per-block table carried by the block (proven: `abst`'s blob glyph 0/1 are 記/録), so what is left is glyph recognition, not reverse engineering |
 | `jplist.py` | **the list**: every untranslated Japanese string on all three discs, one per line, to `work/japanese-inventory.tsv` — 190,180 strings / 3,318,254 kana-kanji glyphs, 32 MB, regenerated not committed. Drops any run the USA disc also has, which is what empties `BRF.DAT` and `FACE.DAT`. `py jplist.py [--min N] [--render N]` |
 | `discaudit.py` | **every file on every disc**: size, the Integral-vs-USA delta and a crude text probe. Written 2026-09-09 because every other sweep here reads only `STAGE.DIR`; the delta is the diagnostic (`RADIO.DAT` is +9.4 MB on Integral, and that is the developer commentary). `py discaudit.py` |
@@ -1794,3 +1799,125 @@ structural rather than careless.
   question correctly inside a universe none of them named - shared stage names
   for `mainsweep`, one archive for all of them - and each time the gap was found
   by someone asking about a thing outside it rather than by the tools.
+
+## 17. The 2026-09-09 pass: the untranslated Japanese, dumped — and what to do next
+
+### START HERE if you are picking this up to identify the glyphs
+
+The work is set up and the remaining step is **naming 1,813 glyph shapes**. Do it
+early in a session: reading images has a per-conversation budget that runs out
+after roughly 15-18 of them, and that is what stopped the last attempt.
+
+1. Open `work/glyphs-to-identify.pdf` — **38 pages, 1,813 glyphs**, ordered by
+   how often each occurs, each cell labelled `gN`. (`work/glyphpages/pageNN.png`
+   is the same thing as images, for tools that cannot read PDF.)
+2. Write each character into the `char` column of
+   `work/glyphs-to-identify.tsv`, matched by the `id` column.
+3. `py jptext.py` — it loads that TSV through `load_shape_table()` and reports
+   coverage. It should climb from 87.2% toward 100%.
+4. `py dumpjp.py` to regenerate the line dump with the new text.
+
+**Only disc 1 needs doing.** The commentary region is byte-identical on both
+discs (`0x042C54C`-`0x0AAC050`, sha256 `93b96e43…` on each), so disc 2's
+`RADIO.DAT` dump is a duplicate; only the story regions differ, and those are
+out of scope.
+
+**Naming a glyph once names it everywhere.** Bank 1 is a per-block table, so
+`code -> shape` differs between blocks - `⟪965A⟫` is a different character in
+different conversations and a code-to-character mapping is meaningless. But
+`shape -> character` is global, which is why the TSV is keyed on `shape_hex`.
+Proof: the 78 shapes named for the stage archives turn up byte-identical inside
+`RADIO.DAT` 150-220 times each.
+
+**Check the result, do not trust it.** Expect 85-95% from isolated glyphs. The
+238-glyph pass earlier ran at ~99% only because consecutive codes there spelled
+words; its two real errors (書 read as 告, 間 as 問) survived a second look at
+the bitmap and fell instantly to a sentence that had to make sense. At 12x12,
+線/緑, 鏡/鎌 and 間/問 are the same picture. So after transcribing, read decoded
+sentences and fix what does not form words.
+
+### The scope, which is the user's decision and narrows this a lot
+
+**Only Japanese that MGS1 USA has no counterpart for.** Asked and answered
+2026-09-09. `RADIO.DAT` holds two halves: a story-codec region where the
+Japanese is a *subtitle track* for conversations USA ships in English, and a
+commentary region with no English anywhere in it. The first is covered by USA
+and out of scope; only the second needs anything.
+
+| | rows (disc 1) | kana/kanji | |
+|---|---:|---:|---|
+| story codec `0x0`-`0x042C54C` | 16,869 | 282,280 | out of scope |
+| **commentary `0x042C54C`-`0x0AAC050`** | **77,361** | **1,369,719** | in scope |
+
+`jplist.py` already applied that test to `DEMO.DAT`, `VOX.DAT`, `BRF.DAT` and
+`FACE.DAT` by subtracting anything that also appears in USA's copy of the same
+file - which is what empties the last two entirely. `RADIO.DAT` slipped through
+it, because USA's codec text is plain ASCII and there were no font-code runs to
+subtract against. `dumpjp.py --scope unported` is where the region split lives.
+
+### What was produced
+
+`py dumpjp.py` writes **156,379 lines over 5,589 pages**, every line rendered
+from the game's own glyph bitmaps, so the images are exact by construction:
+
+    work/jpdump/disc1_RADIO_DAT.pdf   77,361 lines  2,763 pages   the commentary
+    work/jpdump/disc1_DEMO_DAT.pdf       576 lines     21 pages
+    work/jpdump/disc1_VOX_DAT.pdf        338 lines     13 pages
+    work/jpdump/disc1_STAGE_DIR.pdf       98 lines      4 pages
+    work/jpdump/disc2_*.pdf                            (RADIO is a duplicate)
+    work/jpdump/index.tsv            156,379 rows
+
+`index.tsv` locates every line: disc, source, fragment base, byte offset, page
+and row, the text decode so far, and the raw codes.
+
+Verified without eyes, because the image budget was gone by then: 4,000 sampled
+lines render with none blank or sparse, and every glyph cell of a line matches
+the font byte for byte.
+
+### Bank 1's table, and reading the parser instead of guessing
+
+`0x9A01 + i` indexes a `.gcx` script's own font blob; `RADIO.DAT` carries one
+per fragment, and `menu/radiomes.c`'s
+`menu_radio_codec_task_proc_80047AA0()` gives the address outright:
+
+    radioDatIter   = fragment + 8
+    fontAddrOffset = BE16(radioDatIter + 1) + 1
+    font_set_font_addr(1, radioDatIter + fontAddrOffset)
+
+so `base = fragment + 9 + BE16(fragment + 9)`. Fragment 0 yields `0x1B1`, the
+value proved independently by finding the single place in 11 MB where 本 is
+immediately followed by 出 - they sit at adjacent indices in that conversation.
+
+**Fragments are sector-aligned but MULTI-sector** (`size = (radioCode /
+0x1000000) * 2048`), which is the fact that made attribution hard: a
+mid-fragment sector can produce a sane-looking base by accident, and a string's
+true fragment can be tens of KB behind it. Two rules give **100.000%** (94,246
+of 94,246 strings, 77,361 of 77,361 in the commentary): a candidate must contain
+a string in its text region `[frag+8, base)`, and a string belongs to the
+nearest candidate behind it that covers it, searching **128 KB** back.
+
+Five attempts preceded that and are worth knowing so they are not repeated:
+first-plausible-run-after-the-text (99.4%), coordinate ascent on
+repeated-sentence agreement (61.5%), greedy non-overlapping fit (49.9%), a
+sequential fragment walk (78.1%), the same walk with a stricter accept test
+(16.3%). The lesson is the ordinary one: the first method was the best and was
+abandoned over a 0.6% residue instead of being repaired, and reading the
+parser - which took one grep - beat all five.
+
+### Dead ends, measured, so nobody spends a day on them
+
+Template matching cannot identify these glyphs. Two references were tried
+against the 238 hand-transcribed kanji, which is a real labelled test set from
+the same font:
+
+| reference | top-1 |
+|---|---:|
+| MS Gothic / Meiryo, 96px rasterised then area-averaged to 12x12, ZNCC + ink gate | 47% |
+| **Shinonome 12-dot** (MIT, native JIS X 0208 at exactly 12 dots, 6,879 glyphs) | **0% exact, 5.9% fuzzy** |
+
+Shinonome was the right idea - a native 12-dot bitmap font is the
+apples-to-apples comparison - and it failed because **Konami drew their own
+12x12 design**. There is no font to look these up in. An OCR engine is also the
+wrong shape: `manga-ocr` and Tesseract recognise text *lines* at real
+resolution, and the input here is 144 pixels, where the glyph *is* a specific
+bitmap design rather than a picture of a character.
