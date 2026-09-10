@@ -15,7 +15,11 @@ finished: the byte scanner retired for a walk of the game's own records, a
 bank-1 index bug found that had been naming every `0x97xx` glyph one position
 too far along, and 25 more characters identified - the last of them, 蒼, named
 from outside the disc because it occurs exactly once on it - leaving the export
-complete with **zero** unresolved glyph codes (§19) - and on
+complete with **zero** unresolved glyph codes (§19), and finally the VR disc
+added - it had been dropped by a loop over two disc indices, so 97% of the
+export looked like all of it - and the last game data taken back out of the
+repository, the glyph table now shipping digests of the font bitmaps rather
+than the bitmaps (§20) - and on
 2026-09-08, when the housekeeping was cleared, the sweep's one uncovered
 finding became the `en_pad2` family, the three sweeps §5 had filed under "to
 investigate" were all run, and the four `abst` location names were decided
@@ -248,7 +252,7 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
 | **real engineering** | the raw variant's first boot on a real disc image (end of 5.4, and 5.13), 5.6 the upstream sync |
-| ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete: 68,211 lines, 3,923,661 kana/kanji, zero unresolved codes. §18 and §19 |
+| ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete, on all three discs: 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. §18 and §19 |
 | **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
 | **loose ends** | 5.7's remaining untested runtime features, 5.5's items 4 and 5, and the `us1.exe` parity mismatch in 5.13 |
@@ -1307,8 +1311,8 @@ an explicit answer before anything changes.
 | `glyphfill.py` | merges a transcription into the TSV and **scores it**: against those 78 known answers, and against the invariant that bank 1 never reuses a bank-0 character. Every warning it raised in the 2026-09-10 pass was a real error. `py glyphfill.py [--score]` |
 | `glyphreview.py` | prints the **full** decoded lines a glyph appears in - `--verify` does one sentence for every shape, which is the read-through that caught 黙/弄 swapped and 完 for 璧. `py glyphreview.py --verify` |
 | `glyphocr.py` | identifies the game's 12x12 glyphs by matching them against a system Japanese font. **47% top-1 / 59% top-3**, measured against the 238 hand-transcribed `0x90` kanji — a shortlist tool, not an oracle; its errors are 鏡/鎌 and 線/緑, which at 12x12 are the same picture. `py glyphocr.py --validate` |
-| `dumpjp.py` | **the dump**: every in-scope Japanese line, as readable text (`<disc>_<source>.txt`), as a locating index (`index.tsv`) and drawn from the game's own glyph bitmaps (`.pdf`). 68,211 lines, 3,923,661 kana/kanji, zero unresolved codes. `--scope unported` (default) keeps only Japanese USA has no counterpart for. `RADIO.DAT` comes from `radiotext.py`, not the inventory. `py dumpjp.py` |
-| `jptext.py` | **makes the list readable**: font codes -> Japanese, all of it now (kana by arithmetic, the `0x90`/`0x91` kanji banks by transcription, bank 1 through `bank1-glyphs.tsv`'s 1,214 shapes). Writes `work/japanese-readable.tsv`; `--hex` decodes one run, `--sample N` prints the longest. Bank 1 is a per-block table carried by the block (proven: `abst`'s blob glyph 0/1 are 記/録), so what is left is glyph recognition, not reverse engineering |
+| `dumpjp.py` | **the dump**: every in-scope Japanese line, as readable text (`<disc>_<source>.txt`), as a locating index (`index.tsv`) and drawn from the game's own glyph bitmaps (`.pdf`). 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. `--scope unported` (default) keeps only Japanese USA has no counterpart for. `RADIO.DAT` comes from `radiotext.py`, not the inventory. Discs are keyed by name - `disc1`, `disc2`, `vr` - because the VR disc has a stage archive but no `RADIO.DAT`, and a loop over indices used to skip it entirely (§20). `py dumpjp.py [--discs 1,2,vr]` |
+| `jptext.py` | **makes the list readable**: font codes -> Japanese (kana by arithmetic, the `0x90`/`0x91` kanji banks by transcription, bank 1 through `bank1-glyphs.tsv`'s 1,214 shapes). Bank 1 needs the block's own font blob to turn a code into a bitmap, so `jptext.py` **run on its own still reports 87.2%** - it is reading the inventory with no blobs. Hand it one (`dumpjp`, `radiotext`) and it resolves everything: the export has zero unresolved codes. Writes `work/japanese-readable.tsv`; `--hex` decodes one run, `--sample N` prints the longest. Bank 1 is a per-block table carried by the block (proven: `abst`'s blob glyph 0/1 are 記/録), so what is left is glyph recognition, not reverse engineering |
 | `jplist.py` | **the list** - but see the warning in §19: its scanner **ends a run at any code it does not recognise**, so it holds only 85% of the commentary's glyphs and `RADIO.DAT` should be read through `radiotext.py` instead. Every untranslated Japanese string on all three discs, one per line, to `work/japanese-inventory.tsv` — 190,180 strings / 3,318,254 kana-kanji glyphs, 32 MB, regenerated not committed. Drops any run the USA disc also has, which is what empties `BRF.DAT` and `FACE.DAT`. `py jplist.py [--min N] [--render N]` |
 | `discaudit.py` | **every file on every disc**: size, the Integral-vs-USA delta and a crude text probe. Written 2026-09-09 because every other sweep here reads only `STAGE.DIR`; the delta is the diagnostic (`RADIO.DAT` is +9.4 MB on Integral, and that is the developer commentary). `py discaudit.py` |
 | `jpremain.py` | **what Japanese is still on the three DEPLOYED discs** — the only tool here that reads deployed bytes (retail + every deployed PPF, following the relocated STAGE.DIR entry for `abst`/`brf`/`option`/`preope`). 153 Japanese strings a disc, 38 on the VR disc, all itemised with reasons in `COVERAGE.md`. `py jpremain.py` |
@@ -2123,11 +2127,11 @@ was recorded. The habit does not install itself.
   demo-theater label in the stage archive. Its bitmap is mostly mid-tone rather
   than stroke-and-background, so it may not be a kanji at all; it was
   unidentified before this pass too. 2 uses out of 4.2 million.
-* **The VR disc's stage text is not in the dump.** `dumpjp.collect` takes discs
-  1 and 2; `japanese-inventory.tsv` labels the VR archive's rows `vr` and they
-  are skipped, so ten bank-1 code uses in `vrtitle` (「FOXDIEの…」,
-  「これでスネークは助かる」) are neither rendered nor decoded. Small, and a
-  separate job from this one.
+* ~~**The VR disc's stage text is not in the dump.**~~ **Fixed §20.**
+  `dumpjp` looped over disc indices 0 and 1, so the VR archive's 31 `vr`
+  rows were skipped entirely. The three discs are keyed by name now and the
+  export is 68,242 lines. It was *not* small: it was a whole disc, and the
+  note above talked itself out of checking.
 * **`dumpjp.stage_blobs` assumes one font blob per stage.** `roll` and `abst`
   have two. It takes the first, which is right for everything checked so far.
 * **Nothing here changes the port's scope.** USA never shipped the commentary,
@@ -2136,8 +2140,9 @@ was recorded. The habit does not install itself.
 
 ## 19. The 2026-09-10 pass: the export finished, and the scanner retired
 
-**The unportable Japanese is exported in full.** 68,211 lines, 3,923,661
-kana/kanji, **zero** unresolved glyph codes.
+**The unportable Japanese is exported in full.** 68,242 lines, 3,923,944
+kana/kanji, **zero** unresolved glyph codes. (The figures here were 
+68,211 / 3,923,661 until §20 added the VR disc.)
 
     work/jpdump/disc1_RADIO_DAT.txt   the developer commentary, plain text
     work/jpdump/disc<n>_<source>.txt  DEMO.DAT, VOX.DAT, STAGE.DIR likewise
@@ -2247,3 +2252,107 @@ is worth more than another pass over the pixels.
 | the text extraction is complete | more text than the inventory in *every* commentary fragment, all 125 reached, 0 unresolved codes |
 | the glyph table is right | 78/78 on the labelled holdout; every one of 1,200 read back against a full sentence; the 13 new ones each settled by a sentence |
 | the bank-1 index is right | it is `zen_index`, from the game; and the sentence that used to render two ways now renders one way everywhere |
+
+## 20. The VR disc, and no game data in the repository
+
+Two small things, both from the same question: is what is committed actually
+what it says it is?
+
+### The export was missing a disc
+
+`disc1_RADIO_DAT.txt` is 97% of the export, which is close enough to all of it
+to stop looking - and stopping there would have been wrong. `dumpjp.main`
+looped `for disc_ix in (0, 1)`, so the **VR disc was never dumped at all**: 31
+lines of it, sitting in `japanese-inventory.tsv` the whole time under a `vr`
+key nothing consumed. §19 noted the VR disc had no `RADIO.DAT` and moved on
+without noticing that it does have a stage archive.
+
+The fix is that the three discs are now three names, not two indices:
+`STAGE_DIR = {disc1, disc2, vr}` maps each to its archive, `collect(disc)`
+takes the same key the inventory rows carry, and the `RADIO.DAT` half is
+skipped for `vr`, which genuinely has none. Output files are named by that key
+too, so the third is `vr_STAGE_DIR.txt` rather than a `disc3_` that would be
+wrong. The export is 68,242 lines now; it was 68,211.
+
+*Worth naming the shape of this one.* Every check in §18 and §19 was a check
+on **content** - do the glyphs resolve, does the text match the records, does
+one sentence render the same way twice - and all of them passed on a set that
+was silently missing a member. A completeness check has to enumerate the
+inputs, not audit the outputs. The inventory had a `vr` row all along; nothing
+compared the set of discs in it against the set the dumper walked.
+
+### No game data in the repository
+
+`CREDITS.md` says "No game data is in this repository." That had stopped being
+true, in three places, and all three were added by this work:
+
+| what | why it counted | what now |
+|---|---|---|
+| `reference/keyconfig_*.jpg`, 6 files, 1.46 MB | photographs of both games running | deleted; `README.md` says how to reproduce them, and the label mapping they settled stays |
+| `keyconfig-textures.png`, 37 KB | eight of the game's own textures, rendered side by side | deleted, same |
+| `bank1-glyphs.tsv`, 104 KB | its `shape_hex` column was 1,214 raw 12x12 font bitmaps - the Japanese font itself, in hex | `shape_id`: a 64-bit digest of each bitmap (`jptext.shape_key`) |
+
+The digest is the interesting one, because it costs almost nothing. Lookup
+hashes the bitmap the game hands it and reads the table, so every decode works
+exactly as before - the round-trip is byte-identical and the 78-answer holdout
+still scores 78/78. What it can no longer do is *render* a glyph from the
+committed copy, which was a real debugging aid (it is how the 完/璧 and
+朴/林 misreads were caught). That capability stays available where the data
+legitimately is: `work/glyphs-to-identify.tsv` keeps `shape_hex`, and
+`glyphreview.py` reads that one. `jptext.load_shape_table` accepts either
+spelling, so the two are interchangeable for lookup.
+
+`glyphfill.py --publish` is the step that strips the bitmaps out. It exists so
+the next transcription pass cannot put them back by accident, and it refuses to
+write if two shapes ever hash alike. `.gitignore` blocks images under
+`tools/integral-english/`.
+
+**What is deliberately kept:** short quotations of game text in the
+documentation - the sentence a glyph was read against, the subtitle that
+exposed the `0x97xx` index bug. Those are the evidence; a finding nobody can
+check is not a finding. They come to a few thousand characters against the 3.9
+million the export holds, and the export is written to `work/`, outside the
+repository, where it stays.
+
+### "Is that all of it?" - the two other ways the inventory under-reports
+
+Asking whether `disc1_RADIO_DAT.txt` was the whole export turned up the VR
+disc above. Chasing the same question through the remaining containers turned
+up two more limits, neither of which costs the export anything, and both worth
+knowing before anyone trusts `japanese-inventory.tsv` for something new.
+
+**`BRF.DAT` and `FACE.DAT` are scanned and correctly produce nothing.** They
+are image data. 56 runs in `BRF.DAT` match the font-code range by coincidence
+and `looks_like_prose` rejects every one.
+
+**`--min 6` drops short strings in raw files.** `jplist.runs_in` keeps a run
+only if `core_count(run) >= minimum`, and `core_count` counts kana and kanji
+only - the long-vowel mark, `。`, `、` and full-width symbols are excluded,
+because those are exactly what makes binary noise look like prose. The
+threshold is not optional: in a raw file any two bytes in `0x8140`-`0x9AFF`
+decode as a font code, so without it the scan drowns. But it is blunt, and
+short genuine strings fall under it. `セーブ中です。` is seven characters on
+screen and **five** by `core_count` (`セ ブ 中 で す` - the `ー` and the `。` do not
+count), so a min-6 scan does not see it.
+
+This is a *second*, independent way the inventory under-reports, on top of the
+scanner bug in §19 that ended runs at unrecognised codes. Another reason the
+export stopped sourcing `RADIO.DAT` from it.
+
+**Where that led, and why it does not change the export.** Rescanning the
+executables at `--min 3` finds four strings that a min-6 scan misses -
+セーブが / セーブ中です。 / ロードが / ロード中です。 at `0x2718`, `0x27BB`,
+`0x27FF`, `0x285B`. They are **not on the retail discs**: those offsets are
+zero in retail bytes on both discs. They appear only in the *deployed*
+executable, and the patch that owns `0x2600`-`0x2A00` is our own
+`INTEGRAL_disc<n>_en_savemsg.ppf` (531 EXE bytes). So the export, which reads
+retail bytes, is not missing them.
+
+**What it does raise is a port question, and it is open.** `en_savemsg`
+relocates the save-message table into that free space, and Japanese strings
+are sitting in the relocated copy. Either those slots have no USA counterpart,
+in which case leaving them Japanese is correct under rule 1, or they were
+missed. Deciding it means reading the relocated table against USA's, not
+guessing from these four - and the `en_savemsg` area already has an
+UNDETERMINED note against it (README, the MC RAM-patch collision). Filed here
+so it is not lost; it is not part of the export and does not block it.

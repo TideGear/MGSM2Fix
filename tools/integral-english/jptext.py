@@ -67,6 +67,7 @@ shapes, every one read against a decoded sentence, and the export has zero
 unresolved codes. Read `RADIO.DAT` through `radiotext.py`, not the inventory.
 """
 import argparse
+import hashlib
 import io
 import os
 import re
@@ -266,14 +267,33 @@ BANK1 = {
 SHAPES = {}
 
 
-def load_shape_table(path=None):
-    """shape_hex -> character, from a transcribed glyphsheets.py TSV.
+def shape_key(raw36):
+    """the committed table's key for a glyph bitmap.
 
-    `bank1-glyphs.tsv` beside this file is the committed table - 1,200 shapes,
+    A digest, not the bitmap, so `bank1-glyphs.tsv` carries no game data
+    (CREDITS.md). 16 hex digits is 64 bits over ~1,200 shapes; there is no
+    collision today and `glyphfill.py --publish`, which is what writes that
+    table, refuses to write if two shapes ever hash alike.
+    """
+    return hashlib.sha256(raw36).hexdigest()[:16]
+
+
+def load_shape_table(path=None):
+    """shape -> character, from a transcribed glyphsheets.py TSV.
+
+    `bank1-glyphs.tsv` beside this file is the committed table - 1,214 shapes,
     read by hand and checked against a decoded sentence each. It is the one
     artefact here that cannot be regenerated from the discs, so it lives in the
     repository rather than in `work/`. A `work/glyphs-to-identify.tsv` wins
     when it exists, so a pass in progress overrides the committed copy.
+
+    Two column spellings, and the difference matters. `work/` files carry
+    `shape_hex`, the 36 raw font bytes; the committed table carries `shape_id`,
+    `shape_key` of those bytes, because **no game data goes in this
+    repository** and a glyph bitmap is game data. The identification - which
+    character a shape is - is ours and is what ships. Both spellings load, and
+    a `shape_hex` file is converted on the way in, so the committed table and a
+    freshly generated one are interchangeable for lookup.
     """
     for cand in ([path] if path else
                  [WORK + '/glyphs-to-identify.tsv',
@@ -286,14 +306,16 @@ def load_shape_table(path=None):
         return SHAPES
     with io.open(path, encoding='utf-8') as fh:
         head = fh.readline().rstrip('\n').split('\t')
-        try:
-            ci, si = head.index('char'), head.index('shape_hex')
-        except ValueError:
+        raw = 'shape_hex' in head          # a work/ table; hash it on the way in
+        col = 'shape_hex' if raw else 'shape_id'
+        if 'char' not in head or col not in head:
             return SHAPES
+        ci, si = head.index('char'), head.index(col)
         for line in fh:
             f = line.rstrip('\n').split('\t')
             if len(f) > max(ci, si) and f[ci].strip():
-                SHAPES[f[si].strip()] = f[ci].strip()
+                k = f[si].strip()
+                SHAPES[shape_key(bytes.fromhex(k)) if raw else k] = f[ci].strip()
     return SHAPES
 
 
@@ -301,7 +323,7 @@ def char_for_shape(raw36):
     """a glyph bitmap -> character, once the shape table has been filled in"""
     if not SHAPES:
         load_shape_table()
-    return SHAPES.get(raw36.hex())
+    return SHAPES.get(shape_key(raw36))
 
 
 STYLE = 0x6000      # colour/emphasis bits, not part of the glyph index
