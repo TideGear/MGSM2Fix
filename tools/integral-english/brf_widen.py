@@ -587,6 +587,20 @@ for tid in sorted(WIDEN, key=lambda t: -tgt(t)[2]):
     if ufits(ig['px'], tw, bpp) and vfits(ig['py'], th) and row_ok(tid, ig['py']) and not busy(ig['px'], ig['py'], need, th):
         place[tid] = (ig['px'], ig['py'])
     else:
+        # DO NOT move these to rows 256..511. It was tried on 2026-09-10 and
+        # is strictly worse: the relocated labels themselves render as
+        # garbage while the three that stay in place are fine, so this code
+        # path cannot address the lower half of VRAM - the tpage field
+        # selects one 256-row half and the briefing assumes the top one.
+        # `vfits` permits y >= 256 and that permission is wrong here.
+        #
+        # The band this search does pick, x 896..958 at y 1..156, is not
+        # innocent either: the labels drawn from it are correct, but the
+        # briefing's right column is not, and removing en_brf entirely brings
+        # the column back. Something the port cannot see owns those bytes.
+        # `busy()` models only the `nd` payload's 51 textures, and the
+        # content the briefing pages in through brf_800CAC7C() is not in the
+        # stage at all - it comes from BRF.DAT by sector. See NextSteps 24.
         found = None
         for page in (896, 960, 832, 768, 704, 640, 576, 512):
             for ny in range(0, 512 - th):

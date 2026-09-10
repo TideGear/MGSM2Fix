@@ -2749,3 +2749,102 @@ And the patch was read back out of a finished image: the disassembly of
 `--english-default yes`, and the retail `jr $ra` without it.
 
 **Still not booted.** Same caveat as §22: this is static verification.
+
+## 24. The 2026-09-10 pass: the raw disc booted, and the briefing is broken
+
+The raw variant ran for the first time (§5.4). Everything checked so far is
+right except the **briefing**, whose right column renders as vertical stripes
+of sampled VRAM. This section is written while the fault is still open,
+because the eliminations are worth more than the conclusion will be.
+
+### What is established
+
+| | |
+|---|---|
+| unpatched Integral and USA, SwanStation | **clean** |
+| patched, `en_brf` removed (parity regenerated) | **clean**, Japanese |
+| patched, `en_brf` present | **broken** |
+| the same `en_brf` on the Master Collection | **clean** |
+| `en_brf`, raw build vs collection build | **byte-identical**, 276,482 bytes, 0 differing offsets |
+
+So `en_brf` is the fault; it is not raw-specific; and the collection build
+carries the same bug and always has. The emulator is not at fault - the
+settings are the accurate end of the scale (`GPU_Renderer = Software`,
+`ResolutionScale 1`, no PGXP, no filtering, no widescreen hack) and retail
+discs render correctly under them.
+
+### The verification that could not have caught it
+
+§4 records `en_brf` as verified by "26 shot pairs, 0.00% right-column diff".
+That compared **Integral-on-MC against USA-on-MC**. Both sides were drawn by
+the same emulator, so anything MC does differently from a PlayStation cancels
+out of the difference exactly and is invisible to the method. The check
+establishes that the port reproduces USA's layout *as MC executes it*; it
+cannot distinguish that from reproducing it as hardware executes it.
+
+That figure was quoted twice on 2026-09-10 as though it settled the question.
+It does not, and the general form is worth keeping: **a differential test
+against a reference rendered by the same suspect component proves only
+agreement, never correctness.** §16's lesson again - say what the claim
+ranges over.
+
+### Three hypotheses tested and rejected
+
+1. **The language default (§23).** Rejected: the briefing overlay reads
+   `GM_Configuration` zero times, and an image built without the language
+   patch is equally broken.
+2. **`ufits` is wrong for 8bpp** (a page is 128 texels wide at 8bpp, not 256,
+   and the guard uses a flat 255). Real bug in principle, not this one:
+   every one of the 20 widened labels is 4bpp and every one fits, the
+   tightest at 248 of 256.
+3. **Move the relocated labels to VRAM rows 256..511**, which the whole stage
+   leaves empty. **Strictly worse**: the relocated labels themselves render
+   as garbage while the three that stay in place are fine. This code path
+   cannot address the lower half of VRAM - the tpage field selects one
+   256-row half and the briefing assumes the top one. `vfits` permits
+   `py >= 256` and that permission is wrong here. Reverted; the comment in
+   `brf_widen.py` now says so.
+
+### What the current placement does, and what it does not explain
+
+`busy()` models the `nd` payload's 51 textures and nothing else. USA's labels
+are wider than Integral's - `br_s00` goes 13 units to 25 - so 17 of 20 cannot
+stay put, and the search relocates them to **x 896..958, y 1..156**, a band
+Integral's stage uses only at y 226-228 (CLUTs, which are avoided).
+
+But the relocated labels *draw correctly* there. It is the right column that
+does not. So this is not simply "the labels landed on something": their bytes
+are intact and correctly addressed. Something the port changed is making the
+**column** sample wrongly.
+
+A scan for the runtime uploads that `brf_800CAC7C()` performs found nothing
+in the stage - it pages content in from `BRF.DAT` by sector, so the data is
+outside every payload this toolchain parses.
+
+### The split being tested now
+
+`en_brf` does two separable things, and only one of them was tuned by eye:
+
+| half | how it was derived |
+|---|---|
+| texture swap + VRAM placement | fit constraints - `ufits`, `vfits`, `row_ok`, `busy` |
+| quad immediates + row arithmetic (`FRAME`, `MEMBER`, `S01`, `DETAIL`, `ROW_H`, xl, connectors) | **matched against Master Collection screenshots** |
+
+`INTEGRAL_BRF_NO_CODE=1` builds the first half alone: every assert still
+runs, the geometry changes are discarded, and the labels draw stretched to
+Integral's original quads. Clean-but-stretched implicates the tuned half;
+still-broken implicates the placement.
+
+The suspicion is the tuned half, and it came from the user: the geometry was
+reverse-engineered to make Integral's output *look like* USA's on MC, so a
+polygon whose UVs are wrong in a way MC tolerates would have been accepted as
+correct. `FRAME_NEW` rewrites "frame polys 27-38" - and a polygon with wrong
+UVs samples VRAM as vertical stripes, which is the symptom.
+
+### Two things this does not change
+
+The collection build is not at risk of regressing: M2 shipped a final patch
+months ago and will not change the renderer underneath it. And the fix, when
+it comes, belongs in `en_brf` and not in MGSM2Fix - the two builds share this
+patch byte for byte, and fixing it in the ASI would repair one environment,
+leave every other one broken, and split a file that is currently identical.

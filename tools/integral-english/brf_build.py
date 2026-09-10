@@ -174,6 +174,23 @@ print('patched %d quad immediates:' % len(patched))
 for addr, o, n, users in patched:
     print('   %08X  %5d -> %-5d  %s' % (addr, o, n, ', '.join(users)))
 
+# ---- diagnostic: throw the overlay code patches away -------------------------
+# INTEGRAL_BRF_NO_CODE=1 keeps the texture swap and the VRAM placement and
+# discards every geometry change above - the quad immediates, the row
+# arithmetic, the connectors, the advances. Every assert still runs, so the
+# base bytes are still checked; only the result is dropped.
+#
+# It exists to split this family in two. The placement half is driven by fit
+# constraints; the geometry half was tuned against Master Collection
+# screenshots, and the 26-shot-pair check that signed it off compared
+# Integral-on-MC with USA-on-MC - both sides drawn by the same emulator, so
+# any MC-specific rendering cancels out and cannot be seen. If the briefing
+# renders cleanly (if badly proportioned) with this set, the tuned half is
+# where the fault is. See NextSteps 24.
+if _os.environ.get('INTEGRAL_BRF_NO_CODE'):
+    ovl[:] = pi[0]
+    print('*** DIAGNOSTIC BUILD: overlay code patches discarded ***')
+
 # ---- archive: USA art pasted 1:1 into a canvas the size of the quad ----------
 report = []
 for e in ei:
@@ -242,6 +259,15 @@ for name, g in quads.items():                     # quad == canvas, for every la
     qw = target[tid][0] if name in UNSHARE else imm16(g['xr'][1]) - g['xl'][0]
     # families B and C get no yb immediate: the height is forced at runtime
     qh = 17 if name.startswith('br_f') else target[tid][1]   # per-label = texture height
+    # Under INTEGRAL_BRF_NO_CODE the quads are Integral's originals and the
+    # textures are USA's, so of course they disagree - that is the point of
+    # that build. The labels will draw stretched; what is being asked is
+    # whether they draw *cleanly*.
+    if _os.environ.get('INTEGRAL_BRF_NO_CODE'):
+        if (qw, qh) != (G2[tid]['w'], G2[tid]['h']):
+            print('   diagnostic: %s quad %dx%d vs texture %dx%d (will stretch)'
+                  % (name, qw, qh, G2[tid]['w'], G2[tid]['h']))
+        continue
     assert (qw, qh) == (G2[tid]['w'], G2[tid]['h']), \
         '%s quad %dx%d vs texture %dx%d' % (name, qw, qh, G2[tid]['w'], G2[tid]['h'])
 print('\nlabel textures:')
