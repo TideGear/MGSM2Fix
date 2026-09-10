@@ -257,7 +257,7 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 |---|---|
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
-| **real engineering** | **the raw variant's first boot on a real disc image** (end of 5.4, and 5.13) - the last thing standing, and everything in front of it is gone: the images build and verify from either source (§22, `mkimage.py`), the language default is offered (§23), and the branch is rebased onto `upstream/master` (5.6, one trivial conflict). What is left of 5.6 is **submitting the pull request** - see the five-way split there |
+| ~~**real engineering**~~ | **The raw disc BOOTED 2026-09-10** and the image is valid (5.4). What is left is not engineering: **submit the pull request** (5.6, five-way split there), and look at the three raw-only screens now that they are reachable |
 | ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete, on all three discs: 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. §18 and §19 |
 | **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
@@ -397,11 +397,18 @@ the general shape - **a builder that shifts records has to own every patch that
 writes into the region it moves**, and the only thing that notices is a check
 over the assembled set.
 
-**What is NOT proven: the raw variant has never run on a real PSX image.** It
-builds, packages and — since 2026-09-10 — produces patched disc images that
-verify; nobody has booted one. That is the remaining raw-disc work, and it is
-where `en_menu3`, the six-line brightness paragraph and Integral's own KEY
-CONFIG would finally be visible.
+**BOOTED 2026-09-10.** The user ran the patched disc 1 and it worked. That is
+the first time anything in this project has been proved to run outside the
+Master Collection, and it closes the item this paragraph carried from
+2026-09-07. What it establishes is that the image is *valid* - it loads, the
+executable runs, the game plays - not that every ported screen is right on it;
+the raw-only three (`en_menu3`, the six-line brightness paragraph, Integral's
+own KEY CONFIG) still want eyes on them, and they are now reachable for the
+first time.
+
+The image tested was built before the language default existed, so it started
+in Japanese - correct behaviour for a retail disc, and the reason §23 was
+written. Rebuilt with `--english-default yes` the same day.
 
 **Three things used to stand in front of that boot, and all three are now
 closed** (§22). Two were closed in code by §5.10 the same evening this
