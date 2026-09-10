@@ -369,6 +369,79 @@ to copy and the standing rule leaves all of it alone. The list exists because
 here until now, and because anyone who ever wants that commentary in English
 needs a starting point - which is a translation project, not this one.
 
+## Reading it: `jptext.py`, and how the font actually works (2026-09-09)
+
+`jplist.py` gives a list; its `text` column is font codes, which is not something
+a person can read. `py jptext.py` converts it to
+`work/japanese-readable.tsv`, decoding **3,682,776 of 4,225,090 glyphs
+(87.2%)**:
+
+    STAGE.DIR/title/chara CF79   DISC 1 をセットしてください。
+    STAGE.DIR/rank/chara 04F2    クリアデータを保存しますか?
+    RADIO.DAT                    このエレベータは⟪9608⟫⟪9609⟫に移動しているわけ
+                                 ではなく、回りのテクスチャをスクロールさせること
+                                 により⟪9608⟫⟪960A⟫しています。
+
+### Kana are arithmetic
+
+Rendering the contiguous code ranges showed both kana banks are in standard
+order, one code per character including small and voiced forms:
+
+    0x8101 + i  ->  hiragana from U+3041 (ぁ)
+    0x8201 + i  ->  katakana from U+30A1 (ァ)
+
+and the top bits `0x6000` are style flags that must be masked off first, exactly
+as `zen_index` does - without that, `0xD006` (a styled `ー`) reads as an unknown
+code and コントローラ comes out as コントロ⟪D006⟫ラ. Verified against strings
+whose reading was already known. 69% of all glyph uses, exact, no transcription.
+
+### The `0x90` bank is a transcription that checks itself
+
+238 glyphs read off labelled contact sheets. The proof it is right is that
+consecutive codes spell the game's own words - `906A`-`906E` 地雷探知機,
+`9059`-`905D` 精神安定剤, `9055`-`9057` 風邪薬, `904A`-`904D` 光学迷彩 - and a
+single misread glyph would break a word. It is also confirmed independently by
+arithmetic: `zen_index(0x90E2)` is glyph 394, and glyph 394 draws 服, which is
+what the table says.
+
+### Bank 1: solved, and it is why no global table exists
+
+Codes from `0x9600` up are "bank 1", which `rendertext.py` has always refused
+with "bank 1 lives elsewhere; not located". It is not in `font.res`, and not
+appended after bank 0 either - glyph index 392 lands back among bank 0's kanji,
+which ruled that guess out.
+
+**Bank 1 is a per-block glyph table carried by the block itself.** A `.gcx`
+script ends with a font blob - `parse_gcx` has always read it as `font` - and
+`0x9A01 + i` indexes it directly. Proven: `abst`'s caption is
+作戦⟪9A01⟫⟪9A02⟫, and glyphs 0 and 1 of that blob are **記** and **録**. The
+glyphs after them are 諸島沖孤廃棄占拠等 - the mission log's own vocabulary, in
+the order the text first needs it.
+
+This is why the same code means different characters in different places:
+`⟪9A01⟫` is 記 in `abst`, 端 in `s07b` (コントローラ端子1) and 年 in `roll`
+(1980年代). There is no global table to build, and never was.
+
+`RADIO.DAT` behaves the same way: its bank-1 codes never leave `0x9601`-`0x96FF`
+(255 entries - a per-block table), 1,908 of its strings begin a fresh run at
+`0x9601`, and the *same* commentary sentence appears at three offsets using
+different bank-1 codes each time.
+
+### What remains is recognition, not reverse engineering
+
+Locating a block's table yields **bitmaps, not characters** - something still has
+to say which character a 12x12 bitmap is. By hand that is easy for the stage
+archives (421 bank-1 glyph uses in total) and impossible for the commentary
+(541,920 uses, up to 255 distinct glyphs in each of ~1,900 blocks). That wants
+bitmap matching against a reference font, and it is the one piece of work between
+this and a fully readable disc.
+
+`DEMO.DAT` and `VOX.DAT` use no bank-1 glyph at all and come out **fully
+readable** - and reading them corrected an earlier guess in these notes: their
+text is story narration and dialogue (「そしてテロリストの核発射」,
+「け入れられない場合核を発射すると」), not the sound-design commentary the
+single rendered sample had suggested.
+
 ## Reproduce the inventory
 
 ```powershell
