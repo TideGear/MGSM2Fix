@@ -3,6 +3,10 @@
     py radiotext.py                     what it finds, and the checks
     py radiotext.py --disc 2
     py radiotext.py --dump out.txt      every line, in file order
+    py radiotext.py --check             THE REGRESSION GUARD on the
+                                        fragment map - see check()
+    py radiotext.py --selftest          slip bases on purpose; --check
+                                        must catch every one
 
 WHY NOT `japanese-inventory.tsv`
 
