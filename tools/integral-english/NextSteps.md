@@ -24,7 +24,12 @@ plausible-looking metrics were measured and thrown away (§21) - and on
 2026-09-08, when the housekeeping was cleared, the sweep's one uncovered
 finding became the `en_pad2` family, the three sweeps §5 had filed under "to
 investigate" were all run, and the four `abst` location names were decided
-(§5.11, §5.9, §5.14, §15). Written for whoever
+(§5.11, §5.9, §5.14, §15), and finally later on 2026-09-10, when the Redump
+dumps of all three discs were measured against the collection's embedded
+copies - identical outside the hollowed-out executables, which those dumps also
+supply at the exact hash the builder demands - and `mkimage.py` closed the gap
+between a raw build and an actual patched disc image, from either source
+(§22). Written for whoever
 picks this up cold: a later session of the same assistant, a different model, or
 a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
@@ -252,7 +257,7 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 |---|---|
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
-| **real engineering** | the raw variant's first boot on a real disc image (end of 5.4, and 5.13), 5.6 the upstream sync |
+| **real engineering** | the raw variant's first **boot** on a real disc image (end of 5.4, and 5.13) — the images themselves now build and verify from either source, §22; 5.6 the upstream sync |
 | ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete, on all three discs: 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. §18 and §19 |
 | **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
@@ -393,16 +398,21 @@ writes into the region it moves**, and the only thing that notices is a check
 over the assembled set.
 
 **What is NOT proven: the raw variant has never run on a real PSX image.** It
-builds and packages; nobody has applied it to a real disc and booted it. That is
-the remaining raw-disc work, and it is where `en_menu3`, the six-line brightness
-paragraph and Integral's own KEY CONFIG would finally be visible. Two things the
-build does not do yet stand in front of that boot, both found 2026-09-07 (§5.10):
-the PPFs are computed against the collection's embedded images, so the first
-step is to show those equal a retail dump (hash the extracted ISO against
-redump's track for SLPM-86247 / 86248 / 86249), and the raw PPFs carry no
-blockcheck that would refuse a wrong image; and nothing regenerates the EDC/ECC
-tail of the sectors the PPFs change — irrelevant to the collection's emulator,
-not to real hardware or a strict emulator.
+builds, packages and — since 2026-09-10 — produces patched disc images that
+verify; nobody has booted one. That is the remaining raw-disc work, and it is
+where `en_menu3`, the six-line brightness paragraph and Integral's own KEY
+CONFIG would finally be visible.
+
+**Three things used to stand in front of that boot, and all three are now
+closed** (§22). Two were closed in code by §5.10 the same evening this
+paragraph was written, and the text above them went stale: `rebuild.py
+--variant raw` gives every PPF a **block check** (`place()`, from
+`blockcheck_of`) and emits a per-disc **`zz_ecc` PPF** carrying the recomputed
+EDC/ECC of every touched sector (`raw_tails()`, `rawdisc.py`). The third — show
+the collection's embedded images equal a retail dump — was measured on
+2026-09-10 against the Redump set and holds byte for byte outside the
+executables. **Do not re-plan work that the code already does; read
+`rebuild.py` before believing a paragraph in this file.**
 
 ### 5.4a The VR movie captions — DONE and VERIFIED ON SCREEN 2026-09-07
 All three MOVIE selection captions are ported and deployed as
@@ -1277,6 +1287,8 @@ an explicit answer before anything changes.
 | `menu3.py [--collection]` | the `title` stage's disc-swap copy, **raw disc only** — rewrites the five records inside `CMD 9906`'s `-v` option, re-stamps the SCRIPT/ARG/COMMAND sizes and leaves the overflowed `-v` u8; `--deploy` refuses, `--collection` rebuilds the shape that crashes so the fault can be reproduced (§5.3) |
 | `audit_text.py` | main-disc and VR candidate inventory, save-title encoding; see `COVERAGE.md` |
 | `rebuild.py [--variant raw]` | the isolated build of **everything**: nine main families for both discs and the VR disc's seven, checks, manifest and ZIP. Builds Integral's VR executable from the decomp rather than copying it, and points `vr_movie` at its own output. `--variant raw` swaps the two constants and adds `en_menu3`; `--compare-deployed` checks every PPF's effective bytes against `mods/`. See `BUILDING.md` |
+| `mkimage.py` | **writes a patched disc image** from a raw build — the step that turns PPFs into something a burner or emulator can open. `--redump <disc.bin>` or `--collection --game ... --exe int1.exe` (the collection hollows the executable out, so it refuses without one). Checks four things before writing: every PPF's block check against the image, no record past the end, every touched sector's parity **before** patching, and again **after**. §22 |
+| `rawdisc.py [package]` | the EDC/ECC pass `rebuild.py --variant raw` runs, and `verify_set` — apply a finished set in memory and check every touched sector against the parity the set wrote |
 | `portio.py` | shared read-only disc access and deterministic PPF/stage serialisation (`stage`, `pack_stage`, `records`, `encode_records`, `changed_runs`, `ppf`, `relocation`) — the module the recovered builders and `rebuild.py` are built on |
 | `iso.py` | raw-sector disc reader (`Disc(path, base)`; mode-2 24-byte headers), used to read the images inside `alldata.bin` / `dlc_japan.bin` |
 | `kcplace.py`, `kcquads.py`, `kcrects.py` | KEY CONFIG port helpers: VRAM/CLUT allocation for USA's eight labels, quad extraction from an option overlay, the per-button-type label rectangles |
@@ -2443,3 +2455,133 @@ and counting it would inflate the number that means something.
 
 **What this does not check** is whether a shape is named *correctly* - that is
 the 78-answer holdout in `glyphfill.py --score`. This checks the base.
+
+## 22. The 2026-09-10 pass: the Redump images, and patched discs that build
+
+The question was whether the Redump dumps of Integral work with these patches,
+and whether a patched image can be built from **either** them or the
+collection's embedded copies. Both answers are yes, and both were measured
+rather than argued.
+
+### The two sources are the same disc
+
+Streaming all three Redump `.bin` files against the same discs inside
+`windata/dlc/dlc_japan.bin`, sector by sector:
+
+| | disc 1 | disc 2 | VR |
+|---|---|---|---|
+| Redump size | 719,667,312 | 745,788,624 | 481,969,488 |
+| collection's copy | identical length | identical length | identical length |
+| sectors that differ | 312 | 312 | 307 |
+| where | `SLPM_862.47` | `SLPM_862.48` | `SLPM_862.49` |
+| anywhere else | **none** | **none** | **none** |
+
+1.9 GB across three discs, and the **only** bytes that differ are the
+executable extents the collection zero-fills — exactly what `rawdisc.py` says
+and nothing more. (312 of 313 sectors, not 313: one sector of the executable is
+genuinely all zeros, so the hollow copy happens to equal it.) The 1024 bytes at
+`0x9320` that a PPF3 block check carries are identical on all three.
+
+**So the Redump set closes the last of §5.4's three prerequisites** — the one
+that could not be closed from inside, because it is a question about a file
+this project does not ship.
+
+### It also supplies the executables the build asks for
+
+`BUILDING.md` requires `int1.exe` and `int2.exe` as separately supplied inputs,
+because extracting them from the collection yields zeros. Extracted from the
+Redump images instead, both hash to
+`4b8252b65953a02021486406cfcdca1c7670d1d1a8f3cf6e750ef6e360dc3a2f` — **the
+exact hash the builder demands**. The VR disc's `SLPM_862.49` hashes to
+`c370f8e41ec8fb78238bfe2ddbfc25a6d37ec8f0972c86ebfde075ecd4ee8dca`, which is
+the hash `rebuild.py` already checks its **decomp-built** VR executable
+against. So the decomp reproduces that executable byte for byte, and a real
+retail dump says so independently. With the Redump set present the build has
+no unsourced input left.
+
+### `mkimage.py`
+
+Everything else here emits PPFs and stops, because the collection applies them
+itself. `mkimage.py` is the missing step. It takes a raw build's PPF folder and
+writes a patched `MODE2/2352` image plus its `.cue`, from either source, and it
+checks four things before it writes anything:
+
+1. every PPF's block check equals the image's own bytes at `0x9320`;
+2. no record reaches past the end of the image;
+3. every touched sector verifies against **its own stored parity before
+   patching** — a 280-byte sum over 2048 bytes, which is what actually proves
+   the dump is the pressing the patches were computed against;
+4. every touched sector verifies **again after patching**, against the parity
+   the set's own `zz_ecc` PPF wrote.
+
+Check 4 is why the set is all-or-nothing: a tail is computed from the final
+payload of the whole set, so dropping one family leaves right data behind wrong
+parity. `--allow-partial` skips it for bisecting and says so in the output.
+
+**From the collection it requires `--exe` and refuses without it.** That is the
+one asymmetry between the sources and it is not a formality: an image built
+from the collection's copy without the retail executable put back is 641,024
+bytes of zeros where the game's code belongs. Neither the collection nor this
+repository can supply those bytes.
+
+### Built, on the current patch set
+
+`repro21raw` (32 PPFs — 12 per main disc, 8 VR, `en_pad2` included) applied to
+all three Redump dumps:
+
+| disc | PPFs | touched sectors | patch bytes | parity before | after |
+|---|---:|---:|---:|---|---|
+| 1 | 12 | 417 | 907,240 | all pass | all pass |
+| 2 | 12 | 417 | 907,240 | all pass | all pass |
+| VR | 8 | 2,003 | 4,058,372 | all pass | all pass |
+
+Content-checked on disc 1 rather than trusting the counts: the executable now
+holds `Cannot be used in`, `Anti-anxiety`, `Sniper rifle` and `HANDKER` (and no
+longer `SCARF`), and `preope`, `brf`, `option` and `abst` point into DUMMY3M at
+slots 0, 128, 384 and 462 — the documented four.
+
+**And the two sources produce the same disc.** Building disc 1 from the Redump
+dump and from the collection's copy with `int1.exe` supplied gives two files
+with the same SHA-256,
+`a51415b91c03465274795b5b010049918c1b630820823514947f491616ea85e1`
+on `repro21raw` (and the same agreement on the older `repro14raw` set, at a
+different hash). Which source you start from does not matter; only whether the
+executable is accounted for. Getting there needed one length rule: the
+container pads to a 2048-byte boundary between images, which is not a sector
+boundary, so flooring the span to whole 2352-byte sectors is what reproduces
+the Redump length exactly on all three discs.
+
+### What testing the failure paths found
+
+Both were found by running them, not by reading the code, which is the only
+reason they are not still there:
+
+- **A failed post-patch check used to leave the bad image on disk** - 719 MB
+  that fails its own parity, under the name the good one would have had. Both
+  parity checks now run in memory over the touched sectors alone (about a
+  megabyte on a main disc, 4.7 MB on VR) and **nothing is written until both
+  pass**; any failure mid-write unlinks the partial file.
+- **A collection build pointed at a disc image is the realistic mistake**, and
+  it is caught: its PPFs carry no block check (warned) and no `zz_ecc`, so all
+  415 touched sectors fail the after-check and the run stops with the reason.
+- **The block check discriminates all three discs** - disc 1, disc 2 and VR
+  have different bytes at `0x9320`. Handing disc 2's image the disc-1 folder
+  stops on the first PPF, before anything is read past the header.
+
+### What this does and does not establish
+
+It does **not** boot a disc. Every check here is static — parity, framing,
+block checks, string content — and the raw variant's first run on real
+hardware or a strict emulator is still the open item in §5.4. What it removes
+is everything that stood *in front of* that test: there is now a command that
+produces the image to test.
+
+    py mkimage.py --redump "<disc 1>.bin" --ppfs <pkg>/mods/INTEGRAL/INTEGRAL/0 \
+        --output "MGS Integral English (Disc 1).bin" --cue
+
+### The method note, and it is §16's again
+
+Two of §5.4's three blockers had been closed in code on the same evening the
+paragraph naming them was written, and it sat there for three days reading like
+open work. The section listing what remains is not evidence; `rebuild.py` is.
+Before planning work off a paragraph in this file, read the code it describes.

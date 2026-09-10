@@ -46,6 +46,12 @@ confirmed to make it fail, so it is known to have teeth.
   `us1.exe`, `us2.exe`. The collection's ISO executable extents are zero-filled;
   extracting them does **not** supply usable retail code. No game data is
   distributed in this repository.
+
+  **The Redump dumps supply the Integral two.** `SLPM_862.47` and `SLPM_862.48`
+  extracted from `Metal Gear Solid - Integral (Japan, Asia) (En,Ja) (Disc 1/2)`
+  both hash to the `4b8252b6…` the table below requires (measured 2026-09-10,
+  §22 of `NextSteps.md`), so a copy of that set is a complete source for these
+  inputs.
 - The local MGS decomp Git repository containing commit `7964de7`, and a PSYQ
   SDK tree accepted by that revision's `build/build.py --psyq_path` (the local
   tree contains `psyq_4.3`, `psyq_4.4`, `psyq_4.5` and `aspsx`).
@@ -93,8 +99,8 @@ A failed comparison retains the report and does not create a ZIP.
 
 ## Outputs
 
-- `Integral-English-<variant>.zip`: the PPFs in installation paths (collection: 20 main + 7 VR; raw adds `en_menu3` × 2), README,
-  `build-report.json` and `SHA256SUMS.txt`.
+- `Integral-English-<variant>.zip`: the PPFs in installation paths (collection: 20 main + 7 VR; raw adds `en_menu3` × 2 and a
+  `zz_ecc` per disc, 32 in all), README, `build-report.json` and `SHA256SUMS.txt`.
 - `package/`: the same unpacked files for review.
 - `work/`, `decomp/`, `build.log`: extracted inputs, intermediate assets and
   compiler/build evidence, retained for diagnosis.
@@ -104,6 +110,34 @@ different SDK, Python version or source checkout may change the ZIP even if
 the resulting patch effects match. Inspect `reference_effect_equal` for every
 output when comparing against the known deployed set. The package README
 lists installation, removal, ASI requirements and incomplete features.
+
+## Writing a patched disc image
+
+A raw build stops at PPFs. `mkimage.py` applies a disc's folder to an image and
+writes the patched `MODE2/2352` `.bin` and its `.cue`:
+
+```powershell
+py mkimage.py --redump "Metal Gear Solid - Integral (Japan, Asia) (En,Ja) (Disc 1).bin" `
+    --disc 1 --ppfs D:/mgsbuild/repro21raw/package/mods/INTEGRAL/INTEGRAL/0 `
+    --output "D:/out/MGS Integral English (Disc 1).bin" --cue
+```
+
+Disc 2 is `--disc 2` with `.../INTEGRAL/1`; the VR disc is `--disc vr` with
+`.../VR-DISK`. The other source is the collection's own image, which needs the
+retail executable put back and refuses without it:
+
+```powershell
+py mkimage.py --collection --game D:/Steam/SteamApps/common/MGS1 --disc 1 `
+    --exe D:/mgsbuild/integral-english-work/work/int1.exe `
+    --ppfs .../INTEGRAL/0 --output "D:/out/MGS Integral English (Disc 1).bin" --cue
+```
+
+Both routes produce the same file. Give it a **raw** build: a collection build
+carries no block check and no `zz_ecc`, so its images would be left with
+correct data behind stale parity, and `mkimage.py` warns about the first and
+refuses on the second. Every touched sector is verified against its own parity
+before the write and against the set's recomputed parity after it; §22 of
+`NextSteps.md` has the measurements and what they do and do not establish.
 
 ## Recovered builders and obsolete experiments
 
