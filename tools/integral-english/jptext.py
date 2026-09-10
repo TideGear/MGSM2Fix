@@ -89,7 +89,7 @@ GLYPH_90 = {
     0x900B: '「', 0x900C: '」', 0x900E: '』', 0x9010: '％', 0x9011: '＆',
     0x9016: '／', 0x9017: '…', 0x9018: '×', 0x901B: '○', 0x901F: '愛',
     0x9020: '飲', 0x9021: '双', 0x9022: '眼', 0x9023: '鏡', 0x9025: '段',
-    0x9026: '行', 0x9027: '告', 0x9028: '渓', 0x9029: '谷', 0x902A: '核',
+    0x9026: '行', 0x9027: '書', 0x9028: '渓', 0x9029: '谷', 0x902A: '核',
     0x902B: '保', 0x902C: '存', 0x902D: '庫', 0x902E: '大', 0x902F: '雪',
     0x9030: '原', 0x9031: '暗', 0x9032: '視', 0x9033: '闇', 0x9034: '見',
     0x9035: '赤', 0x9036: '外', 0x9037: '線', 0x9038: '熱', 0x9039: '持',
@@ -126,7 +126,7 @@ GLYPH_90 = {
     0x90D1: '維', 0x90D2: '防', 0x90D3: '屈', 0x90D4: '曲', 0x90D5: '者',
     0x90D6: '透', 0x90D7: '軍', 0x90D8: '携', 0x90D9: '帯', 0x90DB: '食',
     0x90DC: '時', 0x90DD: '総', 0x90DE: '合', 0x90DF: '感', 0x90E0: '冒',
-    0x90E1: '治', 0x90E2: '服', 0x90E3: '一', 0x90E4: '問', 0x90E5: '起',
+    0x90E1: '治', 0x90E2: '服', 0x90E3: '一', 0x90E4: '間', 0x90E5: '起',
     0x90E6: '緊', 0x90E7: '急', 0x90E8: '解', 0x90E9: '除', 0x90EA: '扉',
     0x90EB: '敷', 0x90EC: '位', 0x90ED: '表', 0x90EE: '示', 0x90EF: '製',
     0x90F0: '彼', 0x90F1: '女', 0x90F2: '専', 0x90F3: '音', 0x90F4: '抑',
@@ -135,10 +135,126 @@ GLYPH_90 = {
     0x90FF: '殊',
 }
 
+# bank 0x91: five glyphs, identified from the sentences they appear in
+# (ご了承下さい, 上書き保存, 主観移動可能モード, 期限は1週間).
+GLYPH_91 = {0x9108: '了', 0x910B: '上', 0x910F: '能', 0x9111: '期'}
+
+# Bank 1 is PER-BLOCK, so it is keyed by (stage, code): the same code is a
+# different character in a different stage - 記 in `abst`, 端 in `s07b`,
+# 年 in `roll`. Identified by an OCR shortlist plus the decoded context around
+# each use: the staff roll pinned 二/万/五/千 because it is MGS1's own opening
+# text, and 変更内容を上書き保存 pinned 更/内/容/上. 82 of the 90 shapes the
+# remaining Japanese uses are identified; the other 8 stay as codes.
+BANK1 = {
+    ('abst', 0x9A01): '記',
+    ('abst', 0x9A02): '録',
+    ('abst', 0x9A03): '参',
+    ('abst', 0x9A6F): '待',
+    ('camera', 0x9A01): '更',
+    ('camera', 0x9A02): '内',
+    ('camera', 0x9A03): '容',
+    ('ending', 0x9A01): '最',
+    ('ending', 0x9A02): '終',
+    ('endingr', 0x9A01): '最',
+    ('endingr', 0x9A02): '終',
+    ('option', 0x9A03): '画',
+    ('option', 0x9A04): '面',
+    ('option', 0x9A05): '戻',
+    ('option', 0x9A08): '本',
+    ('option', 0x9A09): '整',
+    ('option', 0x9A0C): '下',
+    ('option', 0x9A0D): '遊',
+    ('option', 0x9A0E): '最',
+    ('option', 0x9A0F): '適',
+    ('option', 0x9A10): '態',
+    ('option', 0x9A11): '主',
+    ('option', 0x9A12): '観',
+    ('rank', 0x9A01): '法',
+    ('rank', 0x9A02): '説',
+    ('rank', 0x9A03): '参',
+    ('rank', 0x9A04): '下',
+    ('rank', 0x9A05): '最',
+    ('rank', 0x9A06): '低',
+    ('rank', 0x9A07): '以',
+    ('rank', 0x9A09): '受',
+    ('rank', 0x9A0B): '成',
+    ('rank', 0x9A0C): '血',
+    ('rank', 0x9A0D): '液',
+    ('rank', 0x9A11): '助',
+    ('rank', 0x9A12): '名',
+    ('rank', 0x9A13): '差',
+    ('rank', 0x9A14): '込',
+    ('rank', 0x9A15): '口',
+    ('rank', 0x9A16): '取',
+    ('rank', 0x9A17): '素',
+    ('rank', 0x9A18): '晴',
+    ('rank', 0x9A19): '任',
+    ('rank', 0x9A1A): '務',
+    ('rank', 0x9A1B): '内',
+    ('rank', 0x9A1C): '容',
+    ('rank', 0x9A1D): '道',
+    ('roll', 0x9A01): '年',
+    ('roll', 0x9A02): '代',
+    ('roll', 0x9A03): '世',
+    ('roll', 0x9A04): '常',
+    ('roll', 0x9A05): '五',
+    ('roll', 0x9A06): '万',
+    ('roll', 0x9A07): '以',
+    ('roll', 0x9A08): '在',
+    ('roll', 0x9A09): '壊',
+    ('roll', 0x9A0A): '型',
+    ('roll', 0x9A0B): '分',
+    ('roll', 0x9A0C): '相',
+    ('roll', 0x9A0D): '当',
+    ('roll', 0x9A0E): '月',
+    ('roll', 0x9A10): '西',
+    ('roll', 0x9A11): '暦',
+    ('roll', 0x9A12): '日',
+    ('roll', 0x9A13): '略',
+    ('roll', 0x9A14): '配',
+    ('roll', 0x9A15): '数',
+    ('roll', 0x9A16): '削',
+    ('roll', 0x9A17): '同',
+    ('roll', 0x9A18): '現',
+    ('roll', 0x9A19): '二',
+    ('roll', 0x9A1A): '千',
+    ('title', 0x9A01): '主',
+    ('title', 0x9A02): '観',
+    ('title', 0x9A03): '攻',
+    ('title', 0x9A04): '出',
+    ('title', 0x9A05): '来',
+    ('title', 0x9A06): '同',
+    ('title', 0x9A07): '態',
+    ('title', 0x9A08): '＋',
+    ('title', 0x9A09): '渡',
+    ('title', 0x9A0A): '通',
+    ('title', 0x9A0B): '常',
+    ('title', 0x9A0C): '取',
+    ('title', 0x9A0D): '得',
+    ('title', 0x9A10): '格',
+    ('title', 0x9A11): '闘',
+    ('title', 0x9A12): '各',
+    ('title', 0x9A13): '承',
+    ('title', 0x9A14): '下',
+    ('title', 0x9A15): '難',
+    ('title', 0x9A16): '易',
+    ('title', 0x9A17): '正',
+    ('title', 0x9A18): '去',
+    ('title', 0x9A19): '記',
+    ('title', 0x9A1A): '録',
+    ('title', 0x9A1B): '読',
+    ('title', 0x9A1C): '真',
+    ('title', 0x9A1D): '集',
+    ('title', 0x9A1E): '画',
+    ('title', 0x9A1F): '面',
+    ('title', 0x9A20): '戻',
+    ('title', 0x9A26): '杯',
+}
+
 STYLE = 0x6000      # colour/emphasis bits, not part of the glyph index
 
 
-def glyph_char(code):
+def glyph_char(code, stage=None):
     """one code -> one character, or None if the font bank is not located.
 
     The top bits are style flags and must be masked off first - `zen_index`
@@ -147,18 +263,22 @@ def glyph_char(code):
     codes, which is what made コントローラ decode as コントロ⟪D006⟫ラ.
     """
     code &= ~STYLE
+    if stage is not None and (stage, code) in BANK1:
+        return BANK1[(stage, code)]
     if 0x8101 <= code <= 0x8153:
         return chr(0x3041 + code - 0x8101)
     if 0x8201 <= code <= 0x8256:
         return chr(0x30A1 + code - 0x8201)
     if code in GLYPH_90:
         return GLYPH_90[code]
+    if code in GLYPH_91:
+        return GLYPH_91[code]
     if 0x8000 <= code <= 0x80FF:
         return chr(code & 0xFF)              # the Latin bank, already ASCII
     return None
 
 
-def decode(text):
+def decode(text, stage=None):
     """a `<xxxx>`-coded string -> readable Japanese, unknown glyphs as ⟪xxxx⟫"""
     out = []
     for part in re.split(r'(<[0-9A-F]{4}>)', text):
@@ -169,15 +289,15 @@ def decode(text):
             out.append(part)
             continue
         code = int(m.group(1), 16)
-        ch = glyph_char(code)
+        ch = glyph_char(code, stage)
         out.append(ch if ch is not None else '⟪%04X⟫' % code)
     return ''.join(out)
 
 
-def coverage(text):
+def coverage(text, stage=None):
     """(known, total) glyph codes in a string"""
     codes = [int(c, 16) for c in CODE.findall(text)]
-    return sum(1 for c in codes if glyph_char(c) is not None), len(codes)
+    return sum(1 for c in codes if glyph_char(c, stage) is not None), len(codes)
 
 
 def main():
@@ -207,19 +327,21 @@ def main():
 
     if args.sample:
         for f in sorted(rows, key=lambda r: -int(r[5]))[:args.sample]:
-            known, total = coverage(f[6])
+            st = f[1].split('/')[1] if f[1].startswith('STAGE.DIR/') else None
+            known, total = coverage(f[6], st)
             print('%s %s %s  [%d/%d glyphs known]' % (f[0], f[1], f[2], known, total))
-            print('   %s' % decode(f[6]))
+            print('   %s' % decode(f[6], st))
         return 0
 
     known = total = 0
     with io.open(args.out, 'w', encoding='utf-8', newline='') as fh:
         fh.write('\t'.join(header[:6] + ['japanese', 'codes']) + '\n')
         for f in rows:
-            k, t = coverage(f[6])
+            st = f[1].split('/')[1] if f[1].startswith('STAGE.DIR/') else None
+            k, t = coverage(f[6], st)
             known += k
             total += t
-            fh.write('\t'.join(f[:6] + [decode(f[6]), f[6]]) + '\n')
+            fh.write('\t'.join(f[:6] + [decode(f[6], st), f[6]]) + '\n')
     print('%d row(s) -> %s' % (len(rows), args.out))
     print('glyphs decoded: %d of %d (%.1f%%); the rest are bank 1, whose font is'
           ' not located' % (known, total, 100.0 * known / total if total else 0))
