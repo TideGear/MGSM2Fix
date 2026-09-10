@@ -105,7 +105,7 @@ GLYPH_90 = {
     0x9067: '不', 0x9068: '明', 0x9069: '捨', 0x906A: '地', 0x906B: '雷',
     0x906C: '探', 0x906D: '知', 0x906E: '機', 0x906F: '写', 0x9070: '演',
     0x9071: '習', 0x9072: '納', 0x9073: '長', 0x9074: '丈', 0x9075: '夫',
-    0x9076: '麻', 0x9078: '句', 0x9079: '凍', 0x907A: '付', 0x907B: '押',
+    0x9076: '麻', 0x9078: '匂', 0x9079: '凍', 0x907A: '付', 0x907B: '押',
     0x907C: '構', 0x907D: '離', 0x907E: '発', 0x907F: '砲', 0x9080: '連',
     0x9081: '続', 0x9082: '破', 0x9083: '片', 0x9084: '榴', 0x9085: '弾',
     0x9086: '前', 0x9087: '方', 0x9088: '投', 0x9089: '無', 0x908A: '誘',
@@ -114,7 +114,7 @@ GLYPH_90 = {
     0x9095: '照', 0x9096: '準', 0x9097: '移', 0x9098: '動', 0x9099: '人',
     0x909A: '指', 0x909B: '向', 0x909C: '性', 0x909D: '設', 0x909E: '置',
     0x909F: '敵', 0x90A0: '接', 0x90A1: '近', 0x90A2: '爆', 0x90A3: '閃',
-    0x90A4: '界', 0x90A5: '端', 0x90A6: '電', 0x90A7: '子', 0x90A8: '妨',
+    0x90A4: '界', 0x90A5: '奪', 0x90A6: '電', 0x90A7: '子', 0x90A8: '妨',
     0x90A9: '害', 0x90AA: '狙', 0x90AB: '撃', 0x90AC: '入', 0x90AD: '応',
     0x90AE: '答', 0x90AF: '願', 0x90B0: '煙', 0x90B1: '草', 0x90B2: '吸',
     0x90B3: '過', 0x90B4: '注', 0x90B5: '意', 0x90B6: '可', 0x90B7: '倍',
@@ -122,7 +122,7 @@ GLYPH_90 = {
     0x90BD: '増', 0x90BE: '幅', 0x90BF: '映', 0x90C0: '像', 0x90C1: '器',
     0x90C2: '材', 0x90C3: '場', 0x90C4: '所', 0x90C5: '確', 0x90C6: '事',
     0x90C7: '周', 0x90C8: '囲', 0x90C9: '源', 0x90CA: '生', 0x90CB: '兵',
-    0x90CC: '戦', 0x90CD: '中', 0x90CE: '少', 0x90CF: '遅', 0x90D0: '継',
+    0x90CC: '戦', 0x90CD: '中', 0x90CE: '少', 0x90CF: '遅', 0x90D0: '繊',
     0x90D1: '維', 0x90D2: '防', 0x90D3: '屈', 0x90D4: '曲', 0x90D5: '者',
     0x90D6: '透', 0x90D7: '軍', 0x90D8: '携', 0x90D9: '帯', 0x90DB: '食',
     0x90DC: '時', 0x90DD: '総', 0x90DE: '合', 0x90DF: '感', 0x90E0: '冒',
@@ -179,7 +179,7 @@ BANK1 = {
     ('rank', 0x9A09): '受',
     ('rank', 0x9A0B): '成',
     ('rank', 0x9A0C): '血',
-    ('rank', 0x9A0D): '液',
+    ('rank', 0x9A0D): '清',
     ('rank', 0x9A11): '助',
     ('rank', 0x9A12): '名',
     ('rank', 0x9A13): '差',
@@ -197,7 +197,7 @@ BANK1 = {
     ('roll', 0x9A02): '代',
     ('roll', 0x9A03): '世',
     ('roll', 0x9A04): '常',
-    ('roll', 0x9A05): '五',
+    ('roll', 0x9A05): '六',
     ('roll', 0x9A06): '万',
     ('roll', 0x9A07): '以',
     ('roll', 0x9A08): '在',
@@ -261,9 +261,22 @@ SHAPES = {}
 
 
 def load_shape_table(path=None):
-    """shape_hex -> character, from a transcribed glyphsheets.py TSV"""
-    path = path or (WORK + '/glyphs-to-identify.tsv')
-    if not os.path.exists(path):
+    """shape_hex -> character, from a transcribed glyphsheets.py TSV.
+
+    `bank1-glyphs.tsv` beside this file is the committed table - 1,200 shapes,
+    read by hand and checked against a decoded sentence each. It is the one
+    artefact here that cannot be regenerated from the discs, so it lives in the
+    repository rather than in `work/`. A `work/glyphs-to-identify.tsv` wins
+    when it exists, so a pass in progress overrides the committed copy.
+    """
+    for cand in ([path] if path else
+                 [WORK + '/glyphs-to-identify.tsv',
+                  os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               'bank1-glyphs.tsv')]):
+        if cand and os.path.exists(cand):
+            path = cand
+            break
+    if not path or not os.path.exists(path):
         return SHAPES
     with io.open(path, encoding='utf-8') as fh:
         head = fh.readline().rstrip('\n').split('\t')
