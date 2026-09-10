@@ -2025,6 +2025,45 @@ a bank-1 glyph, and `glyphfill.py` warns when an assignment breaks that. Every
 warning it raised in this pass was a real error — three in `GLYPH_90`, none in
 the new work.
 
+### Every conversation already has an English slot (asked 2026-09-10)
+
+Asked whether the process could be reversed - English written where the
+Japanese is. The engine already has the mechanism, and the commentary already
+has the space. `sub_80047D70` picks a fragment half by the language flag:
+
+    startSector = code & 0xFFFF
+    Japanese    = (code >> 24) sectors there
+    English     = ((code >> 16) & 0xFF) sectors immediately after
+
+Measured on disc 1, over the fragments the radio codes name:
+
+| | Japanese half | English half |
+|---|---|---|
+| story codec | 28.7% glyph codes | **1.6% glyph codes, 73.9% ASCII** - `"Be careful, Snake. That air lock is set..."` |
+| commentary | 35.6% glyph codes | **35.6% glyph codes** - a copy of the Japanese |
+
+So the story codec's English half is plain ASCII, and **the commentary's
+English half is a duplicate of the Japanese** - which is exactly what the
+channel says about itself: 「なお、この周波数のみ字幕言語設定が英語の場合でも日本語で表示されます。」
+None of the 192 recovered codes declares an empty English extent.
+
+Writing ASCII into the English half therefore shows in English mode and leaves
+the Japanese untouched in Japanese mode - no relocation, no new allocation.
+The budget is comfortable: ASCII is one byte per character against two for
+glyph codes, and the English half needs no font blob (1.49 MB of the
+commentary's 6.81 MB is font).
+
+What would still have to be built: a writer that keeps the record's BE16 size,
+the script's BE16 total and the fragment's declared sector count in agreement,
+and that respects the 240px line width (README, "font render limits"). Then
+the usual on-screen check.
+
+**None of this is authorised.** Filling those slots means writing English that
+Konami never shipped, which is translation - rule 1, verbatim: *"I'm not
+authorizing you to translate (yet) anything only in english with no port should
+be left in Japanese."* The mechanism is recorded here so the answer exists; the
+decision is the user's.
+
 ### Where the number stops, measured the day it was claimed
 
 The 100% is over `japanese-inventory.tsv`, and **the inventory is not the
