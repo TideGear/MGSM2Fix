@@ -61,15 +61,19 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cdecc
 import langdefault
 import rawdisc
+import workdir
 from portio import BLOCKCHECK_AT, BLOCKCHECK_LEN, image_offset, read_ppf
 from iso import Disc
 
 # The collection concatenates the three Integral images into one container.
 CONTAINER = 'windata/dlc/dlc_japan.bin'
 DISCS = {
-    '1':  dict(base=0x00000000, exe='/MGS/SLPM_862.47;1', folder='mods/INTEGRAL/INTEGRAL/0'),
-    '2':  dict(base=0x2AE54800, exe='/MGS/SLPM_862.48;1', folder='mods/INTEGRAL/INTEGRAL/1'),
-    'vr': dict(base=0x57592000, exe='/MGS/SLPM_862.49;1', folder='mods/INTEGRAL/VR-DISK'),
+    '1':  dict(base=0x00000000, exe='/MGS/SLPM_862.47;1', folder='mods/INTEGRAL/INTEGRAL/0',
+               label='Integral disc 1 (SLPM-86247)'),
+    '2':  dict(base=0x2AE54800, exe='/MGS/SLPM_862.48;1', folder='mods/INTEGRAL/INTEGRAL/1',
+               label='Integral disc 2 (SLPM-86248)'),
+    'vr': dict(base=0x57592000, exe='/MGS/SLPM_862.49;1', folder='mods/INTEGRAL/VR-DISK',
+               label='Integral VR disc (SLPM-86249)'),
 }
 
 
@@ -96,6 +100,51 @@ def exe_extent(container, base, iso_path):
 
 def exe_lba(container, base, iso_path):
     return exe_extent(container, base, iso_path)[0]
+
+
+def identify(image, base=0):
+    """Which disc an image is, read from the disc rather than from its name.
+
+    A filename is a guess and a `--disc` flag is a chance to be wrong; the
+    executable in the ISO says which disc this is and cannot disagree with
+    itself. Returns the key into DISCS, or None.
+    """
+    try:
+        disc = Disc(image, base)
+    except (OSError, AssertionError):
+        return None
+    try:
+        names = {n.upper() for n, l, s, d in disc.walk() if not d}
+    except (OSError, AssertionError, IndexError, KeyError):
+        return None
+    finally:
+        disc.f.close()
+    for key, spec in DISCS.items():
+        if spec['exe'] in names:
+            return key
+    return None
+
+
+def find_ppfs(where, disc):
+    """Accept a package root, a mods/ tree, or the folder itself.
+
+    Someone handed a raw build has `package/mods/INTEGRAL/INTEGRAL/0` to type
+    correctly for disc 1 and a different one for the VR disc. Any level of
+    that will do here, and the disc is already known, so the right leaf is
+    picked rather than typed.
+    """
+    where = where.rstrip('/\\')
+    leaf = DISCS[disc]['folder']                      # mods/INTEGRAL/...
+    tries = [where,
+             os.path.join(where, leaf),
+             os.path.join(where, 'package', leaf)]
+    # ...and, if they pointed at the ZIP's extracted root, the same again
+    for extra in ('mods', os.path.join('package', 'mods')):
+        tries.append(os.path.join(where, extra, *leaf.split('/')[1:]))
+    for candidate in tries:
+        if glob.glob(os.path.join(candidate, '*.ppf')):
+            return candidate.replace(os.sep, '/')
+    return None
 
 
 ENGLISH_QUESTION = """
@@ -139,13 +188,17 @@ def main(argv=None):
                         help='a Redump MODE2/2352 single-track image')
     source.add_argument('--collection', action='store_true',
                         help="read the image out of the collection's dlc_japan.bin")
-    parser.add_argument('--game', help='the collection install (for --collection)')
-    parser.add_argument('--disc', choices=sorted(DISCS), default='1',
-                        help="which Integral disc: 1, 2 or vr (default 1)")
+    parser.add_argument('--game', help='the collection install (for --collection). '
+                                       'Found via Steam if omitted')
+    parser.add_argument('--disc', choices=sorted(DISCS),
+                        help='which Integral disc: 1, 2 or vr. Read from the '
+                             'image itself if omitted')
     parser.add_argument('--exe', metavar='INT1.EXE',
                         help='the retail executable, required with --collection')
     parser.add_argument('--ppfs', required=True, metavar='DIR',
-                        help="a raw build's PPF folder for this disc")
+                        help="the raw build's PPF folder, or the package/ or "
+                             'unzipped root above it - the right one for this '
+                             'disc is picked')
     parser.add_argument('--output', required=True, metavar='PATCHED.BIN')
     parser.add_argument('--english-default', choices=('ask', 'yes', 'no'),
                         default='ask', metavar='ask|yes|no',
@@ -158,10 +211,40 @@ def main(argv=None):
                         help='skip the post-patch parity check (bisecting only)')
     args = parser.parse_args(argv)
 
+    # --- which disc, read from the image rather than trusted from a flag ---
+    if args.redump:
+        if not os.path.isfile(args.redump):
+            parser.error('%s does not exist' % args.redump)
+        found = identify(args.redump)
+        if found is None:
+            parser.error(
+                '%s does not look like an Integral disc image.\n'
+                '  Expected a MODE2/2352 single-track .bin holding one of\n'
+                '  %s.\n'
+                '  If it is a .cue/.bin pair, pass the .bin.'
+                % (args.redump, ', '.join(d['exe'] for d in DISCS.values())))
+        if args.disc and args.disc != found:
+            parser.error('--disc %s was given but %s is disc %s'
+                         % (args.disc, os.path.basename(args.redump), found))
+        args.disc = found
+    else:
+        args.game = workdir.require_game(args.game)
+        if not args.disc:
+            parser.error(
+                '--collection needs --disc (1, 2 or vr): all three images live '
+                'in the same container, so there is nothing to detect.')
+
     spec = DISCS[args.disc]
-    paths = sorted(glob.glob(os.path.join(args.ppfs, '*.ppf')))
-    if not paths:
-        parser.error('no PPFs in %s' % args.ppfs)
+
+    # --- the patches, from whatever level of the package they pointed at ---
+    folder = find_ppfs(args.ppfs, args.disc)
+    if folder is None:
+        parser.error(
+            'no PPFs for disc %s under %s.\n'
+            '  Looked for %s/*.ppf and the same under package/.\n'
+            '  Give the folder from a `rebuild.py --variant raw` build, or the\n'
+            '  root of its unzipped package.' % (args.disc, args.ppfs, spec['folder']))
+    paths = sorted(glob.glob(os.path.join(folder, '*.ppf')))
 
     # --- the source, and the executable question -------------------------
     substitutes = rawdisc.Substitutes()
@@ -171,8 +254,6 @@ def main(argv=None):
             parser.error('--exe belongs to --collection; a real dump already '
                          'holds its executable')
     else:
-        if not args.game:
-            parser.error('--collection needs --game')
         image = os.path.join(args.game, CONTAINER).replace('\\', '/')
         base = spec['base']
         if not args.exe:
@@ -200,8 +281,9 @@ def main(argv=None):
         if others:
             size = min(others) - base
     size -= size % cdecc.SECTOR
+    print('disc        : %s' % spec['label'])
     print('source      : %s%s' % (image, '' if not base else ' @ 0x%X' % base))
-    print('patches     : %d from %s' % (len(paths), args.ppfs))
+    print('patches     : %d from %s' % (len(paths), folder))
 
     # --- 1. the block check ----------------------------------------------
     expected = blockcheck_of_image(image, base)

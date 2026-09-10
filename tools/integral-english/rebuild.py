@@ -21,6 +21,7 @@ from iso import Disc
 from portio import (INTEGRAL_IMAGES, USA_IMAGES, stage, relocation, sha256,
                     read_ppf, ppf as make_ppf, blockcheck_of, add_blockcheck)
 import rawdisc
+from workdir import WORK, require_game, require_decomp
 
 TOOLS = Path(__file__).resolve().parent
 FAMILIES = ('items', 'menu', 'menu2', 'preope', 'brf', 'option', 'savemsg', 'camsave',
@@ -149,17 +150,33 @@ def effects(path, image):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', required=True, type=Path)
-    parser.add_argument('--game', type=Path, default=Path('D:/Steam/SteamApps/common/MGS1'))
-    parser.add_argument('--decomp', type=Path, default=Path('D:/mgsbuild/d'))
-    parser.add_argument('--psyq', type=Path, default=Path('D:/mgsbuild/psyq'))
+    # No absolute defaults: these used to be four literal paths on the author's
+    # D: drive, which meant a first run anywhere else failed pointing at a drive
+    # that may not exist. workdir searches Steam for the game and looks beside
+    # the repository for the decomp, and says what to pass when it cannot.
+    parser.add_argument('--game', type=Path,
+                        help='the Master Collection MGS1 folder (searched for via Steam)')
+    parser.add_argument('--decomp', type=Path,
+                        help='the MGS decomp checkout (searched for beside this repo)')
+    parser.add_argument('--psyq', type=Path,
+                        help='the PSY-Q SDK tree (defaults to <decomp>/../psyq)')
     parser.add_argument('--executables', type=Path,
-                        default=Path('D:/mgsbuild/integral-english-work/work'))
+                        help='the four retail executables (defaults to %s)' % WORK)
     parser.add_argument('--variant', choices=('collection', 'raw'), default='collection',
                         help='collection (the default, what mods/ gets) or raw, for a real PSX '
                              'disc image: SC_KEEP_LINES 6, OPTION_MC_CONTROL_SETTINGS 0, and '
                              'en_menu3 included')
     parser.add_argument('--compare-deployed', action='store_true')
     args = parser.parse_args()
+    args.game = Path(require_game(str(args.game) if args.game else None))
+    args.decomp = Path(require_decomp(str(args.decomp) if args.decomp else None))
+    if args.psyq is None:
+        args.psyq = args.decomp.parent / 'psyq'
+        if not args.psyq.is_dir():
+            parser.error('cannot find the PSY-Q SDK; pass --psyq <path> (looked '
+                         'for %s)' % args.psyq)
+    if args.executables is None:
+        args.executables = Path(WORK)
     output, game, source, psyq = (p.resolve() for p in (args.output,args.game,args.decomp,args.psyq))
     if output.exists():
         parser.error('output must be a new directory; existing runs are never overwritten')

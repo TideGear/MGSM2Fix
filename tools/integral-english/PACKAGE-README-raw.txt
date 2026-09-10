@@ -13,10 +13,37 @@ WHAT IT IS FOR
   Integral VR disc  SLPM-86249
 
 Each folder in mods/ holds one disc's patches. The folder names are the
-collection's and are kept only so the two builds can be compared file by file;
-apply the PPFs to the matching disc image with any PPF3 tool.
+collection's and are kept only so the two builds can be compared file by file.
 
-APPLY THE WHOLE SET, PER DISC
+THE EASY WAY: mkimage.py
+
+  py mkimage.py --redump "<your disc>.bin" --ppfs <this folder>       --output "MGS Integral English (Disc 1).bin" --cue
+
+That is the whole command. It works out which of the three discs the image is
+by reading the executable inside it, picks the matching folder out of this
+package, applies every patch, and writes a MODE2/2352 image and its .cue.
+You do not have to say which disc it is, and you cannot pair the wrong
+patches with the wrong image - it checks.
+
+It is in tools/integral-english/ in the source repository and needs Python 3
+and nothing else. Before it writes anything it verifies:
+
+  - every patch's block check against your image, so a patch built for a
+    different pressing is refused rather than applied;
+  - that every sector it is about to touch already matches its own stored
+    error-correction data - which is what proves your dump is the pressing
+    these patches were computed against;
+  - that every one of those sectors still verifies afterwards.
+
+If any of that fails it stops and writes nothing at all, and says why.
+
+It will also offer to make English the power-on language. That is optional and
+it is not about this port's text - see LANGUAGE below.
+
+APPLYING BY HAND INSTEAD
+
+Any PPF3 tool will do it, but you take on three things mkimage.py does for
+you.
 
 Every PPF for a disc must be applied, and the *_zz_ecc.ppf one must be applied
 last. It carries the recomputed EDC and ECC of every sector the other patches
@@ -25,7 +52,28 @@ of them and the error-correction data will describe a disc you do not have.
 Order among the others does not matter.
 
 Each patch carries a PPF3 block check, so a tool that honours it will refuse an
-image that is not the disc the patch was built against.
+image that is not the disc the patch was built against. Not every tool honours
+it. If yours does not, nothing will tell you that you used the wrong image.
+
+And you must give it a MODE2/2352 image of the whole disc - the offsets are
+raw-sector offsets from LBA 0. A 2048-byte-per-sector .iso will be corrupted
+by these patches, silently.
+
+LANGUAGE
+
+Integral is a bilingual disc. One bit in its own configuration decides which
+language the *game* uses - the codec dialogue and the cutscene subtitles - and
+it is clear at power-on, so a retail disc starts in Japanese. The player turns
+it on in Integral's own OPTION screen, where it saves to the memory card.
+
+None of this port's text depends on that bit: the menus, item descriptions,
+briefings and mission log are English either way. So if you do nothing, you
+get English menus and a Japanese story until you visit OPTION once.
+
+mkimage.py offers to set the bit at boot instead, so the disc starts in
+English. The OPTION screen and the memory card still override it afterwards,
+so a player who prefers Japanese still gets Japanese. Say no and the image is
+byte-for-byte what it would have been without the offer.
 
 WHAT DIFFERS FROM THE COLLECTION BUILD
 

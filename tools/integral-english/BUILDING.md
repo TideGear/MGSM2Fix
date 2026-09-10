@@ -74,11 +74,25 @@ Integral `0`, `0x2AE54800`; USA `0xF12F8000`, `0x11B3E5800`.
 
 ## Command
 
-From this directory in PowerShell (substitute your input paths):
+From this directory in PowerShell. **Only `--output` is required** - the game
+is found through Steam (registry, then `libraryfolders.vdf`, then the ordinary
+install paths on every drive), the decomp is looked for beside this repository,
+and the SDK defaults to `<decomp>/../psyq`:
 
 ```powershell
-py rebuild.py --output D:/mgsbuild/repro4 --game D:/Steam/SteamApps/common/MGS1 --decomp D:/mgsbuild/d --psyq D:/mgsbuild/psyq --executables D:/mgsbuild/integral-english-work/work --compare-deployed
+py rebuild.py --output D:/mgsbuild/repro22
 ```
+
+Pass any of them explicitly to override, and a path that is wrong is refused
+rather than quietly replaced by a search result:
+
+```powershell
+py rebuild.py --output D:/mgsbuild/repro22 --game D:/Steam/SteamApps/common/MGS1 --decomp D:/mgsbuild/d --psyq D:/mgsbuild/psyq --executables D:/mgsbuild/integral-english-work/work --compare-deployed
+```
+
+`py workdir.py` prints everything that resolved and how, and lists the Steam
+libraries it searched when it cannot find the game. That is the first thing to
+run when a tool cannot find something.
 
 The output directory must not exist and must have a short path without spaces.
 `--compare-deployed` requires the 25 deployed PPFs: the 18 under the game's
@@ -118,19 +132,28 @@ writes the patched `MODE2/2352` `.bin` and its `.cue`:
 
 ```powershell
 py mkimage.py --redump "Metal Gear Solid - Integral (Japan, Asia) (En,Ja) (Disc 1).bin" `
-    --disc 1 --ppfs D:/mgsbuild/repro21raw/package/mods/INTEGRAL/INTEGRAL/0 `
-    --output "D:/out/MGS Integral English (Disc 1).bin" --cue
+    --ppfs D:/mgsbuild/repro21raw --output "D:/out/MGS Integral English (Disc 1).bin" --cue
 ```
 
-Disc 2 is `--disc 2` with `.../INTEGRAL/1`; the VR disc is `--disc vr` with
-`.../VR-DISK`. The other source is the collection's own image, which needs the
-retail executable put back and refuses without it:
+**Which disc it is, and which folder to use, are both worked out.** The disc is
+read from the executable inside the image, not from `--disc` and not from the
+filename, so the wrong pairing is impossible rather than merely unlikely - pass
+`--disc` and a disagreement is an error. `--ppfs` accepts the build directory,
+its `package/`, the `mods/` tree, or the leaf folder itself, and picks the leaf
+that matches the disc. The same command therefore does disc 2 and the VR disc
+with only the image changed.
+
+The other source is the collection's own image, which needs the retail
+executable put back, refuses without it, and does need `--disc` (all three
+images live in one container, so there is nothing to detect):
 
 ```powershell
-py mkimage.py --collection --game D:/Steam/SteamApps/common/MGS1 --disc 1 `
+py mkimage.py --collection --disc 1 `
     --exe D:/mgsbuild/integral-english-work/work/int1.exe `
-    --ppfs .../INTEGRAL/0 --output "D:/out/MGS Integral English (Disc 1).bin" --cue
+    --ppfs D:/mgsbuild/repro21raw --output "D:/out/MGS Integral English (Disc 1).bin" --cue
 ```
+
+(`--game` is optional here too; it is found the same way `rebuild.py` finds it.)
 
 Both routes produce the same file. Give it a **raw** build: a collection build
 carries no block check and no `zz_ecc`, so its images would be left with

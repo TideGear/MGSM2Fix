@@ -1,13 +1,16 @@
-"""Where the port's working data lives, resolved once for every tool.
+"""Where the port's working data and the game live, resolved for every tool.
 
     from workdir import WORK          # .../work  - the directory itself
     WORK + '/int1_stage.dir'          # the extracted STAGE.DIRs, exes, PPF backups
 
-Resolution, first match wins:
+`py workdir.py` prints everything this resolved and how, which is the first
+thing to run when a tool cannot find something.
+
+Resolution of WORK, first match wins:
 
   1. INTEGRAL_ENGLISH_WORK          environment variable naming the ROOT that
                                     holds work/ (not work/ itself)
-  2. D:/mgsbuild/integral-english-work   the durable home since 2026-09-03
+  2. D:/mgsbuild/integral-english-work   the author's machine, if it exists
   3. the current directory          the old convention, kept so `cd <root>`
                                     still works
 
@@ -15,10 +18,24 @@ Until 2026-09-03 every tool opened 'work/...' relative to wherever it was run
 from, and the only copy of that data sat in a session scratchpad under Windows
 Temp. The data moved; this module is what lets the tools follow it without each
 one growing its own path logic.
+
+**GAME and DECOMP are searched for, not assumed.** They used to be two literal
+paths on the author's D: drive, which is fine for the author and wrong for
+everybody else: a first run on another machine failed pointing at a drive that
+may not exist. `find_game()` asks Steam where its libraries are - the registry,
+then `libraryfolders.vdf`, then the ordinary install locations on every drive -
+and accepts a directory only if it actually holds the collection's data files.
+If nothing is found the constant is empty rather than a lie, and
+`require_game()` raises with the flag and the variable to set.
 """
 import os
 
 _DEFAULT_ROOT = r'D:/mgsbuild/integral-english-work'
+
+# The collection's MGS1 folder is recognised by its own data, never by name.
+_GAME_MARKERS = ('windata/alldata.bin', 'windata/dlc/dlc_japan.bin')
+_STEAM_APP = 'MGS1'          # under <library>/steamapps/common/
+_DECOMP_MARKERS = ('source/main/main.c', 'build/build.py')
 
 # --- which build is being made.
 #
@@ -52,12 +69,140 @@ def _root():
     return os.getcwd()
 
 
+def _looks_like(directory, markers):
+    return bool(directory) and any(
+        os.path.isfile(os.path.join(directory, m)) for m in markers)
+
+
+def _steam_libraries():
+    """Every Steam library root Steam itself admits to, best effort."""
+    roots = []
+    try:                                     # where Steam is installed
+        import winreg
+        for hive, key in ((winreg.HKEY_CURRENT_USER, r'Software\Valve\Steam'),
+                          (winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\WOW6432Node\Valve\Steam')):
+            try:
+                with winreg.OpenKey(hive, key) as handle:
+                    for name in ('SteamPath', 'InstallPath'):
+                        try:
+                            roots.append(winreg.QueryValueEx(handle, name)[0])
+                        except OSError:
+                            pass
+            except OSError:
+                pass
+    except ImportError:                      # not Windows
+        pass
+    roots += [r'C:/Program Files (x86)/Steam', r'C:/Program Files/Steam']
+    roots += ['%s:/Steam' % chr(d) for d in range(ord('A'), ord('Z') + 1)]
+
+    libraries, seen = [], set()
+    for root in roots:
+        root = root.replace('\\', '/').rstrip('/')
+        if not root or root.lower() in seen or not os.path.isdir(root):
+            continue
+        seen.add(root.lower())
+        libraries.append(root)
+        # libraryfolders.vdf lists the other drives Steam installs to. Parsed
+        # by picking out quoted "path" values rather than by understanding VDF.
+        for vdf in (root + '/steamapps/libraryfolders.vdf',
+                    root + '/config/libraryfolders.vdf'):
+            try:
+                with open(vdf, encoding='utf-8', errors='replace') as handle:
+                    text = handle.read()
+            except OSError:
+                continue
+            import re
+            for path in re.findall(r'"path"\s*"([^"]+)"', text):
+                path = path.replace('\\\\', '/').replace('\\', '/').rstrip('/')
+                if path.lower() not in seen and os.path.isdir(path):
+                    seen.add(path.lower())
+                    libraries.append(path)
+    return libraries
+
+
+def find_game(explicit=None):
+    """The collection's MGS1 directory, or '' if it cannot be found.
+
+    Order: what the caller passed, the environment variable, the author's own
+    path, then every Steam library. A candidate counts only if it holds the
+    collection's data files - a directory called MGS1 is not evidence.
+    """
+    # A path the caller typed is a statement of intent: if it is wrong, say so
+    # rather than quietly using a different install they did not ask for.
+    if explicit and not _looks_like(explicit, _GAME_MARKERS):
+        raise SystemExit(
+            '%s is not the collection\'s MGS1 directory.\n'
+            '  Expected to find %s under it.\n'
+            '  (Searching instead would use an install you did not name.)'
+            % (explicit, ' or '.join(_GAME_MARKERS)))
+    candidates = [explicit, os.environ.get('INTEGRAL_ENGLISH_GAME'),
+                  'D:/Steam/SteamApps/common/MGS1']
+    for library in _steam_libraries():
+        candidates.append(library + '/steamapps/common/' + _STEAM_APP)
+    for candidate in candidates:
+        if _looks_like(candidate, _GAME_MARKERS):
+            return candidate.replace('\\', '/').rstrip('/')
+    return ''
+
+
+def find_decomp(explicit=None):
+    """The MGS decomp checkout, or '' - same rules, checked by its own files."""
+    if explicit and not _looks_like(explicit, _DECOMP_MARKERS):
+        raise SystemExit(
+            '%s is not the MGS decomp checkout.\n'
+            '  Expected to find %s under it.'
+            % (explicit, ' and '.join(_DECOMP_MARKERS)))
+    candidates = [explicit, os.environ.get('INTEGRAL_ENGLISH_DECOMP'),
+                  'D:/mgsbuild/d']
+    here = os.path.dirname(os.path.abspath(__file__))
+    for up in (3, 4):                       # a sibling of the repo
+        parent = os.path.abspath(os.path.join(here, *(['..'] * up)))
+        candidates += [os.path.join(parent, n) for n in ('d', 'mgs', 'mgs-decomp')]
+    for candidate in candidates:
+        if _looks_like(candidate, _DECOMP_MARKERS):
+            return candidate.replace('\\', '/').rstrip('/')
+    return ''
+
+
+def require_game(explicit=None):
+    """find_game(), but say what to do instead of failing later on open()."""
+    found = find_game(explicit)
+    if not found:
+        raise SystemExit(
+            'Cannot find the Master Collection MGS1 directory.\n'
+            '  Looked in: the --game argument, $INTEGRAL_ENGLISH_GAME, and every\n'
+            '  Steam library on this machine.\n'
+            '  It is the folder holding windata/alldata.bin (and, for Integral,\n'
+            '  windata/dlc/dlc_japan.bin). Pass --game <path>, or set\n'
+            '  INTEGRAL_ENGLISH_GAME.')
+    return found
+
+
+def require_decomp(explicit=None):
+    found = find_decomp(explicit)
+    if not found:
+        raise SystemExit(
+            'Cannot find the MGS decomp checkout.\n'
+            '  Looked in: the --decomp argument, $INTEGRAL_ENGLISH_DECOMP, and\n'
+            '  beside this repository.\n'
+            '  It is the git checkout holding source/main/main.c. Pass\n'
+            '  --decomp <path>, or set INTEGRAL_ENGLISH_DECOMP.')
+    return found
+
+
 ROOT = _root()
 WORK = os.path.join(ROOT, 'work').replace('\\', '/')
-GAME = os.environ.get('INTEGRAL_ENGLISH_GAME', 'D:/Steam/SteamApps/common/MGS1')
-DECOMP = os.environ.get('INTEGRAL_ENGLISH_DECOMP', 'D:/mgsbuild/d')
+GAME = find_game()
+DECOMP = find_decomp()
 
 if __name__ == '__main__':
     print('VARIANT =', VARIANT)
-    print('ROOT =', ROOT)
-    print('WORK =', WORK, '(exists)' if os.path.isdir(WORK) else '(MISSING)')
+    print('ROOT    =', ROOT)
+    print('WORK    =', WORK, '(exists)' if os.path.isdir(WORK) else '(MISSING)')
+    print('GAME    =', GAME or '(NOT FOUND - pass --game or set INTEGRAL_ENGLISH_GAME)')
+    print('DECOMP  =', DECOMP or '(NOT FOUND - pass --decomp or set INTEGRAL_ENGLISH_DECOMP)')
+    if not GAME:
+        print()
+        print('Steam libraries searched:')
+        for library in _steam_libraries():
+            print('   ', library)
