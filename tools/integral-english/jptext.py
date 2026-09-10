@@ -86,7 +86,8 @@ CODE = re.compile(r'<([0-9A-F]{4})>')
 GLYPH_90 = {
     0x9001: ' ', 0x9002: '、', 0x9003: '。', 0x9004: '，', 0x9005: '々',
     0x9006: 'ー', 0x9007: '〜', 0x9008: '‥', 0x9009: '（', 0x900A: '）',
-    0x900B: '「', 0x900C: '」', 0x900E: '』', 0x9010: '％', 0x9011: '＆',
+    0x900B: '「', 0x900C: '」', 0x900D: '『', 0x900E: '』',
+    0x9010: '％', 0x9011: '＆',
     0x9016: '／', 0x9017: '…', 0x9018: '×', 0x901B: '○', 0x901F: '愛',
     0x9020: '飲', 0x9021: '双', 0x9022: '眼', 0x9023: '鏡', 0x9025: '段',
     0x9026: '行', 0x9027: '書', 0x9028: '渓', 0x9029: '谷', 0x902A: '核',
@@ -135,9 +136,17 @@ GLYPH_90 = {
     0x90FF: '殊',
 }
 
-# bank 0x91: five glyphs, identified from the sentences they appear in
-# (ご了承下さい, 上書き保存, 主観移動可能モード, 期限は1週間).
-GLYPH_91 = {0x9108: '了', 0x910B: '上', 0x910F: '能', 0x9111: '期'}
+# bank 0x91: the second kanji page. Four were identified from the UI text
+# (ご了承下さい, 上書き保存, 主観移動可能モード, 期限は1週間); the rest came out
+# of RADIO.DAT's commentary once `radiotext.py` started reading the text the
+# inventory's scanner had been dropping - each is settled by a sentence, and
+# they are the reason it was dropping it (an unrecognised code ends a run).
+GLYPH_91 = {
+    0x9101: '気', 0x9102: '絶', 0x9103: '安', 0x9104: '属',
+    0x9106: '布', 0x9107: '完', 0x9108: '了', 0x910B: '上',
+    0x910C: '自', 0x910D: '拳', 0x910E: '銃', 0x910F: '能',
+    0x9110: '初', 0x9111: '期',
+}
 
 # Bank 1 is PER-BLOCK, so it is keyed by (stage, code): the same code is a
 # different character in a different stage - 記 in `abst`, 端 in `s07b`,

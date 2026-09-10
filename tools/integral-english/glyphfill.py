@@ -96,9 +96,9 @@ def main():
     print('that is %.2f%% of the bank-1 glyph instances' % (100.0 * got / tot))
     print('bank-1 is 12.8%% of the glyph codes in japanese-inventory.tsv, so '
           'coverage OF THE INVENTORY is %.2f%%' % (87.2 + 12.8 * got / tot))
-    print('  (the inventory itself holds ~85% of the commentary\'s glyphs - its'
-          ' scanner\n   drops codes it does not recognise. NextSteps.md '
-          '\xa718, "Where the number stops".)')
+    print('  (that is over the inventory, which holds ~85% of the commentary\'s'
+          ' glyphs.\n   The export no longer uses it for RADIO.DAT - radiotext.py'
+          ' walks the game\'s\n   own records. NextSteps.md \xa719.)')
 
     bad = [(r[ii], r[ci]) for r in rows if r[ci].strip() in bank0_chars()]
     if bad:

@@ -91,7 +91,8 @@ def main():
                 continue
             v = int(mm.group(1), 16) & ~0x6000
             if 0x9600 <= v < 0x9A00:
-                raw = blob[(v - 0x9601)*GLYPH:][:GLYPH]
+                i = radiomap.bank1_index(v) * GLYPH
+                raw = blob[i:i + GLYPH]
                 gid = wanted_shapes.get(raw)
                 if gid is not None:
                     hit.add(gid)

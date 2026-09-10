@@ -55,6 +55,7 @@ import jptext
 import mainsweep
 import portio
 import radiomap
+import radiotext
 import rendertext
 import vr_sweep
 from audit_text import game_text
@@ -117,7 +118,7 @@ def render_line(text, fonts, blob):
             continue
         code = int(m.group(1), 16) & ~0x6000
         if 0x9600 <= code < 0x9A00 and blob is not None:
-            cur.append(('g', fonts.bank1(blob, code - 0x9601)))
+            cur.append(('g', fonts.bank1(blob, radiomap.bank1_index(code))))
         elif code >= 0x9A00 and blob is not None:
             cur.append(('g', fonts.bank1(blob, code - 0x9A01)))
         else:
@@ -143,6 +144,22 @@ def render_line(text, fonts, blob):
     return im
 
 
+def coded(raw):
+    """raw subtitle bytes -> the `<XXXX>`-and-ASCII form the rest of this uses"""
+    out, p = [], 0
+    while p < len(raw):
+        b = raw[p]
+        if b < 0x80:
+            out.append(chr(b) if 0x20 <= b < 0x7F else '')
+            p += 1
+        elif p + 1 < len(raw):
+            out.append('<%02X%02X>' % (raw[p], raw[p + 1]))
+            p += 2
+        else:
+            break
+    return ''.join(out)
+
+
 def collect(disc_ix, scope='unported'):
     """(source, key, offset, text, blob) for every in-scope Japanese line.
 
@@ -151,25 +168,32 @@ def collect(disc_ix, scope='unported'):
     `DEMO.DAT`/`VOX.DAT` pockets (already USA-subtracted by `jplist`) and the
     stage archives' Integral-only screens. It drops `RADIO.DAT`'s story-codec
     region, whose Japanese is a subtitle track for conversations USA ships in
-    English. scope='all' keeps everything."""
+    English. scope='all' keeps everything.
+
+    `RADIO.DAT` comes from `radiotext.subtitles`, which walks the game's own
+    records, NOT from `japanese-inventory.tsv`. The inventory's scanner ends a
+    run at any code it does not recognise and so holds only 85% of the
+    commentary's glyphs; the record walk gets all of it. The other three
+    sources still come from the inventory, which is complete for them.
+    """
     STORY_END = 0x042C54C          # the story codec ends, the commentary begins
     COMMENTARY_END = 0x0AAC050
     out = []
     want = 'disc%d' % (disc_ix + 1)
+    m = radiomap.build(disc_ix, verbose=False)
+    fonts = radiotext.blobs(m)
+    for frag, off, raw in radiotext.subtitles(m)[0]:
+        if scope == 'unported' and not (STORY_END <= frag < COMMENTARY_END):
+            continue
+        out.append(('RADIO.DAT', 'frag%07X' % frag, off, coded(raw), fonts[frag]))
     with io.open(WORK + '/japanese-inventory.tsv', encoding='utf-8') as fh:
         fh.readline()
         rows = [l.rstrip(chr(10)).split(chr(9)) for l in fh]
-    rows = [f for f in rows if len(f) >= 7 and f[0] == want]
-    m = radiomap.build(disc_ix, verbose=False)
     for f in rows:
+        if len(f) < 7 or f[0] != want:
+            continue
         src, off, text = f[1], int(f[2], 16), f[6]
-        if src == 'RADIO.DAT':
-            if scope == 'unported' and not (STORY_END <= off < COMMENTARY_END):
-                continue
-            at = m['base_of'].get(off)
-            blob = radiomap.blob_of(m, off)
-            out.append((src, 'base%07X' % (at[0] if at else 0), off, text, blob))
-        elif src in ('DEMO.DAT', 'VOX.DAT'):
+        if src in ('DEMO.DAT', 'VOX.DAT'):
             out.append((src, src, off, text, None))
         elif src.startswith('STAGE.DIR/'):
             out.append(('STAGE.DIR', src.split('/')[1], off, text, None))
@@ -212,7 +236,7 @@ def text_with_bank1(text, blob, stage=None):
         v = int(c, 16) & ~0x6000
         i = None
         if 0x9600 <= v < 0x9A00:
-            i = v - 0x9601
+            i = radiomap.bank1_index(v)
         elif v >= 0x9A00:
             i = v - 0x9A01
         if i is None:
