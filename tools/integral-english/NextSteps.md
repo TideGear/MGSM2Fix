@@ -616,9 +616,12 @@ yet seen). What is left, in rough order:
    25 equal to the deployed set's effective bytes.**
 
 ### 5.6 Sync with upstream, and the pull request — one job, done once
-**Measured 2026-09-07, and the decision was to defer it deliberately.** A
-fast-forward is impossible: that needs a branch with no commits of its own, and
-this one has 133.
+**REBASED 2026-09-10: the branch now sits on `upstream/master` (`97172f5`).**
+The rest of this section is the 2026-09-07 estimate, kept because most of it
+still describes the pull request, and because **its cost estimate was wrong in
+a way worth recording** - see "What it actually cost" at the end. A
+fast-forward was never possible: that needs a branch with no commits of its
+own, and this one had 133 then and 161 now.
 
 | | |
 |---|---|
@@ -667,6 +670,46 @@ doing it twice. When it happens:
   and `BrightnessText` covers title 981 (USA) only;
 - re-test the runtime list above afterwards - the port's behaviour in the
   collection depends on all of it.
+
+**What it actually cost, measured 2026-09-10.** The estimate above said a
+merge would cost "a conflict resolution in our most-changed file". It did not.
+Following this section's own advice - try it on a throwaway branch first -
+both routes were run, and both produced **one** conflict, in
+`build_zydis.cmd`, where upstream moved the submodule to `src/extern/zydis`
+and our commit had quoted the old path. Everything else applied by itself:
+
+| | |
+|---|---|
+| upstream commits taken | 11, through `97172f5` |
+| our commits replayed | 161 |
+| conflicts | **1**, at commit 1 of 161 |
+| `src/mgs1.cpp`, the feared file | auto-merged |
+
+Git's rename detection carried all nine files into upstream's new layout
+(`src/games/`, `src/m2fix/`, `src/modules/`) unaided. The rebased tree and the
+merged tree came out with **the same tree hash**, `356d3798` - that is the
+check worth copying: if a rebase and a merge of the same work disagree, one of
+them lost something.
+
+Verified after: all fourteen feature markers appear the same number of times
+as before (`bGameEnglishText`, `SetPatchWatch`, `Ketchup_DiskPatch`,
+`BrightnessText`, ...), and `selftest.py` still passes 35/35.
+`backup-before-rebase` points at the pre-rebase tip, `b6513f8`.
+
+**One piece of fallout, and it is not git's fault.** Upstream moved six
+*submodules* into `src/extern/`, and a submodule's working tree does not move
+with a checkout. `git submodule sync --recursive && git submodule update
+--init --recursive` populates the new paths; the old
+`src/{imgui,inipp,json,safetyhook,spdlog,zydis}` checkouts are left behind as
+untracked duplicates - 53 MB, including a built `Zydis.lib` that
+`build_zydis.cmd` regenerates at the new path on the next build.
+
+**The lesson for the estimate.** Nothing about the 2026-09-07 reasoning was
+careless: it read the rename percentages and the line counts and concluded the
+work was concentrated in `mgs1.cpp`. What it never did was spend two minutes
+running the merge on a throwaway branch - which this very section recommended.
+A deferral justified by an unmeasured cost is a guess, and this one was wrong
+by about a day of imagined work.
 
 ### 5.7 Still untested, low effort when the moment comes
 - **The patch watch is blind while `DisableCDROM = true`**: the early return
