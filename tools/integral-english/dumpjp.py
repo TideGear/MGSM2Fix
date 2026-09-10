@@ -1,9 +1,10 @@
 """Dump every Japanese line on the Integral discs, exactly as the game draws it.
 
-This is the 100%-fidelity dump: each line is rendered from the game's OWN glyph
-bitmaps, so there is no recognition step and nothing to get wrong. Text output
-can only ever be as complete as the glyph identification (87% today, see
-`COVERAGE.md`); the images are complete now.
+Both halves are complete as of 2026-09-10: the images are drawn from the game's
+OWN glyph bitmaps, so there is no recognition step in them at all, and the text
+now decodes with **zero** unresolved codes - 68,211 lines, 3,923,661 kana/kanji.
+`RADIO.DAT` comes from `radiotext.py`'s walk of the game's records, not from
+`japanese-inventory.tsv`, whose scanner drops 15% of the commentary.
 
     py dumpjp.py                      everything, to work/jpdump/
     py dumpjp.py --source RADIO.DAT   one source only
@@ -11,6 +12,7 @@ can only ever be as complete as the glyph identification (87% today, see
 
 Output, per source file and per disc:
 
+    work/jpdump/<disc>_<source>.txt      every line as readable text
     work/jpdump/<disc>_<source>.pdf      paginated images of every line
     work/jpdump/<disc>_<source>/*.png    the same pages as PNGs
     work/jpdump/index.tsv                one row per line: where it is, its

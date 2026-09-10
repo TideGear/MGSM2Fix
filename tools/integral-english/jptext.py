@@ -54,20 +54,17 @@ That also explains why one code means different characters in different places:
 (1980年代). The code is an index into whatever block is loaded, so there is no
 global table to build and never was.
 
-`RADIO.DAT` works the same way, structurally: its bank-1 codes never leave
-`0x9601`-`0x96FF` - 255 entries, a per-block table - and 1,908 of its strings
-start a fresh run at `0x9601`.
+`RADIO.DAT` works the same way. **Correction, 2026-09-10:** this file used to
+say its bank-1 codes "never leave `0x9601`-`0x96FF` - 255 entries". They do.
+A commentary fragment's blob holds up to **441** glyphs and the codes run on
+into `0x97xx`; the claim only looked true because `japanese-inventory.tsv`'s
+scanner silently dropped every code it did not recognise, `0x97xx` included.
+And the index is not `code - 0x9601` but `zen_index` - see
+`radiomap.bank1_index`, which is the single copy of that rule.
 
-So the remaining 12.8% is no longer a reverse-engineering problem; it is a
-**glyph recognition** problem. Locating a block's table gives you bitmaps, not
-characters, and something still has to say which character a 12x12 bitmap is.
-By hand that is fine for the stage archives (421 bank-1 glyph uses in total)
-and hopeless for the commentary (541,920 uses, up to 255 distinct glyphs in
-each of ~1,900 conversation blocks). That wants matching against a reference
-font, which is the next piece of work and a well-defined one.
-
-None of it costs anything on `DEMO.DAT` or `VOX.DAT`, which use no bank-1
-glyph at all and come out fully readable.
+**It is all readable now.** `bank1-glyphs.tsv` beside this file names 1,214
+shapes, every one read against a decoded sentence, and the export has zero
+unresolved codes. Read `RADIO.DAT` through `radiotext.py`, not the inventory.
 """
 import argparse
 import io
