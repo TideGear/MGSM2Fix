@@ -1,4 +1,4 @@
-# Text coverage evidence (2026-09-04, VR section added 2026-09-06, updated 2026-09-08)
+# Text coverage evidence (2026-09-04, VR section added 2026-09-06, updated 2026-09-09)
 
 The current patch is not a complete English port. The title's disc-swap copy
 (`en_menu3`) is ported but raw-disc only - the collection patches that block
@@ -615,6 +615,57 @@ sentences with the same kana skeleton and genuinely different kanji are counted
 as disagreeing. Separating those two causes is the next step, and until it is
 done sentence rendering would produce a confident-looking document with wrong
 glyphs in it - which is the failure mode this whole exercise is trying to avoid.
+
+## The dump, and the scope it is drawn to (2026-09-09)
+
+The figures above count Japanese on the disc. This is the part that matters for
+anyone who wants to *do* something about it: the Japanese **USA has no
+counterpart for**, which is the user's scope as of 2026-09-09 and is much
+narrower than the totals.
+
+`RADIO.DAT` is the case that needed splitting. It holds two halves - a
+story-codec region whose Japanese is a subtitle track for conversations USA
+ships in English, and a commentary region with no English dialogue anywhere in
+it:
+
+| region | rows (disc 1) | kana/kanji | |
+|---|---:|---:|---|
+| story codec `0x0`-`0x042C54C` | 16,869 | 282,280 | USA covers it - out of scope |
+| **commentary `0x042C54C`-`0x0AAC050`** | **77,361** | **1,369,719** | in scope |
+
+`jplist.py` had already applied the same test to the other files by subtracting
+runs that also appear in USA's copy - which is what empties `BRF.DAT` and
+`FACE.DAT` completely. `RADIO.DAT` escaped it because USA's codec text is plain
+ASCII, so there were no font-code runs to subtract against.
+
+**The commentary is byte-identical on both discs.** sha256 of
+`0x042C54C`-`0x0AAC050` is `93b96e43…` on disc 1 and disc 2 alike, while the
+story regions differ. So the identical 77,361 line count on both discs is
+correct rather than a bug, disc 2's `RADIO.DAT` dump duplicates disc 1's, and
+the glyphs only have to be identified once.
+
+### What `dumpjp.py` produces
+
+156,379 lines over 5,589 pages, every line drawn from the game's own glyph
+bitmaps, so the images are exact by construction - there is no recognition step
+in the picture path:
+
+    work/jpdump/disc1_RADIO_DAT.pdf   77,361 lines  2,763 pages
+    work/jpdump/disc1_DEMO_DAT.pdf       576 lines     21 pages
+    work/jpdump/disc1_VOX_DAT.pdf        338 lines     13 pages
+    work/jpdump/disc1_STAGE_DIR.pdf       98 lines      4 pages
+    work/jpdump/index.tsv            156,379 rows
+
+The text column of `index.tsv` is only as complete as the glyph identification
+(87.2%), and it upgrades retroactively: name a shape in
+`glyphs-to-identify.tsv` and every line that uses it reads correctly from then
+on, in every block.
+
+Verified mechanically rather than visually, because the session's image budget
+was spent: 4,000 sampled lines render with none blank or sparse, and every glyph
+cell of a line matches the font byte for byte. **Nobody has looked at a page
+yet** - the scale and lines-per-page are `--scale` and `--lines-per-page` and
+are cheap to change before a re-render.
 
 ## Reproduce the inventory
 
