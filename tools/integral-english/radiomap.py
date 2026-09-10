@@ -62,8 +62,22 @@ none of the 384 they prove true.
 WHAT THE RESULT MEASURES
 
 553 fragments; the text lookups then produce 1,200 distinct bitmaps, 100% of them
-with the blank twelfth row. That is the check to re-run after any change here -
-not the share of strings that got *an* answer.
+with the blank twelfth row. Re-run that after any change here - it is a far
+better measure than the share of strings that got *an* answer, which is what
+the broken predecessor reported.
+
+**But it is not sufficient, and do not treat it as the check.** Both numbers
+are aggregates over 125 fragments, and they cannot see ONE fragment's base go
+bad: a base wrong by a whole number of glyphs still slices on glyph
+boundaries, so every bitmap it reads is a real glyph with a real blank twelfth
+row. Valid bitmaps, wrong characters, both numbers unmoved.
+
+    py radiotext.py --check      per fragment, and it catches that
+    py radiotext.py --selftest   slips bases on purpose to prove --check works
+
+Run both after any change here. NextSteps.md §21 records the two
+plausible-looking per-fragment metrics that were measured and thrown away
+before the working one, so nobody rebuilds them.
 """
 import argparse
 import bisect
