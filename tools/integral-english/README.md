@@ -665,10 +665,16 @@ Integral's is not, and no CD-ROM patch explains it.
 
 So porting this screen is invisible to a stock USA player and fully visible to a
 stock Integral player - which is the version this port targets, so the work
-counts. It is also what a raw PSX disc patch would need for either game. It also matters for a
-future patch aimed at raw PSX disc images. Reference shots of both games,
-unintercepted, are in `reference/keyconfig_*.{usa,int}.jpg`, and every label's
-art from both discs is rendered side by side in `keyconfig-textures.png`.
+counts. It is also what a raw PSX disc patch would need for either game.
+
+The reference shots this was settled from - both games unintercepted, and
+every label's art from both discs rendered side by side - are **not in the
+repository**:
+they are photographs and renderings of the games, and no game data is committed
+here (`CREDITS.md`). Reproduce them from a local install: run each game with
+MGSM2Fix's own patches filtered off to get the unintercepted screen, and dump
+the eight textures with `kcquads.py`, which writes their quads and locations.
+The mapping table below is the finding, and the finding is what ships.
 
 The collection's button involvement elsewhere is real but separate: its Squirrel
 `_update_option_button_setting` (`play_standalone_mgs.nut:844`) rewrites the

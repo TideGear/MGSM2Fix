@@ -63,6 +63,9 @@ def main():
     ap.add_argument('--tsv', default=WORK + '/glyphs-to-identify.tsv')
     ap.add_argument('--answers', default=WORK + '/glyph-answers.tsv')
     ap.add_argument('--score', action='store_true', help='report only')
+    ap.add_argument('--publish', nargs='?', const='bank1-glyphs.tsv', metavar='PATH',
+                    help='write the committed table: the same rows with shape_hex'
+                         ' replaced by jptext.shape_key, so no game data ships')
     args = ap.parse_args()
 
     new = {}
@@ -75,6 +78,7 @@ def main():
         head = fh.readline().rstrip('\n').split('\t')
         rows = [l.rstrip('\n').split('\t') for l in fh]
     ci, ii = head.index('char'), head.index('id')
+    si = head.index('shape_hex') if 'shape_hex' in head else -1
     filled = 0
     for r in rows:
         if r[ii] in new:
@@ -131,6 +135,30 @@ def main():
             for g, c in sorted(done):
                 if by[g] != c:
                     print('   %-6s read %s, is %s' % (g, by[g], c))
+    if args.publish:
+        # The committed table carries the identification, not the bitmap:
+        # a glyph bitmap is game data and none goes in this repository
+        # (CREDITS.md). jptext loads either spelling, so lookups are
+        # unaffected - what is lost is the ability to RENDER a glyph from
+        # the committed copy, which is why work/glyphs-to-identify.tsv keeps
+        # shape_hex and glyphreview.py reads that one.
+        out, seen = [], {}
+        for r in rows:
+            r = list(r)
+            k = jptext.shape_key(bytes.fromhex(r[si]))
+            if k in seen:
+                print('ABORT: %s and %s hash alike' % (seen[k], r[ii]))
+                return 1
+            seen[k] = r[ii]
+            r[si] = k
+            out.append(r)
+        hd = list(head)
+        hd[si] = 'shape_id'
+        with io.open(args.publish, 'w', encoding='utf-8', newline='') as fh:
+            fh.write('\t'.join(hd) + '\n')
+            for r in out:
+                fh.write('\t'.join(r) + '\n')
+        print('%s: %d shape(s), no bitmaps' % (args.publish, len(out)))
     return 0
 
 

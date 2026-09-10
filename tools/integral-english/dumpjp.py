@@ -2,7 +2,8 @@
 
 Both halves are complete as of 2026-09-10: the images are drawn from the game's
 OWN glyph bitmaps, so there is no recognition step in them at all, and the text
-now decodes with **zero** unresolved codes - 68,211 lines, 3,923,661 kana/kanji.
+now decodes with **zero** unresolved codes - 68,242 lines, 3,923,944 kana/kanji,
+across disc 1, disc 2 and the VR disc.
 `RADIO.DAT` comes from `radiotext.py`'s walk of the game's records, not from
 `japanese-inventory.tsv`, whose scanner drops 15% of the commentary.
 
@@ -67,6 +68,10 @@ from vrlib import chunk_index
 from workdir import GAME, WORK
 
 CONTAINER = GAME + '/windata/dlc/dlc_japan.bin'
+# the inventory labels rows disc1 / disc2 / vr; the VR disc has its own stage
+# archive and no RADIO.DAT, and it was silently skipped until 2026-09-10
+STAGE_DIR = {'disc1': 'int1_stage.dir', 'disc2': 'int2_stage.dir',
+             'vr': 'vrint_stage.dir'}
 CODE = re.compile(r'<([0-9A-F]{4})>')
 GLYPH, N = 36, 12
 BLANK = Image.new('L', (N, N), 0)
@@ -162,7 +167,7 @@ def coded(raw):
     return ''.join(out)
 
 
-def collect(disc_ix, scope='unported'):
+def collect(disc, scope='unported'):
     """(source, key, offset, text, blob) for every in-scope Japanese line.
 
     scope='unported' keeps only Japanese with no USA counterpart, which is what
@@ -181,13 +186,15 @@ def collect(disc_ix, scope='unported'):
     STORY_END = 0x042C54C          # the story codec ends, the commentary begins
     COMMENTARY_END = 0x0AAC050
     out = []
-    want = 'disc%d' % (disc_ix + 1)
-    m = radiomap.build(disc_ix, verbose=False)
-    fonts = radiotext.blobs(m)
-    for frag, off, raw in radiotext.subtitles(m)[0]:
-        if scope == 'unported' and not (STORY_END <= frag < COMMENTARY_END):
-            continue
-        out.append(('RADIO.DAT', 'frag%07X' % frag, off, coded(raw), fonts[frag]))
+    want = disc
+    if disc != 'vr':                       # the VR disc carries no RADIO.DAT
+        m = radiomap.build(int(disc[-1]) - 1, verbose=False)
+        fonts = radiotext.blobs(m)
+        for frag, off, raw in radiotext.subtitles(m)[0]:
+            if scope == 'unported' and not (STORY_END <= frag < COMMENTARY_END):
+                continue
+            out.append(('RADIO.DAT', 'frag%07X' % frag, off, coded(raw),
+                        fonts[frag]))
     with io.open(WORK + '/japanese-inventory.tsv', encoding='utf-8') as fh:
         fh.readline()
         rows = [l.rstrip(chr(10)).split(chr(9)) for l in fh]
@@ -201,9 +208,9 @@ def collect(disc_ix, scope='unported'):
             out.append(('STAGE.DIR', src.split('/')[1], off, text, None))
     return out
 
-def stage_blobs(disc_ix):
+def stage_blobs(disc):
     """stage name -> its .gcx font blob, for bank 1 in the stage archives"""
-    sd = open('%s/int%d_stage.dir' % (WORK, disc_ix + 1), 'rb').read()
+    sd = open('%s/%s' % (WORK, STAGE_DIR[disc]), 'rb').read()
     out = {}
     for name in portio.entries(sd):
         try:
@@ -271,12 +278,12 @@ def main():
     index = io.open(args.out + '/index.tsv', 'w', encoding='utf-8', newline='')
     index.write('disc\tsource\tgroup\toffset\tpage\trow\tpartial_text\tcodes\n')
     total = 0
-    for disc_ix in (0, 1):
-        if str(disc_ix + 1) not in args.discs.split(','):
+    for disc in ('disc1', 'disc2', 'vr'):
+        if disc.replace('disc', '') not in args.discs.split(','):
             continue
-        fonts = Fonts('%s/int%d_stage.dir' % (WORK, disc_ix + 1))
-        blobs = stage_blobs(disc_ix)
-        lines = collect(disc_ix, args.scope)
+        fonts = Fonts('%s/%s' % (WORK, STAGE_DIR[disc]))
+        blobs = stage_blobs(disc)
+        lines = collect(disc, args.scope)
         if args.source:
             lines = [l for l in lines if l[0] == args.source]
         if args.limit:
@@ -287,12 +294,12 @@ def main():
         for src, items in sorted(bysrc.items()):
             pages, page, row = [], None, 0
             H = N * 3 * args.scale
-            pdfname = '%s/disc%d_%s' % (args.out, disc_ix + 1, src.replace('.', '_'))
+            pdfname = '%s/%s_%s' % (args.out, disc, src.replace('.', '_'))
             os.makedirs(pdfname, exist_ok=True)
             plain = io.open(pdfname + '.txt', 'w', encoding='utf-8', newline='')
-            plain.write('# %s, disc %d - every line, in file order, decoded.\n'
+            plain.write('# %s, %s - every line, in file order, decoded.\n'
                         '# A blank line separates conversations.\n\n'
-                        % (src, disc_ix + 1))
+                        % (src, disc))
             last_key = None
             for key, off, text, blob in items:
                 use = blob if blob is not None else blobs.get(key)
@@ -316,7 +323,7 @@ def main():
                     last_key = key
                 plain.write('%s\n' % said.replace('#N', '\n'))
                 index.write('%s\t%s\t%s\t0x%X\t%d\t%d\t%s\t%s\n'
-                            % ('disc%d' % (disc_ix + 1), src, key, off,
+                            % (disc, src, key, off,
                                len(pages) + 1, row + 1,
                                said.replace('\t', ' '), text))
                 row += 1
@@ -331,8 +338,8 @@ def main():
             if args.png:
                 for i, pg in enumerate(inv):
                     pg.save('%s/page%04d.png' % (pdfname, i + 1))
-            print('disc%d %-12s %6d line(s), %4d page(s) -> %s.pdf'
-                  % (disc_ix + 1, src, len(items), len(pages), pdfname), flush=True)
+            print('%-5s %-12s %6d line(s), %4d page(s) -> %s.pdf'
+                  % (disc, src, len(items), len(pages), pdfname), flush=True)
     index.close()
     print()
     print('%d line(s) dumped; index -> %s/index.tsv' % (total, args.out))

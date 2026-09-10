@@ -72,6 +72,19 @@ reimplementation rather than a tweak, but possible.
 * **No game data is in this repository.** Disc images, stage archives,
   executables and textures are read from a local installation and from retail
   discs the builder supplies; none is committed and none is redistributed.
+  Audited and enforced 2026-09-10: the reference screenshots and the rendered
+  key-config art were deleted, and `bank1-glyphs.tsv` - the bank-1 glyph
+  table - now carries a digest of each 12x12 bitmap (`jptext.shape_key`)
+  instead of the bitmap itself. The digest is enough to look a glyph up, so
+  nothing here stopped working; what it deliberately cannot do is reproduce
+  the font. `glyphfill.py --publish` is the step that strips the bitmaps, so
+  a future transcription pass cannot reintroduce them by accident, and
+  `.gitignore` blocks images under `tools/integral-english/`.
+  **The one thing that is not stripped is short quotations of game text in
+  the documentation** - the sentence each glyph was read against, a subtitle
+  that showed a decoder bug. They are there because a finding nobody can
+  check is not a finding; they total a few thousand characters against the
+  3.9 million the export holds, and the export lives outside the repository.
 * **No new translation exists.** Every English string comes from a released
   Konami build. Where the USA release has no counterpart, the Japanese is left
   exactly as it is, on purpose. `COVERAGE.md` lists those cases.
