@@ -2585,3 +2585,117 @@ Two of §5.4's three blockers had been closed in code on the same evening the
 paragraph naming them was written, and it sat there for three days reading like
 open work. The section listing what remains is not evidence; `rebuild.py` is.
 Before planning work off a paragraph in this file, read the code it describes.
+
+## 23. The 2026-09-10 pass: the language default, offered rather than assumed
+
+A raw disc has no ASI, so the one runtime behaviour a player would miss is
+`[Game] EnglishText`. `mkimage.py` now asks whether to bake it in, and applies
+it or not according to the answer.
+
+### What the bit is, and what it is not
+
+`GM_CONFIG_ENGLISH` (0x0100) in `GM_Configuration` (`linkvarbuf[2]`). Grepping
+the decomp gives **exactly four** places that act on it:
+
+| | |
+|---|---|
+| `radiomes.c:526` | picks the **English half** of a codec fragment - §18's mechanism |
+| `radio.c:1320` | `NO RESPONSE` over its Japanese twin |
+| `movie.c:54`, `jimctrl.c:390` | pick the movie / cutscene subtitle stream |
+
+`opt.c` sets it and reflects it into the option row; `datasave.c` restores it
+from the memory card. **Nothing else reads it.** The README used to list
+`font_draw_string` as a fifth reader and that was wrong (`cfbc635`) - the
+correction is load-bearing, because if font drawing tested the bit then the
+menus this port wrote in place would depend on it. They do not: **every string
+this port wrote is English whether the bit is set or clear.** What the bit
+gates is *Integral's own* English.
+
+So the honest description of the default is: English menus, Japanese story,
+until the player visits Integral's OPTION screen - where the setting is
+Integral's own and saves to the memory card.
+
+### Where it is set, and why the patch fits in 72 bytes
+
+`GCL_StartDaemon` runs once, from `Main()`, and its second call is
+`GCL_InitVar` - which reads `GM_Configuration`, zeroes all of `linkvarbuf`,
+and writes the value back. A store in **that call's delay slot** therefore
+lands before `GCL_InitVar`'s body and is carried through it by the game's own
+code. Once per boot, before anything reads it, and the option screen and
+memory card still override it afterwards.
+
+Three instructions have to be found room for in an 18-instruction function,
+and they are paid for exactly:
+
+| word | paid by |
+|---|---|
+| `sh $v1, off($v0)` | the `nop` in `jal GCL_InitVar`'s delay slot |
+| `addiu $sp, $sp, 0x18` | the `nop` after `lw $ra` (a load-delay slot) |
+| the third | turning the last call into a **tail call** - `GCL_ChangeSenerioCode` is a leaf ending in `jr $ra`, so jumping to it with `$ra` restored returns straight to `Main()` and the `jr $ra` word is freed |
+
+18 instructions in, 18 out, same 72 bytes, same five calls in the same order.
+Nothing relocates.
+
+### There is no free space in that executable, and that was checked
+
+The first plan was a stub in a zero run. Every zero run in the image turns out
+to be live: the 4,203-byte one at `0x800AA095` holds `Hcount`, the 1,771-byte
+tail holds `GM_StageName` - they are `.sdata`/`.sbss` inside the loaded image,
+not padding. `__bss_obj` is at `0x800ABBB0`. And `GCL_ResetSystem`, the one
+`/* do nothing */` function next door, is **called** from `0x8002AA68` - a scan
+for every `jal`/`j`/pointer to it found one, against a control scan that found
+two for `GCL_InitVar`. Fitting in place was not elegance; it was the only
+option, and finding that out cost less than assuming it.
+
+### Nothing is hardcoded
+
+`langdefault.py` matches `GCL_StartDaemon` by its exact 18-word shape and
+requires **exactly one** match; reads `linkvarbuf` out of `GCL_InitVar`'s own
+`lui`/`addiu` pair, confirmed by the two `lh` at +2 and +4 that the C names
+`GM_GameLevel` and `GM_Configuration`; and checks the tail-call target really
+is a leaf before jumping to it. That is why it works unchanged on the VR
+executable, where the function is at `0x8001FE10` and `linkvarbuf` is 0x23A0
+lower - both derived, neither typed in:
+
+    int1.exe   GCL_StartDaemon at 0x8001FCDC, GM_Configuration at 0x800B4D9C
+    int2.exe   GCL_StartDaemon at 0x8001FCDC, GM_Configuration at 0x800B4D9C
+    vrint.exe  GCL_StartDaemon at 0x8001FE10, GM_Configuration at 0x800B29FC
+
+(`int1.exe` and `int2.exe` are byte-identical, so the two main discs take the
+same patch at the same offset.)
+
+### How it asks
+
+`--english-default ask` is the default. On a terminal it explains what the bit
+does - including that it does *not* affect this port's text - and takes y/n.
+**Off a terminal it refuses** rather than choosing: a build script has to pass
+`yes` or `no` explicitly. Declining is byte-exact: disc 1 built with
+`--english-default no` reproduces `a51415b9…`, the same image as before this
+feature existed.
+
+### The one thing that needed care
+
+The set's `zz_ecc` PPF computes each tail from the final payload of the whole
+set - so adding 72 bytes to a sector invalidates the tail the set wrote for
+it. `mkimage.py` recomputes the tail for the sectors the language patch
+touches, and **only** those; everywhere else the set's own tail still governs,
+and the post-patch parity check over every touched sector is what says so.
+Measured: disc 1 goes from 417 touched sectors to 418, disc 2 the same, VR
+2,003 to 2,004, and all of them verify.
+
+### Tested
+
+Seven tests in `selftest.py` (35 total now), over a synthetic executable so
+they need no game data: same length, all five calls preserved in order, the
+store lands on `GM_Configuration`, it follows `linkvarbuf` rather than
+assuming it, the store is in the delay slot, and it refuses an unrecognised
+function, a non-leaf tail-call target and two matches. Each was confirmed to
+fail when the module is mutated - changing the bit value or turning the tail
+call back into a `jal` both break it.
+
+And the patch was read back out of a finished image: the disassembly of
+`SLPM_862.47` inside `MGS Integral English (Disc 1).bin` shows
+`addiu $v1, $zero, 0x100` / `sh $v1, 0x4d9c($v0)` / `j 0x8001fcb0` with
+`--english-default yes`, and the retail `jr $ra` without it.
+
+**Still not booted.** Same caveat as §22: this is static verification.

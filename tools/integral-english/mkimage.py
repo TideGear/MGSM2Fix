@@ -53,14 +53,15 @@ import argparse
 import glob
 import hashlib
 import os
-import shutil
+import struct
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import cdecc
+import langdefault
 import rawdisc
-from portio import BLOCKCHECK_AT, BLOCKCHECK_LEN, read_ppf
+from portio import BLOCKCHECK_AT, BLOCKCHECK_LEN, image_offset, read_ppf
 from iso import Disc
 
 # The collection concatenates the three Integral images into one container.
@@ -83,13 +84,50 @@ def ppf_blockcheck(data):
     return data[60:60 + BLOCKCHECK_LEN] if data[57] else None
 
 
-def exe_lba(container, base, iso_path):
+def exe_extent(container, base, iso_path):
+    """(lba, size) of the executable's ISO extent on this disc."""
     disc = Disc(container, base)
     try:
-        return next(l for n, l, s, d in disc.walk()
+        return next((l, s) for n, l, s, d in disc.walk()
                     if not d and n.upper() == iso_path)
     finally:
         disc.f.close()
+
+
+def exe_lba(container, base, iso_path):
+    return exe_extent(container, base, iso_path)[0]
+
+
+ENGLISH_QUESTION = """
+  Integral is a bilingual disc, and one bit decides which language the game
+  itself uses: the codec dialogue and the cutscene subtitle stream. It is
+  clear at power-on, so a retail disc starts in Japanese and the player sets
+  it in Integral's own OPTION screen, where it saves to the memory card.
+
+  This port's text is not affected either way - the menus, items, briefings
+  and mission log are English whatever the bit says. The question is only
+  whether the disc should *start* in English instead of asking the player to
+  go and turn it on.
+
+  Choosing yes rewrites one function, GCL_StartDaemon, in place: same 18
+  instructions in the same 72 bytes, setting the bit once at boot. The OPTION
+  screen and the memory card still override it afterwards, so a player who
+  picks Japanese keeps Japanese.
+"""
+
+
+def ask_english_default():
+    print(ENGLISH_QUESTION)
+    while True:
+        try:
+            answer = input('  Default to English? [y/N] ').strip().lower()
+        except EOFError:
+            return False
+        if answer in ('', 'n', 'no'):
+            return False
+        if answer in ('y', 'yes'):
+            return True
+        print('  Please answer y or n.')
 
 
 def main(argv=None):
@@ -109,6 +147,11 @@ def main(argv=None):
     parser.add_argument('--ppfs', required=True, metavar='DIR',
                         help="a raw build's PPF folder for this disc")
     parser.add_argument('--output', required=True, metavar='PATCHED.BIN')
+    parser.add_argument('--english-default', choices=('ask', 'yes', 'no'),
+                        default='ask', metavar='ask|yes|no',
+                        help='set English as the power-on language (default: ask). '
+                             'Affects the codec and cutscene subtitles, not this '
+                             "port's text - see langdefault.py")
     parser.add_argument('--cue', action='store_true',
                         help='also write a matching single-track .cue')
     parser.add_argument('--allow-partial', action='store_true',
@@ -143,6 +186,8 @@ def main(argv=None):
                         os.path.basename(args.exe))
         print('executable  : %s, %d bytes, sha256 %s'
               % (args.exe, len(data), hashlib.sha256(data).hexdigest()))
+
+    lba, exe_size = exe_extent(image, base, spec['exe'])
 
     size = os.path.getsize(image) - base
     if args.collection:
@@ -179,8 +224,46 @@ def main(argv=None):
     else:
         print('block check : all %d PPFs match the image at 0x%X' % (len(paths), BLOCKCHECK_AT))
 
+    # --- the optional language default -----------------------------------
+    # Asked here, after the patches have been named and before anything is
+    # read, so the question comes with the run it applies to.
+    english = {'yes': True, 'no': False}.get(args.english_default)
+    if english is None:
+        if not sys.stdin or not sys.stdin.isatty():
+            raise SystemExit(
+                'STOP: --english-default is "ask" and this is not a terminal.\n'
+                '      Pass --english-default yes or no; a build script must say\n'
+                '      which it wants rather than have one chosen for it.')
+        english = ask_english_default()
+
+    language = {}
+    if english:
+        with open(image, 'rb') as handle:
+            handle.seek(base + lba * cdecc.SECTOR)
+            raw = handle.read(((exe_size + 2047) // 2048) * cdecc.SECTOR)
+        exe = b''.join(raw[k + cdecc.DATA:k + cdecc.DATA_END]
+                       for k in range(0, len(raw), cdecc.SECTOR))[:exe_size]
+        for span_lba, _end, data, _name in substitutes.spans:
+            if span_lba == lba:
+                exe = data[:exe_size].ljust(exe_size, b'\0')
+        for address, word in sorted(langdefault.patch_for(exe).items()):
+            at = langdefault.HDR + address - langdefault.TADDR
+            language[image_offset(lba, at)] = struct.pack('<I', word)
+        print('language    : English at power-on - %s'
+              % langdefault.describe(exe))
+    else:
+        print('language    : left as the disc has it (Japanese until the '
+              'OPTION screen)')
+
     # --- 2/3. bounds, and the parity of the disc we were handed -----------
     changed = rawdisc.all_writes(paths)
+    touched_by_language = set()
+    for offset, payload in language.items():
+        sector, within = divmod(offset, cdecc.SECTOR)
+        assert within + len(payload) <= cdecc.DATA_END, hex(offset)
+        changed.setdefault(sector, {}).update(
+            {within + k: b for k, b in enumerate(payload)})
+        touched_by_language.add(sector)
     past = [s for s in changed if (s + 1) * cdecc.SECTOR > size]
     if past:
         raise SystemExit('STOP: %d record(s) reach past the end of the image, '
@@ -206,6 +289,12 @@ def main(argv=None):
                 bad.append(sector)
             for within, byte in changed[sector].items():
                 raw[within] = byte
+            if sector in touched_by_language:
+                # The set's own zz_ecc tail was computed without these bytes,
+                # so for these sectors - and only these - the tail is recomputed
+                # here. Everywhere else the set's tail still governs, and the
+                # check below is what says so.
+                raw = bytearray(cdecc.fixed(bytes(raw)))
             if not cdecc.verify(bytes(raw)):
                 failures.append(sector)
             patched[sector] = bytes(raw)
@@ -257,6 +346,7 @@ def main(argv=None):
             os.unlink(out)
         raise
     written = sum(len(p) for path in paths for _, p in read_ppf(path))
+    written += sum(len(p) for p in language.values())
     print('written     : %s, %d bytes, %d patch bytes applied'
           % (out, os.path.getsize(out), written))
 

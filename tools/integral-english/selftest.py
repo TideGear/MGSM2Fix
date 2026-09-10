@@ -26,6 +26,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import cdecc
+import langdefault
 import pad2
 import pcx4
 import portio
@@ -264,6 +265,104 @@ class Pad2(unittest.TestCase):
     def test_refuses_an_unterminated_replacement(self):
         with self.assertRaises(AssertionError):
             pad2.fill(self.SLOT, b'NO TERMINATOR')
+
+
+class LangDefault(unittest.TestCase):
+    """The English-at-boot rewrite of GCL_StartDaemon (langdefault.py).
+
+    Built over a synthetic executable rather than a real one, so it runs with
+    no game data: what it checks is the shape contract - that the rewrite is
+    the same length, keeps all five calls in the same order, and refuses
+    anything that does not look like the function it means to rewrite. That
+    the real executables match the shape is `py langdefault.py`.
+    """
+
+    CALLS = (0x80020B68, 0x80021264, 0x8002040C, 0x80015418, 0x8001FCB0)
+
+    def exe(self, at=0x8001FCDC, linkvar=0x800B4D98):
+        L = langdefault
+        body = [
+            L.ADDIU_SP_DOWN, L.SW_RA,
+            L.jal(self.CALLS[0]), L.NOP,
+            L.jal(self.CALLS[1]), L.NOP,
+            L.jal(self.CALLS[2]), L.NOP,
+            L.ADDIU_A0_G, L.LUI_A1_8002,
+            L.jal(self.CALLS[3]), 0x24A5FC88,
+            L.jal(self.CALLS[4]), L.MOVE_A0_ZERO,
+            L.LW_RA, L.NOP, L.JR_RA, L.ADDIU_SP_UP,
+        ]
+        init_var = [
+            L.ADDIU_SP_DOWN,
+            0x3C100000 | (linkvar >> 16),                  # lui   $s0, hi
+            0x26100000 | (linkvar & 0xFFFF),               # addiu $s0, $s0, lo
+            0x86120000 | (L.CONFIG_INDEX * 2),             # lh    $s2, 4($s0)
+            0x86110000 | (L.LEVEL_INDEX * 2),              # lh    $s1, 2($s0)
+            L.JR_RA, L.NOP, L.NOP,
+        ]
+        change = [0x24020001, L.JR_RA, L.NOP]              # a leaf
+        image = bytearray(bytes(L.HDR + 0x30000))
+        def put(address, words):
+            off = L.HDR + address - L.TADDR
+            image[off:off + 4 * len(words)] = struct.pack('<%dI' % len(words), *words)
+        put(at, body)
+        put(self.CALLS[1], init_var)
+        put(self.CALLS[4], change)
+        return bytes(image), at
+
+    def test_same_length_and_same_calls(self):
+        exe, at = self.exe()
+        writes = langdefault.patch_for(exe)
+        self.assertEqual(len(writes), 18)
+        self.assertEqual(sorted(writes), [at + 4 * k for k in range(18)])
+        words = [writes[at + 4 * k] for k in range(18)]
+        targets = [langdefault.jal_target(w, at + 4 * k)
+                   for k, w in enumerate(words) if langdefault.is_jal(w)]
+        self.assertEqual(targets, list(self.CALLS[:4]),
+                         'the four jal targets must survive, in order')
+        self.assertEqual(words[16], langdefault.jump(self.CALLS[4]),
+                         'the fifth call becomes a tail jump')
+
+    def test_the_store_lands_on_gm_configuration(self):
+        exe, at = self.exe(linkvar=0x800B4D98)
+        words = langdefault.patch_for(exe)
+        self.assertEqual(words[at + 4 * 5], 0x3C02800B)         # lui $v0, 0x800b
+        self.assertEqual(words[at + 4 * 7], 0xA4434D9C)         # sh  $v1, 0x4d9c($v0)
+        self.assertEqual(words[at + 4 * 4], 0x24030100)         # addiu $v1, $zero, 0x100
+
+    def test_it_follows_linkvarbuf_rather_than_assuming_it(self):
+        exe, at = self.exe(linkvar=0x800B29F8)                  # the VR layout
+        words = langdefault.patch_for(exe)
+        self.assertEqual(words[at + 4 * 7] & 0xFFFF, 0x29FC)
+
+    def test_the_store_sits_in_the_call_s_delay_slot(self):
+        exe, at = self.exe()
+        words = langdefault.patch_for(exe)
+        self.assertTrue(langdefault.is_jal(words[at + 4 * 6]))
+        self.assertEqual(words[at + 4 * 7] >> 26, 0x29, 'sh follows the jal')
+
+    def test_it_refuses_a_function_it_does_not_recognise(self):
+        exe, at = self.exe()
+        broken = bytearray(exe)
+        off = langdefault.HDR + at - langdefault.TADDR
+        struct.pack_into('<I', broken, off, 0x27BDFFF0)         # a different frame
+        with self.assertRaises(AssertionError):
+            langdefault.patch_for(bytes(broken))
+
+    def test_it_refuses_when_the_tail_call_is_not_a_leaf(self):
+        exe, at = self.exe()
+        broken = bytearray(exe)
+        off = langdefault.HDR + self.CALLS[4] - langdefault.TADDR
+        struct.pack_into('<I', broken, off, langdefault.jal(self.CALLS[0]))
+        with self.assertRaises(AssertionError):
+            langdefault.patch_for(bytes(broken))
+
+    def test_it_refuses_two_matches(self):
+        exe, at = self.exe()
+        doubled = bytearray(exe)
+        off = langdefault.HDR + at - langdefault.TADDR
+        doubled[off + 0x400:off + 0x400 + 72] = exe[off:off + 72]
+        with self.assertRaises(AssertionError):
+            langdefault.patch_for(bytes(doubled))
 
 
 _TMP = os.path.join(os.environ.get('TEMP') or '/tmp', 'integral-english-selftest')
