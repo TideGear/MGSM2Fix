@@ -2196,19 +2196,44 @@ shapes. Every one is settled by a sentence, not by a second look at 144 pixels:
 
 ### What is left, exactly
 
-* **One glyph, `('title', 0x9A27)`, two instances**, in
-  「⟪9A27⟫のラブソング」. Its bitmap is
-  `6baae96bbee902eb806faab92eaaa80eaae00eaae02eaa902bfff0b780b013fff0000000`
-  (12x12, 2bpp, MSB first); it is 丷-topped with a 日-like box below, it does
-  not match any of the 1,213 bank-1 shapes, and the string sits among the
-  disc-swap messages in the title string table, which gives no context. Two
-  instances out of 3,923,659.
+* **Nothing.** The last glyph, `('title', 0x9A27)`, is **蒼** - see below.
+  1,214 bank-1 shapes, zero unresolved codes in the whole export.
 * **Two `IF` records fail to parse**, both in the story-codec region, which is
   out of scope (USA ships that dialogue in English). The commentary walk is
   clean.
 * **The story codec is not exported.** By design - §17's scope decision - but
   note the record walk only reaches 43 of its 425 fragments, so anyone who
   wants it should expect to work on the walk first.
+
+### The last glyph: 蒼, and why the disc could not name it
+
+`('title', 0x9A27)` resisted every method here, and the reason is instructive:
+**there was nothing on the disc to check it against.** The bitmap occurs
+exactly once per disc - index 38, the last glyph of the `title` blob - and
+appears in no other stage on disc 1, disc 2 or the VR disc, and in none of
+`RADIO.DAT`'s 1.4 MB of font blobs. Its one string, 「⟪9A27⟫のラブソング」,
+sits orphaned among the memory-card prompts. Context is what settled the other
+1,213; here there was none to have.
+
+It came from outside: TCRF's *Metal Gear Solid (PlayStation)* page documents
+the Japanese DEMO THEATER, whose four rolls are titled 蒼のラブソング,
+蒼色の青春, 紅のラブソング and 紅色の青春. Integral replaced all four with
+メリル / オタコン / （赤忍者）メリル / （赤忍者）オタコン - and the disc agrees
+exactly: searching both main archives for the byte sequence のラブソング finds
+**one** hit each, the leftover ROLL A title. The other three went with their
+strings, which is why 蒼's glyph survives with no companion characters.
+
+The bitmap decomposes as 艹 over 倉 (`g647`), which is 蒼. Note the honest
+weight of that last check on its own: at 12x12 a shifted 倉 agrees with it on
+85% of pixels and an unshifted one on 84.7%, so the pixel test decides nothing.
+What decides it is the external source naming the exact string plus the disc
+holding exactly that string, once, orphaned.
+
+*A method note.* This is the one character out of 1,214 that no amount of
+reading the disc could settle, and the lesson is not that the method failed -
+it is that a cross-reference is the whole method, and when a glyph has exactly
+one use anywhere, there is nothing to cross-reference. Recognising that early
+is worth more than another pass over the pixels.
 
 ### What is now believed with what evidence
 
