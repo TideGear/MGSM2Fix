@@ -108,7 +108,8 @@ def contexts(m, known, want, per_shape=3, width=13):
                 continue
             v = int(mm.group(1), 16) & ~0x6000
             if 0x9600 <= v < 0x9A00:
-                raw = blob[(v - 0x9601)*GLYPH:][:GLYPH]
+                i = radiomap.bank1_index(v) * GLYPH
+                raw = blob[i:i + GLYPH]
                 chars.append(known.get(raw, '・'))
                 shapes.append(raw)
             else:

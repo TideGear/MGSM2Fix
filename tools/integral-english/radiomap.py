@@ -97,6 +97,19 @@ RDCODE = {0: 'NULL', 1: 'TALK', 2: 'VOICE', 3: 'ANIM', 4: 'ADD_CONTACT',
           0x40: 'EVAL', 0x80: 'SCRIPT'}
 
 
+def bank1_index(code):
+    """glyph index for a bank-1 code, per font.c's `get_zen_font_data`.
+
+    `zen_index` (rendertext.py) is `((code - 0x956B) - code/256) | 0x1000`, so
+    the index drops one per 256-page: `code - 0x9601` is right inside `0x96xx`
+    and one too high from `0x97xx` on, because each page's `00` entry is not a
+    glyph. The inventory only ever contained `0x96xx` codes, so the error was
+    invisible until the record walk started reading `0x97xx` - where it named
+    every glyph one position too far along.
+    """
+    return (code - 0x956B) - (code >> 8)
+
+
 def read_radio(disc_ix):
     """RADIO.DAT and FACE.DAT's sector count off one of the collection's ISOs"""
     image = Disc(CONTAINER, INTEGRAL_IMAGES[disc_ix])
@@ -248,7 +261,7 @@ def shape_table(radio, frags, rows):
                 v = int(c, 16) & ~0x6000
                 if not (0x9600 <= v < 0x9A00):
                     continue
-                a = base + (v - 0x9601) * GLYPH
+                a = base + bank1_index(v) * GLYPH
                 if a + GLYPH > nxt:
                     stats['over-run'] += 1
                     continue

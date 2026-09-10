@@ -10,7 +10,11 @@ the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12), and through
 identification was set up as the one open task (§17), and on 2026-09-10,
 when that task was finished - all 1,200 bank-1 glyphs named, 100% of the
 Japanese readable as text, and the fragment map §17 rested on found to be
-wrong for 93% of strings and rebuilt (§18) - and on
+wrong for 93% of strings and rebuilt (§18), and then the export itself
+finished: the byte scanner retired for a walk of the game's own records, a
+bank-1 index bug found that had been naming every `0x97xx` glyph one position
+too far along, and 24 more characters identified, leaving two unresolved glyph
+instances in 3.9 million (§19) - and on
 2026-09-08, when the housekeeping was cleared, the sweep's one uncovered
 finding became the `en_pad2` family, the three sweeps §5 had filed under "to
 investigate" were all run, and the four `abst` location names were decided
@@ -2124,3 +2128,93 @@ was recorded. The habit does not install itself.
 * **Nothing here changes the port's scope.** USA never shipped the commentary,
   so there is no English to copy. What changed is that the Japanese can now be
   read, by anyone, as text.
+
+## 19. The 2026-09-10 pass: the export finished, and the scanner retired
+
+**The unportable Japanese is exported in full.** 68,211 lines, 3,923,659
+kana/kanji, and **two** unresolved glyph instances in the whole of it - one
+character, used once per disc, in a title-screen string table.
+
+    work/jpdump/disc1_RADIO_DAT.txt   the developer commentary, plain text
+    work/jpdump/disc<n>_<source>.txt  DEMO.DAT, VOX.DAT, STAGE.DIR likewise
+    work/jpdump/index.tsv             one row per line, with offsets and codes
+    work/jpdump/*.pdf                 the same lines drawn from the game's font
+
+### What was still wrong when §18 was written
+
+§18 said 100% and meant "100% of `japanese-inventory.tsv`". Chasing that
+qualifier turned up two real defects, and the second one had been quietly
+corrupting text since the beginning.
+
+**1. The inventory is not the file.** `jplist`'s scanner ends a run at any code
+it does not recognise, dropping the code and starting a new row after it. It
+did not recognise `0x91xx` (bank 0's second kanji page) or `0x97xx` (bank 1
+above index 255), and both carry real text - so the inventory held **85.2%** of
+the commentary's glyph instances. The fix is not a better scanner:
+`radiotext.py` walks the records the game walks (`menu_gcl_exec_block_800478B4`
+and the `TALK`/`IF`/`SWITCH`/`RANDSWITCH` payloads), which is where the text
+provably is. It finds **33,277 subtitles and 2,257,918 glyph instances** in the
+commentary against the inventory's 1,729,477, reaches all **125** commentary
+fragments where the inventory reached 124, and has more text than the inventory
+in **every single fragment** - it never trades one gap for another.
+
+**2. The bank-1 index was off by one from `0x97xx` on.** Every tool here used
+`code - 0x9601`. The game uses `zen_index` (`font/font.c`, via
+`rendertext.zen_index`), which is `((code - 0x956B) - code/256) | 0x1000` - the
+index drops one per 256-page, because each page's `00` entry is not a glyph. So
+`code - 0x9601` is exactly right inside `0x96xx` and one too high from `0x97xx`
+onward, naming every glyph one position too far along.
+
+The inventory only ever contained `0x96xx` codes, so **the error was invisible
+until the record walk started reading `0x97xx`** - 58,704 codes in the
+commentary, every one of them a wrong kanji. It showed up as one sentence
+rendering differently in different fragments:
+「プログラムの記述が楽になる効果」 in one, 「述□が楽になる効果」 in another. `radiomap.bank1_index`
+is now the single copy of that rule and every tool calls it.
+
+The lesson is the cheap one again: the two renderings could not both be right,
+and that was visible in the output long before it was explained. Read the
+output.
+
+### The 24 characters that were hiding behind the scanner
+
+The text the inventory dropped needed 11 more bank-0 codes and 13 more bank-1
+shapes. Every one is settled by a sentence, not by a second look at 144 pixels:
+
+| | | |
+|---|---|---|
+| `0x9101` 気 無邪気 | `0x9102` 絶 気絶している | `0x9103` 安 安田有希子 |
+| `0x9104` 属 付属機関 | `0x9106` 布 昆布 | `0x9107` 完 完成した |
+| `0x910C` 自 建物自体 | `0x910D` 拳 中国拳法 | `0x910E` 銃 銃口 / 銃身 / 銃弾 |
+| `0x9110` 初 業界初 / 当初 | `0x900D` 『 pairs with `0x900E` 』 | 貢 + 献 作品総体に対し貢献する |
+| 師 ドット絵師 | 泣 怒ったり泣いたり | 委 想像力に委ねた |
+| 梯 梯子昇降 | 即 即座に当たる | 伴 それに伴うカメラ |
+| 痢 下痢モーション | 又 又、後半の | 涙 （涙） |
+| ＊ and ＄ - ○＃％＆＊＄! , a censored expletive | | |
+
+`bank1-glyphs.tsv` now holds **1,213** shapes and `GLYPH_91` fourteen codes.
+
+### What is left, exactly
+
+* **One glyph, `('title', 0x9A27)`, two instances**, in
+  「⟪9A27⟫のラブソング」. Its bitmap is
+  `6baae96bbee902eb806faab92eaaa80eaae00eaae02eaa902bfff0b780b013fff0000000`
+  (12x12, 2bpp, MSB first); it is 丷-topped with a 日-like box below, it does
+  not match any of the 1,213 bank-1 shapes, and the string sits among the
+  disc-swap messages in the title string table, which gives no context. Two
+  instances out of 3,923,659.
+* **Two `IF` records fail to parse**, both in the story-codec region, which is
+  out of scope (USA ships that dialogue in English). The commentary walk is
+  clean.
+* **The story codec is not exported.** By design - §17's scope decision - but
+  note the record walk only reaches 43 of its 425 fragments, so anyone who
+  wants it should expect to work on the walk first.
+
+### What is now believed with what evidence
+
+| claim | how it is checked |
+|---|---|
+| the fragment map is right | all 192 JP + 192 EN radio-code starts parse; no declared extent overrun; 1,213 distinct bitmaps, 100% with the blank twelfth row |
+| the text extraction is complete | more text than the inventory in *every* commentary fragment, all 125 reached, 0 unresolved codes |
+| the glyph table is right | 78/78 on the labelled holdout; every one of 1,200 read back against a full sentence; the 13 new ones each settled by a sentence |
+| the bank-1 index is right | it is `zen_index`, from the game; and the sentence that used to render two ways now renders one way everywhere |

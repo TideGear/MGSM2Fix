@@ -458,7 +458,7 @@ remaining Japanese actually uses were identified by pairing two weak signals:
 | `STAGE.DIR` | 1,718 | 2 | **99.9%** |
 | `RADIO.DAT` | 3,304,914 | 0 | **100%** |
 
-*(updated 2026-09-10: every bank-1 shape the inventory contains is now identified - see §18 of `NextSteps.md`. The `STAGE.DIR` residue is one glyph, `('title', 0x9A27)`, used twice. **These percentages are over `japanese-inventory.tsv`, which holds 85.2% of the commentary's glyph instances** - its scanner ends a run at any code it does not recognise, and `0x91xx` and `0x97xx` carry real text. §18, "Where the number stops", has the measurement.)*
+*(superseded 2026-09-10. The table above counts what `japanese-inventory.tsv` holds, and the inventory holds only **85.2%** of the commentary's glyph instances: its scanner ends a run at any code it does not recognise, and `0x91xx` and `0x97xx` carry real text. The export no longer uses it for `RADIO.DAT` - `radiotext.py` walks the game's own records instead, which reaches all 125 commentary fragments and finds more text than the inventory in every one of them. **The finished figures: 68,211 lines, 3,923,659 kana/kanji, two unresolved glyph instances in the whole export.** §19 of `NextSteps.md` has the account, including the bank-1 index bug that was naming every `0x97xx` glyph one position too far along.)*
 
 **And it found two errors in the hand transcription.** `0x9027` was read as 告
 and is 書 - 「上書き保存」 and 「解説書」 both demand it - and `0x90E4` was read
