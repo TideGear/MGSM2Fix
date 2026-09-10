@@ -49,7 +49,7 @@ recoverable that way. **All 192 Japanese starts and all 192 English starts are
 among the 597 the parse found, and no declared extent is overrun.** That is
 what makes the parse trustworthy rather than merely plausible.
 
-The 405 fragments no code names are real too - the codes for them live
+The 169 fragments no code names are real too - the codes for them live
 somewhere this does not look - and they are kept, minus one class:
 
 **A nested block has the same header as a fragment.** `radio_if_80047514` hands
@@ -61,9 +61,9 @@ none of the 384 they prove true.
 
 WHAT THE RESULT MEASURES
 
-553 fragments; the text lookups then produce ~2,000 distinct bitmaps with 99.9%
-blank twelfth rows. That is the check to re-run after any change here - not the
-share of strings that got *an* answer.
+553 fragments; the text lookups then produce 1,200 distinct bitmaps, 100% of them
+with the blank twelfth row. That is the check to re-run after any change here -
+not the share of strings that got *an* answer.
 """
 import argparse
 import bisect

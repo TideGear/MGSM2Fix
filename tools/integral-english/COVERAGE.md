@@ -422,10 +422,17 @@ This is why the same code means different characters in different places:
 `⟪9A01⟫` is 記 in `abst`, 端 in `s07b` (コントローラ端子1) and 年 in `roll`
 (1980年代). There is no global table to build, and never was.
 
-`RADIO.DAT` behaves the same way: its bank-1 codes never leave `0x9601`-`0x96FF`
-(255 entries - a per-block table), 1,908 of its strings begin a fresh run at
+`RADIO.DAT` behaves the same way: 1,908 of its strings begin a fresh run at
 `0x9601`, and the *same* commentary sentence appears at three offsets using
 different bank-1 codes each time.
+
+**Corrected 2026-09-10.** This paragraph used to add that its bank-1 codes "never
+leave `0x9601`-`0x96FF` (255 entries)". They do: a commentary fragment's blob
+holds up to **441** glyphs and the codes run on into `0x97xx`. The claim only
+looked true because `japanese-inventory.tsv`'s scanner drops every code it does
+not recognise, `0x97xx` included - so the evidence for it was manufactured by the
+same bug it was describing. The index is `zen_index`, not `code - 0x9601`; see
+`radiomap.bank1_index` and §19 of `NextSteps.md`.
 
 ### Finishing bank 1: three sources done, the commentary measured
 
@@ -578,6 +585,8 @@ single rendered sample had suggested.
 
 ### The 1,735: no font can look them up, so they are rendered for transcription
 
+*(The count was wrong - it is 1,214, and the 1,735/1,813 figures came from a fragment map that was wrong for 93% of strings. All of them are named as of 2026-09-10. The method below - render them and read them - is what worked, with one change: read each glyph against a decoded **sentence**, not on its own. §18-19 of `NextSteps.md`.)*
+
 Two reference fonts were tried and both are recorded because the second one was
 the *right* idea and still failed:
 
@@ -595,9 +604,11 @@ earth to look these up in, and the remaining work is recognition by eye.
 `glyphsheets.py` therefore renders them for a person - or a multimodal model -
 to read:
 
-    py glyphsheets.py     -> work/glyphs-to-identify.pdf   38 pages, 1,813 glyphs
+    py glyphsheets.py     -> work/glyphs-to-identify.pdf   8 pages, 1,200 glyphs
                           -> work/glyphpages/pageNN.png    the same, as images
+                          -> work/glyphpages/pageNN.txt    decoded sentences per glyph
                           -> work/glyphs-to-identify.tsv   id, occurrences, char, shape_hex
+                          -> work/glyph-answers.tsv        78 known, to score the pass
 
 Glyphs are ordered **by how often they occur**, so a partial pass buys the most
 text - the first few hundred cover most of the commentary's characters. Fill the
