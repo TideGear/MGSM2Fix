@@ -19,7 +19,8 @@ complete with **zero** unresolved glyph codes (§19), and finally the VR disc
 added - it had been dropped by a loop over two disc indices, so 97% of the
 export looked like all of it - and the last game data taken back out of the
 repository, the glyph table now shipping digests of the font bitmaps rather
-than the bitmaps (§20) - and on
+than the bitmaps (§20), and a regression guard put on the fragment map after two
+plausible-looking metrics were measured and thrown away (§21) - and on
 2026-09-08, when the housekeeping was cleared, the sweep's one uncovered
 finding became the `en_pad2` family, the three sweeps §5 had filed under "to
 investigate" were all run, and the four `abst` location names were decided
@@ -1306,7 +1307,7 @@ an explicit answer before anything changes.
 | `widths.py` | how wide a ported line renders and how wide it may be: the `vrwindow` budget derived step by step from the decomp, the 255-px `max_width` ceiling, and the pool line separator. Read its docstring before adding a width assert — the per-window budget is **not** an invariant, retail exceeds it |
 | `mainsweep.py` | the main discs' answer to `vr_sweep.py`: pairs every GCL string with the USA disc's by owning command, so "Integral Japanese where USA has English" is measured. `py mainsweep.py [--disc 2] [--samples]`. Its one uncovered finding is §5.11, ported 2026-09-08. Three modes were added the same day: `--integral-only` pairs each of the 13 Integral-only stages with the USA stage it is a variant of (the shared-name universe's hole — 1 string, already ported); `--diff-english` sequence-diffs the two discs' English for wording differences (§5.14 step 2 — found the fourth `abst` spelling); `--census` accounts for every Japanese GCL string and **exits non-zero unless the unaccounted bucket is 0** (§5.8) |
 | `radiomap.py` | **where every `RADIO.DAT` fragment starts and where its bank-1 font sits.** Parses each candidate sector's record list (self-checking) and checks the result against the 192 fragment extents the game's own radio codes declare. Prints the number that matters - DISTINCT bitmaps the text lookups produce (1,200) and their blank-twelfth-row rate (100%) - not the share of strings attributed, which is what the broken predecessor reported. `py radiomap.py` |
-| `radiotext.py` | **every subtitle, by walking the records the game walks** (`menu_gcl_exec_block_800478B4` and the TALK/IF/SWITCH/RANDSWITCH payloads). Replaces the byte scanner for `RADIO.DAT`, which was dropping 15% of the commentary. `py radiotext.py [--dump out.txt]` |
+| `radiotext.py` | **every subtitle, by walking the records the game walks** (`menu_gcl_exec_block_800478B4` and the TALK/IF/SWITCH/RANDSWITCH payloads). Replaces the byte scanner for `RADIO.DAT`, which was dropping 15% of the commentary. Also carries **the regression guard on the fragment map**: `--check` requires every fragment's bank-1 text to also appear in another fragment (worst real score 96.0%, a base slipped one glyph scores 0.0%), and `--selftest` slips bases on purpose and requires `--check` to catch them - which the first two versions of the check did not. §21 records both metrics that failed. `py radiotext.py [--check] [--selftest] [--dump out.txt]` |
 | `glyphsheets.py` | renders the unidentified bank-1 glyphs to `work/glyphs-to-identify.pdf` and matching PNGs, ordered by frequency, **with a `.txt` of real decoded sentences beside each page** - that companion file is the more important half, because at 12x12 線/緑 and 間/問 are the same picture and a sentence is not. Leaves the 78 already-known shapes in unmarked, with the answers in `work/glyph-answers.tsv`, so a pass can be scored. `py glyphsheets.py` |
 | `glyphfill.py` | merges a transcription into the TSV and **scores it**: against those 78 known answers, and against the invariant that bank 1 never reuses a bank-0 character. Every warning it raised in the 2026-09-10 pass was a real error. `py glyphfill.py [--score]` |
 | `glyphreview.py` | prints the **full** decoded lines a glyph appears in - `--verify` does one sentence for every shape, which is the read-through that caught 黙/弄 swapped and 完 for 璧. `py glyphreview.py --verify` |
@@ -2356,3 +2357,89 @@ missed. Deciding it means reading the relocated table against USA's, not
 guessing from these four - and the `en_savemsg` area already has an
 UNDETERMINED note against it (README, the MC RAM-patch collision). Filed here
 so it is not lost; it is not part of the export and does not block it.
+
+## 21. A regression guard on the fragment map, and two metrics that failed
+
+`radiomap.py` prints two aggregates - distinct bitmaps produced and their
+blank-twelfth-row rate - and they catch a map that is grossly wrong. They
+caught the one that was (§18): 91,834 distinct bitmaps at a 9.8% blank rate.
+
+**They cannot catch one fragment's base going bad.** A base wrong by a whole
+number of glyphs still slices on glyph boundaries, so every bitmap it reads is
+a real glyph with a real blank twelfth row. Valid bitmaps, wrong characters,
+both aggregates unmoved against 125 fragments, and the output is fluent-looking
+nonsense. Nothing committed would have said a word.
+
+`py radiotext.py --check` closes that, and `--selftest` proves it does.
+
+### Two metrics that looked right and were worthless
+
+Recording these because both are the obvious thing to reach for, and the
+second one cost real time.
+
+**"What share of this fragment's bank-1 codes hit a *named* shape?"** This is
+the check I proposed, and it does not work now the table is complete. Every
+shape in every blob is named, so slipping a base one glyph just reads a
+*different named shape*: the score moves from 100.00% to **99.89%**. It was
+diagnostic during the identification pass, when the table was half empty. It
+is saturated now, and a saturated metric is worse than none because it reads
+like a pass.
+
+**"What share of its characters are in the corpus top 100?"** Real text
+over-samples common characters heavily, so a permuted mapping should flatten.
+It does flatten - but there is no margin. **Bank 1 holds the rare kanji**;
+bank 0 has the common ones. So bank-1 frequency is inherently flat and
+fragment-specific. Legitimate fragments run down to **34.1%** and a slipped
+base sits at about **35%**. Chasing the four lowest-scoring fragments to see
+whether they were broken found them decoding as clean, ordinary commentary.
+
+The general lesson: before trusting a metric, **slip a base on purpose and see
+what it reads.** Both of these looked convincing until they were made to fail.
+
+### What works: cross-fragment agreement
+
+The commentary is duplicated across fragments, and every copy carries its own
+font blob with its own codes - so the same sentence is encoded differently in
+each and must still decode identically. That is the invariant that exposed the
+`0x97xx` index bug in §19, and it does not care how rare a fragment's
+vocabulary is.
+
+**Only lines that contain a bank-1 code are scored**, because those are the
+only lines a wrong base can change. This matters more than it sounds:
+fragment `0x03F6800` has 23 lines and **two** that use bank 1, so scoring all
+of its text dilutes a slip to 8.7% and it walks through any sane floor. On
+bank-1 lines alone the same fragment is correctly reported as *too thin to
+check* rather than passed.
+
+Measured on both discs:
+
+| | |
+|---|---|
+| fragments checked | 126 |
+| no bank-1 line - nothing a base can break | 40 |
+| too thin (<4 bank-1 lines) | 5 |
+| worst legitimate agreement | **96.0%** |
+| median | 100.0% |
+| one base slipped by a single glyph | **0.0%** |
+
+The default floor of 50% sits in the middle of that gap. A slip large enough
+also makes the record walk itself throw, which `check` reports rather than
+raising.
+
+### The selftest, and why it is not optional
+
+    py radiotext.py --selftest
+
+It slips three fragments' bases by +1, -1 and +8 glyphs and requires `--check`
+to name each one. **The first two versions of the check passed their baseline
+and failed this**, which is the only reason they were caught: a guard nobody
+has watched fail is not a guard.
+
+Its victims are drawn from exactly the set `--check` claims to cover, so it
+cannot pass by testing something the check never promised. Fragments with no
+bank-1 line are reported separately rather than counted as passes - one of
+them holds nothing but four copies of a leftover English developer warning,
+and counting it would inflate the number that means something.
+
+**What this does not check** is whether a shape is named *correctly* - that is
+the 78-answer holdout in `glyphfill.py --score`. This checks the base.
