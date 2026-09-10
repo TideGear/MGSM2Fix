@@ -461,10 +461,73 @@ visible by squinting at the glyph a second time; both were obvious the moment a
 sentence had to make sense. That is the argument for context over eyesight, and
 it applies to the 238 as much as to the 90.
 
-### Why `RADIO.DAT`'s 12.8% is not finishable the same way
+### `RADIO.DAT`'s glyph tables: located, and the identifications propagate
+
+Two things were missing to read the commentary: where each conversation's glyph
+table sits, and what its glyphs are. The first is now solved and the second
+turned out to be half-solved already.
+
+**The identifications propagate, because the master font is shared.** Of the 82
+bank-1 shapes identified for the stage archives, **78 appear inside
+`RADIO.DAT`** as byte-identical 36-byte bitmaps, 150-220 times each. So
+`shape -> character` is **global** even though `code -> shape` is per-block:
+identify a glyph once anywhere and it is identified everywhere it is reused.
+That is what makes the remaining work additive rather than per-block.
+
+**The table sits immediately after the conversation's text.** Proven by a
+constraint with exactly one solution in 11 MB. The second line of the first
+conversation is
+`⟪9603⟫眼では見えないでしょうけど、#N⟪9604⟫から⟪9605⟫⟪9606⟫も赤外線が⟪9607⟫ているのよ`,
+whose English counterpart in the same file reads "You probably can't see them
+with your naked eyes, but there are infrared beams coming out of that wall." So
+`9606` is 本 and `9607` is 出 - both already known - and they are at adjacent
+indices, which means their bitmaps must be 36 bytes apart. Searching the whole
+file for 本 immediately followed by 出 returns **one** offset, `0x265`. With 本
+at index 5 that puts the table base at **`0x1B1`** - directly after the text
+records, which end at `0x1B0`. Decoding the conversation from that base:
+
+    ⟪仕⟫⟪掛⟫けられているわ           …が仕掛けられているわ
+    ⟪肉⟫眼では…⟪壁⟫から⟪何⟫本も赤外線が出ているのよ
+    それに⟪触⟫れると扉が⟪閉⟫まって毒ガスが⟪噴⟫き出してくる…
+
+Every gap is now a single plausible character rather than a mystery, and the
+sentences match their English line for line. The rule is therefore:
+
+    table base   = end of the conversation's text records
+    glyph index  = code - 0x9601
+
+which is the same shape as the `.gcx` case (`0x9A01 + i` into the script's own
+font blob), just with the table inline instead of at the end of the file.
+
+**What is left is only identification, and it is now countable.** Because shapes
+dedupe globally, the cost is not 541,920 uses or ~1,900 blocks - it is the number
+of *distinct* shapes in the file, each of which needs naming once. The
+`glyphocr.py` shortlist plus surrounding context is the method that worked for
+the stage archives' 90, and the commentary has the strongest context of all: its
+own English translation sits in the same file for the story half, and the
+commentary half is prose about making a game.
+
+**The number is 1,735.** Walking outwards in 36-byte steps from each of the
+8,840 known-glyph occurrences recovers **319 glyph runs, 57,007 cells and 1,813
+distinct shapes**, of which 78 are already identified. So finishing the
+commentary means naming **1,735 more glyphs**, once each - not 541,920 uses and
+not ~1,900 blocks. For a few hours of Japanese prose that is the expected size
+of a kanji set, which is a good sign the count is real.
+
+Treat it as a **lower bound**: the walk only finds a table that contains at
+least one of the 78 anchors, so tables built entirely from rarer kanji are not
+counted yet. A first attempt to avoid that by sweeping all 36 byte-phases over
+the whole file reported 1.9 million "shapes" and is recorded here as a
+cautionary result - without an anchor to start from, the test cannot tell a font
+cell from any other 36 bytes, and the answer was garbage rather than merely
+imprecise.
+
+### Why `RADIO.DAT`'s 12.8% needs 1,735 more glyph identifications
 
 The commentary uses **541,920 bank-1 glyphs**, in tables of up to 255 entries in
-each of ~1,900 conversation blocks. Three things would each have to hold:
+each of ~1,900 conversation blocks. Two of the three obstacles below are now
+gone - the table location is solved and the identifications propagate - so read
+this list as the record of what the problem looked like before that:
 
 1. the glyph block inside a `RADIO.DAT` conversation has to be located - the
    `.gcx` case is solved and this one is not yet parsed;
