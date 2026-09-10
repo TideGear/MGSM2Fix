@@ -427,6 +427,57 @@ This is why the same code means different characters in different places:
 `0x9601`, and the *same* commentary sentence appears at three offsets using
 different bank-1 codes each time.
 
+### Finishing bank 1: three sources done, the commentary measured
+
+Bank 1 is a per-block table, so there is no global mapping to build - each
+`(stage, code)` pair is its own question. The 90 distinct glyph *shapes* the
+remaining Japanese actually uses were identified by pairing two weak signals:
+
+* **an OCR shortlist.** `glyphocr.py` renders every JIS level 1 character at
+  96px, area-averages to 12x12 and scores by zero-mean normalised correlation.
+  Measured against the 238 hand-transcribed `0x90` kanji - a real labelled test
+  set from the same font - it gets **47% top-1, 59% top-3**. Not usable alone,
+  and the errors say why: 鏡→鎌, 線→緑, 減→滅. At 12x12 those are the same
+  picture.
+* **the decoded context.** With 87% of each sentence already readable, the gap
+  is usually forced. 「⟪9A50⟫入ドック」 narrows a shortlist to almost nothing;
+  「作戦⟪9A01⟫⟪9A02⟫」 is 作戦記録; 「変更内容を⟪910B⟫書き保存」 pins 上; and
+  the staff roll is MGS1's own opening text, which pins 二/万/五/千 outright:
+  「1980年代、世界には常時五万発以上の核兵器が存在した。」
+
+82 of the 90 shapes fell to that combination. The result:
+
+| source | kana/kanji | unresolved | readable |
+|---|---:|---:|---:|
+| `DEMO.DAT` | 7,150 | 0 | **100%** |
+| `VOX.DAT` | 4,472 | 0 | **100%** |
+| `STAGE.DIR` | 1,718 | 27 | **98.4%** |
+| `RADIO.DAT` | 3,304,914 | 541,920 | 83.6% |
+
+**And it found two errors in the hand transcription.** `0x9027` was read as 告
+and is 書 - 「上書き保存」 and 「解説書」 both demand it - and `0x90E4` was read
+as 問 and is 間, because 「1⟪90E4⟫」 in the rank screen is 1週間. Neither was
+visible by squinting at the glyph a second time; both were obvious the moment a
+sentence had to make sense. That is the argument for context over eyesight, and
+it applies to the 238 as much as to the 90.
+
+### Why `RADIO.DAT`'s 12.8% is not finishable the same way
+
+The commentary uses **541,920 bank-1 glyphs**, in tables of up to 255 entries in
+each of ~1,900 conversation blocks. Three things would each have to hold:
+
+1. the glyph block inside a `RADIO.DAT` conversation has to be located - the
+   `.gcx` case is solved and this one is not yet parsed;
+2. every distinct shape across all those blocks has to be *recognised*, and
+   locating a table yields bitmaps, not characters;
+3. at 47% top-1, OCR cannot do step 2 alone, and there is far too much of it for
+   the context trick, which needs a human reading each sentence.
+
+So the honest position is that three of the four sources are done and the
+commentary is bounded and costed rather than finished. Publishing a 47%-accurate
+kanji table would put wrong Japanese into a document that looks authoritative,
+which is worse than leaving `⟪9601⟫` visible.
+
 ### What remains is recognition, not reverse engineering
 
 Locating a block's table yields **bitmaps, not characters** - something still has
