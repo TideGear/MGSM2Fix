@@ -442,8 +442,12 @@ remaining Japanese actually uses were identified by pairing two weak signals:
 * **the decoded context.** With 87% of each sentence already readable, the gap
   is usually forced. 「⟪9A50⟫入ドック」 narrows a shortlist to almost nothing;
   「作戦⟪9A01⟫⟪9A02⟫」 is 作戦記録; 「変更内容を⟪910B⟫書き保存」 pins 上; and
-  the staff roll is MGS1's own opening text, which pins 二/万/五/千 outright:
-  「1980年代、世界には常時五万発以上の核兵器が存在した。」
+  the staff roll is MGS1's own opening text, which pins 二/万/千 outright:
+  「1980年代、世界には常時六万発以上の核兵器が存在した。」
+  **Corrected 2026-09-10:** that glyph was transcribed 五 and is 六. The roll gives
+  no way to tell them apart at 12 pixels; `RADIO.DAT` does, twice (第六感, and
+  レイブンは六人もの人間を運んだ against a 四人運び record), and so does the
+  history: the stockpile peaked near 60,000, not 50,000.
 
 82 of the 90 shapes fell to that combination. The result:
 
@@ -451,8 +455,10 @@ remaining Japanese actually uses were identified by pairing two weak signals:
 |---|---:|---:|---:|
 | `DEMO.DAT` | 7,150 | 0 | **100%** |
 | `VOX.DAT` | 4,472 | 0 | **100%** |
-| `STAGE.DIR` | 1,718 | 27 | **98.4%** |
-| `RADIO.DAT` | 3,304,914 | 541,920 | 83.6% |
+| `STAGE.DIR` | 1,718 | 2 | **99.9%** |
+| `RADIO.DAT` | 3,304,914 | 0 | **100%** |
+
+*(updated 2026-09-10: every bank-1 shape the inventory contains is now identified - see §18 of `NextSteps.md`. The `STAGE.DIR` residue is one glyph, `('title', 0x9A27)`, used twice. **These percentages are over `japanese-inventory.tsv`, which holds 85.2% of the commentary's glyph instances** - its scanner ends a run at any code it does not recognise, and `0x91xx` and `0x97xx` carry real text. §18, "Where the number stops", has the measurement.)*
 
 **And it found two errors in the hand transcription.** `0x9027` was read as 告
 and is 書 - 「上書き保存」 and 「解説書」 both demand it - and `0x90E4` was read
@@ -522,7 +528,21 @@ cautionary result - without an anchor to start from, the test cannot tell a font
 cell from any other 36 bytes, and the answer was garbage rather than merely
 imprecise.
 
-### Why `RADIO.DAT`'s 12.8% needs 1,735 more glyph identifications
+### DONE (2026-09-10): the 12.8% is identified, and the count was wrong
+
+**Everything from here to "The dump, and the scope it is drawn to" is the record
+of the problem before it was solved. Read it for the method, not the numbers.**
+
+The commentary needed **1,200** more glyph identifications, not 1,735; the larger
+figure came from a fragment map that was wrong for 93% of strings and so
+manufactured bitmaps no font contains. `radiomap.py` rebuilt the map from the
+game's own record-list parser plus the 192 fragment extents its radio codes
+declare, and `glyphsheets.py` / `glyphfill.py` / `glyphreview.py` named all
+1,200. Coverage is **100.00%** and the dump is regenerated. §18 of
+`NextSteps.md` has the full account, including the five characters this work
+proved wrong in the tables above.
+
+### Why `RADIO.DAT`'s 12.8% looked like it needed 1,735 more identifications
 
 The commentary uses **541,920 bank-1 glyphs**, in tables of up to 255 entries in
 each of ~1,900 conversation blocks. Two of the three obstacles below are now

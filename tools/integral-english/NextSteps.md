@@ -7,8 +7,10 @@ when the **VR disc** was ported (§11), and through 2026-09-07, the day the VR
 disc was tested on screen and the three items that were still open all closed:
 the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12), and through
 2026-09-09, when the untranslated Japanese was dumped and the glyph
-identification was set up as the one open task (§17 has a START HERE block
-for it), and on
+identification was set up as the one open task (§17), and on 2026-09-10,
+when that task was finished - all 1,200 bank-1 glyphs named, 100% of the
+Japanese readable as text, and the fragment map §17 rested on found to be
+wrong for 93% of strings and rebuilt (§18) - and on
 2026-09-08, when the housekeeping was cleared, the sweep's one uncovered
 finding became the `en_pad2` family, the three sweeps §5 had filed under "to
 investigate" were all run, and the four `abst` location names were decided
@@ -1802,39 +1804,23 @@ structural rather than careless.
 
 ## 17. The 2026-09-09 pass: the untranslated Japanese, dumped — and what to do next
 
-### START HERE if you are picking this up to identify the glyphs
+### DONE - see §18
 
-The work is set up and the remaining step is **naming 1,813 glyph shapes**. Do it
-early in a session: reading images has a per-conversation budget that runs out
-after roughly 15-18 of them, and that is what stopped the last attempt.
+The glyph identification is finished: **all 1,200 shapes are named and 100.00%
+of the Japanese decodes**. Two things this section said are wrong and are
+corrected in §18, because they matter more than the fact that the job is done:
 
-1. Open `work/glyphs-to-identify.pdf` — **38 pages, 1,813 glyphs**, ordered by
-   how often each occurs, each cell labelled `gN`. (`work/glyphpages/pageNN.png`
-   is the same thing as images, for tools that cannot read PDF.)
-2. Write each character into the `char` column of
-   `work/glyphs-to-identify.tsv`, matched by the `id` column.
-3. `py jptext.py` — it loads that TSV through `load_shape_table()` and reports
-   coverage. It should climb from 87.2% toward 100%.
-4. `py dumpjp.py` to regenerate the line dump with the new text.
+* **"1,813 glyph shapes"** was an artefact. The real count is **1,200**; the
+  extra 613 came from a fragment map that was wrong for 93% of strings.
+* **"Two rules give 100.000% (94,246 of 94,246 strings)"** measured that every
+  string got *an* answer, which the rule guarantees. It was not a check. The
+  check is how many distinct 12x12 bitmaps the text lookups produce: 91,834
+  then, 1,200 now. `radiomap.py` prints it.
 
-**Only disc 1 needs doing.** The commentary region is byte-identical on both
-discs (`0x042C54C`-`0x0AAC050`, sha256 `93b96e43…` on each), so disc 2's
-`RADIO.DAT` dump is a duplicate; only the story regions differ, and those are
-out of scope.
-
-**Naming a glyph once names it everywhere.** Bank 1 is a per-block table, so
-`code -> shape` differs between blocks - `⟪965A⟫` is a different character in
-different conversations and a code-to-character mapping is meaningless. But
-`shape -> character` is global, which is why the TSV is keyed on `shape_hex`.
-Proof: the 78 shapes named for the stage archives turn up byte-identical inside
-`RADIO.DAT` 150-220 times each.
-
-**Check the result, do not trust it.** Expect 85-95% from isolated glyphs. The
-238-glyph pass earlier ran at ~99% only because consecutive codes there spelled
-words; its two real errors (書 read as 告, 間 as 問) survived a second look at
-the bitmap and fell instantly to a sentence that had to make sense. At 12x12,
-線/緑, 鏡/鎌 and 間/問 are the same picture. So after transcribing, read decoded
-sentences and fix what does not form words.
+The image budget this section warns about also turned out to be the wrong
+worry. The whole pass cost eleven images, because the glyphs were read against
+decoded sentences (`glyphsheets.py` writes them beside each page) rather than
+by squinting harder at 144 pixels.
 
 ### The scope, which is the user's decision and narrows this a lot
 
@@ -1921,3 +1907,181 @@ apples-to-apples comparison - and it failed because **Konami drew their own
 wrong shape: `manga-ocr` and Tesseract recognise text *lines* at real
 resolution, and the input here is 144 pixels, where the glyph *is* a specific
 bitmap design rather than a picture of a character.
+
+## 18. The 2026-09-10 pass: the commentary is readable, and the map it rested on was wrong
+
+**All 1,200 bank-1 glyph shapes are identified: 100.00% of the glyph codes in
+`japanese-inventory.tsv` now decode to text.** Read that qualifier - it is
+load-bearing, and "Where the number stops" below says exactly what it excludes.
+The developer commentary §16 found is no longer a stack of pictures; it is
+156,379 lines of readable Japanese in `work/jpdump/disc1_RADIO_DAT.txt` (plain
+text, conversations separated by a blank line) and `work/jpdump/index.tsv`
+(one row per line, with offsets and raw codes). The channel says what it is in
+its own words:
+
+> この周波数では「メタルギアソリッド」制作スタッフによる制作過程での裏話などをお伝えします。
+> なお、この周波数のみ字幕言語設定が英語の場合でも日本語で表示されます。
+
+That second sentence is the game telling you §16's conclusion directly: this
+frequency stays Japanese even with the language set to English. There is no
+English to port and the standing no-translation rule leaves it alone.
+
+### The thing to learn from this pass
+
+§17 set up the glyph work on a fragment map that was **wrong for 93% of
+strings**, and said so in the language of certainty: "Two rules give 100.000%
+(94,246 of 94,246 strings)". That number counted strings that got *an* answer.
+It could not have counted anything else — the rule always terminates.
+
+One cheap measure exposes it. Bank-1 codes index a font, so resolving them
+yields 12x12 bitmaps; **count the distinct ones.** A Japanese font has a couple
+of thousand. The old map produced **91,834**, and only 9.8% of them had the
+blank twelfth row that every real glyph in this font has. The current map
+produces **1,200**, all of them with it.
+
+So: when a walk over data reports a percentage, ask what the percentage would
+look like if the walk were wrong. If the answer is "the same", it is not a
+check. `radiomap.py` prints the distinct-bitmap count for exactly this reason —
+that is the number to look at, not the share of strings attributed.
+
+### What the map is now (`radiomap.py`)
+
+Two things fixed it, both from reading the game rather than the bytes.
+
+* **Parse the script.** A `RADIO.DAT` fragment's script is not GCL; it is a
+  record list of its own (`menu_gcl_exec_block_800478B4`, `menu/radiomes.c`):
+  `FF <code> <BE16 size> <payload>`, next record at `+size+2`, a 0 byte ends it,
+  and the font blob sits at `script + totalSize + 1`. Walking those records is
+  self-checking — a sector that is not a fragment desynchronises within a record
+  or two. 597 of 5,468 sectors survive, and the first ends at exactly `0x1B1`,
+  the value §17 had proved independently.
+* **Get an answer key.** Fragments are named by "radio codes", unpacked by
+  `sub_80047D70`: `startSector = code & 0xFFFF`, Japanese `(code >> 24)` sectors
+  there, English `((code >> 16) & 0xFF)` sectors immediately after. The codes are
+  arguments to the GCL `radio` command (id `0x24E1`, `GV_StrCode("radio")`,
+  `game/script.c`) in the stage scripts; 192 are recoverable. **All 192 Japanese
+  starts and all 192 English starts are among the 597 the parse found, and no
+  declared extent is overrun.** That is what makes the parse trustworthy instead
+  of merely plausible.
+
+A nested `IF`/`SWITCH` body has the same header as a fragment, so one that lands
+8 bytes after a sector boundary parses like one. Dropping every candidate inside
+another candidate's script region removes all 28 such cases the radio codes prove
+false and none of the 384 they prove true, leaving **553 fragments**: 26 of
+94,246 strings unattributed, zero glyph over-runs.
+
+Note the layout this exposes: **Integral's `RADIO.DAT` stores each conversation
+twice, Japanese then English, adjacent**, and one runtime flag picks the half.
+
+### How the 1,200 were named, and how good it is
+
+Not by looking harder at 144 pixels. `glyphsheets.py` now writes, beside each
+page of glyphs, a `.txt` of **real lines from the game with the glyph marked and
+everything already readable spelled out**. At 12x12 線/緑, 鏡/鎌 and 間/問 are
+the same picture; in a sentence they are not. The bitmap says which characters
+are possible and the sentence says which one it is. Every case where the two
+disagreed, the sentence was right: 望 was 量 (大量に分泌), 屈 was 肩 (肩もみ),
+惜 was 情 (情報), 問 was 聞 (直接聞くさ), 昔 was 替 (すり替えた).
+
+Then `glyphreview.py --verify` prints **one full decoded sentence per glyph, all
+1,200**, and they get read. That is what catches the rest: 黙 and 弄 had been
+swapped ("なぜ今まで黙っていた" / "…のように弄ばれつづけた"), and two more fell
+to comparing a bitmap against its near-twin — 完 was 璧 (identical to 壁 in its
+top three rows, with 玉 below where 壁 has 土) and 朴 was 林.
+
+**Measured, not asserted:** 78 shapes had already been identified from the stage
+archives, and `glyphsheets.py` puts them on the sheets unmarked with the answers
+in `work/glyph-answers.tsv`. **78 of 78 correct.** Two of those 78 were scored
+wrong at first and turned out to be errors in the *key* (below), which is the
+only reason to trust the other 76.
+
+The whole pass cost **11 images**: eight sheet pages, two magnified sheets for
+the name kanji that no sentence can check, and one single glyph.
+
+### Five characters in the existing tables were wrong
+
+The complete decode makes bank-0 mistakes visible, because a wrong bank-0
+character now sits in an otherwise readable sentence.
+
+| where | was | is | the sentence that settles it |
+|---|---|---|---|
+| `GLYPH_90[0x9078]` | 句 | **匂** | 硝煙の匂いがなつかしいぜ |
+| `GLYPH_90[0x90A5]` | 端 | **奪** | 力を奪う事ができる / メリルに服を奪われて |
+| `GLYPH_90[0x90D0]` | 継 | **繊** | 筋繊維を刺激してみたの / 大胆にして繊細 |
+| `BANK1[('roll',0x9A05)]` | 五 | **六** | レイブンは六人もの人間を運んだ (against 四人運び) / 第六感 |
+| `BANK1[('rank',0x9A0D)]` | 液 | **清** | ウイルス兵器だ。必ず血清がある |
+
+All five are fixed in `jptext.py`. The 五/六 one is worth dwelling on: it was
+"proved" by 二万五千 in the staff roll, and the roll gives no way to tell 五 from
+六 at 12 pixels. `RADIO.DAT` does, twice.
+
+### An invariant worth keeping
+
+**Bank 0 and bank 1 never share a bitmap, and — once those five are corrected —
+never share a character either.** All 1,200 bank-1 shapes were compared against
+every glyph in `font.res`: not one matches. So a character bank 0 already has
+(the 255 kanji of `GLYPH_90`, the kana, the punctuation) cannot be the answer to
+a bank-1 glyph, and `glyphfill.py` warns when an assignment breaks that. Every
+warning it raised in this pass was a real error — three in `GLYPH_90`, none in
+the new work.
+
+### Where the number stops, measured the day it was claimed
+
+The 100% is over `japanese-inventory.tsv`, and **the inventory is not the
+file**. `jplist`'s scanner walks for runs of glyph codes and **ends a run at
+any code it does not recognise**, so text after such a code starts a new row
+and the code itself is dropped. Two ranges it does not recognise carry real
+text:
+
+* **`0x91xx`** - bank 0's second kanji page. `GLYPH_90` covers `0x90xx` and
+  only four characters of `0x91xx` were ever identified, so the scanner treats
+  the rest as "not Japanese".
+* **`0x97xx`** - bank 1 above index 255. The README says bank-1 codes "never
+  leave `0x9601`-`0x96FF`"; that is wrong. The commentary's font blobs hold up
+  to **441** glyphs and the codes run straight on into `0x97xx`.
+
+The symptom is visible in the dump: 「無限バンダナは制作チーム内では昆」 - the
+布 of 昆布 is `0x9106`, the run stops on it, and the next row begins after it.
+
+Measured over the commentary region, counting only codes that resolve to a
+glyph passing the blank-twelfth-row test:
+
+| | glyph instances |
+|---|---:|
+| captured by the inventory (all decode) | 1,729,477 |
+| **skipped by the inventory** | **301,473** (14.8%) |
+|  of those, decodable with today's tables | 287,601 (95.4%) |
+|  needing new identifications | 13,872 (0.68% of the commentary) |
+
+So the shape table holds up well on the text it never saw - 640 of the 653
+distinct bank-1 shapes in the skipped bytes are already named. What is missing
+is small and specific: **13 bank-1 shapes** and **23 bank-0 codes**, the
+commonest being `0x9101` (2,538 uses), `0x8F65` (2,198), `0x9110` (1,754) and
+`0x910C` (1,712).
+
+**The next job, in order:** extract text from the parsed `TALK` records instead
+of scanning bytes - `radiomap.walk_block` already gives the records, and
+recursing into `IF`/`SWITCH` bodies is the missing piece - then name those 36
+characters. That takes the commentary from 85.2% of its glyphs to all of them.
+
+And note what this is an instance of. §16 said: *when a claim of completeness
+is made, say what it ranges over.* The claim above ranged over the inventory
+and was written as if it ranged over the disc, one section after that lesson
+was recorded. The habit does not install itself.
+
+### What is left
+
+* **One glyph, two uses.** `('title', 0x9A27)` in 「⟪9A27⟫のラブソング」, a
+  demo-theater label in the stage archive. Its bitmap is mostly mid-tone rather
+  than stroke-and-background, so it may not be a kanji at all; it was
+  unidentified before this pass too. 2 uses out of 4.2 million.
+* **The VR disc's stage text is not in the dump.** `dumpjp.collect` takes discs
+  1 and 2; `japanese-inventory.tsv` labels the VR archive's rows `vr` and they
+  are skipped, so ten bank-1 code uses in `vrtitle` (「FOXDIEの…」,
+  「これでスネークは助かる」) are neither rendered nor decoded. Small, and a
+  separate job from this one.
+* **`dumpjp.stage_blobs` assumes one font blob per stage.** `roll` and `abst`
+  have two. It takes the first, which is right for everything checked so far.
+* **Nothing here changes the port's scope.** USA never shipped the commentary,
+  so there is no English to copy. What changed is that the Japanese can now be
+  read, by anyone, as text.

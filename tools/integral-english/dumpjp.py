@@ -23,26 +23,19 @@ signature in the stage archive. Bank 1 is per-block, and the block carries it:
 
 * a `.gcx` script ends with a font blob - `parse_gcx` reads it as `font` - and
   `0x9A01 + i` indexes it.
-* a `RADIO.DAT` fragment carries its own, and the offset is not guesswork. The
-  game's parser says exactly where (`menu/radiomes.c`,
-  `menu_radio_codec_task_proc_80047AA0`):
+* a `RADIO.DAT` fragment carries its own, and finding the fragment a string
+  belongs to is `radiomap.py`'s job - read its docstring before touching any
+  of this. The short version: the fragment list comes from parsing each
+  candidate sector's record list (`menu_gcl_exec_block_800478B4`) and is
+  checked against the 192 fragment extents the game's own radio codes declare.
 
-      radioDatIter   = fragment + 8
-      fontAddrOffset = BE16(radioDatIter + 1) + 1
-      font_set_font_addr(1, radioDatIter + fontAddrOffset)
-
-  so `base = fragment + 9 + BE16(fragment + 9)`, and fragments are sector
-  aligned because they are loaded with `FS_LoadFileRequest(1, startSector, ...)`.
-  Fragment 0 gives `0x1B1`, which is the value proved independently by finding
-  the single place in 11 MB where 本 is immediately followed by 出 (they sit at
-  adjacent indices in that conversation). 99.4% of the file's strings fall
-  inside their fragment's text region, which is the check that the walk is
-  right.
-
-Reading the parser is what made this exact. Two earlier attempts to infer the
-base from the data - "first plausible run after the text", then coordinate
-ascent on repeated-sentence agreement - reached 55-61% and would have produced
-a neat document full of wrong glyphs.
+An earlier version of this file inferred the base with a heuristic and was
+wrong for 93% of strings while reporting "100.000% attributed"; the dump it
+produced was a neat 2,763-page document full of wrong glyphs. The measure that
+catches that is the number of DISTINCT bitmaps the text lookups produce - a
+Japanese font has a couple of thousand, and the heuristic produced 91,834.
+`radiomap.py` prints that number; check it, not the share of strings that got
+an answer.
 """
 import argparse
 import bisect
@@ -61,6 +54,7 @@ import abst_build
 import jptext
 import mainsweep
 import portio
+import radiomap
 import rendertext
 import vr_sweep
 from audit_text import game_text
@@ -149,41 +143,6 @@ def render_line(text, fonts, blob):
     return im
 
 
-def radio_fragments(d, offs, ends):
-    """(fragment, bank-1 base) candidates, and an exact string->fragment map.
-
-    Fragments are sector ALIGNED but multi-sector - `size = (radioCode /
-    0x1000000) * 2048` - so every sector is a candidate start, a mid-fragment
-    sector can produce a sane-looking base by accident, and the true start can
-    be tens of KB behind a given string. Two rules settle it: a candidate must
-    actually contain a string in its text region, and a string belongs to the
-    nearest candidate behind it that covers it. Searching only 32 KB back left
-    5% of strings unattributed; 128 KB reaches 100.000%.
-    """
-    cands = []
-    for frag in range(0, len(d), 2048):
-        if frag + 11 > len(d):
-            break
-        base = frag + 9 + struct.unpack_from('>H', d, frag + 9)[0]
-        if not (frag + 12 < base <= frag + 0x20000) or base + GLYPH > len(d):
-            continue
-        lo = bisect.bisect_left(offs, frag + 8)
-        hi = bisect.bisect_left(offs, base)
-        if hi <= lo:
-            continue
-        cands.append((frag, base))
-    starts = [c[0] for c in cands]
-    attrib = {}
-    for o in offs:
-        i = bisect.bisect_right(starts, o) - 1
-        while i >= 0 and o - cands[i][0] <= 0x20000:
-            frag, base = cands[i]
-            if frag + 8 <= o < base:
-                attrib[o] = base
-                break
-            i -= 1
-    return cands, attrib
-
 def collect(disc_ix, scope='unported'):
     """(source, key, offset, text, blob) for every in-scope Japanese line.
 
@@ -201,25 +160,15 @@ def collect(disc_ix, scope='unported'):
         fh.readline()
         rows = [l.rstrip(chr(10)).split(chr(9)) for l in fh]
     rows = [f for f in rows if len(f) >= 7 and f[0] == want]
-    radio_rows = sorted((int(f[2], 16), int(f[3])) for f in rows if f[1] == 'RADIO.DAT')
-    offs = [r[0] for r in radio_rows]
-    ends = {o: o + n for o, n in radio_rows}
-    image = Disc(CONTAINER, INTEGRAL_IMAGES[disc_ix])
-    try:
-        files = {n.upper(): (l, s2) for n, l, s2, dd in image.walk() if not dd}
-        lba, size = files['/MGS/RADIO.DAT;1']
-        radio = image.read(lba, size)
-        cands, attrib = radio_fragments(radio, offs, ends)
-    finally:
-        image.f.close()
+    m = radiomap.build(disc_ix, verbose=False)
     for f in rows:
         src, off, text = f[1], int(f[2], 16), f[6]
         if src == 'RADIO.DAT':
             if scope == 'unported' and not (STORY_END <= off < COMMENTARY_END):
                 continue
-            base = attrib.get(off)
-            blob = radio[base:base + GLYPH*256] if base else None
-            out.append((src, 'base%07X' % (base or 0), off, text, blob))
+            at = m['base_of'].get(off)
+            blob = radiomap.blob_of(m, off)
+            out.append((src, 'base%07X' % (at[0] if at else 0), off, text, blob))
         elif src in ('DEMO.DAT', 'VOX.DAT'):
             out.append((src, src, off, text, None))
         elif src.startswith('STAGE.DIR/'):
@@ -250,14 +199,14 @@ def stage_blobs(disc_ix):
     return out
 
 
-def text_with_bank1(text, blob):
+def text_with_bank1(text, blob, stage=None):
     """decode, resolving bank-1 codes through the block font + shape table.
 
     This is what lets the text output grow toward 100% on its own: every glyph
     named in `glyphs-to-identify.tsv` resolves here from that moment on, in
     every block that reuses the same bitmap."""
     if blob is None:
-        return jptext.decode(text)
+        return jptext.decode(text, stage)
     out = text
     for c in set(CODE.findall(text)):
         v = int(c, 16) & ~0x6000
@@ -274,7 +223,7 @@ def text_with_bank1(text, blob):
         ch = jptext.char_for_shape(raw)
         if ch:
             out = out.replace('<%s>' % c, ch)
-    return jptext.decode(out)
+    return jptext.decode(out, stage)
 
 
 def main():
@@ -314,6 +263,11 @@ def main():
             H = N * 3 * args.scale
             pdfname = '%s/disc%d_%s' % (args.out, disc_ix + 1, src.replace('.', '_'))
             os.makedirs(pdfname, exist_ok=True)
+            plain = io.open(pdfname + '.txt', 'w', encoding='utf-8', newline='')
+            plain.write('# %s, disc %d - every line, in file order, decoded.\n'
+                        '# A blank line separates conversations.\n\n'
+                        % (src, disc_ix + 1))
+            last_key = None
             for key, off, text, blob in items:
                 use = blob if blob is not None else blobs.get(key)
                 im = render_line(text, fonts, use)
@@ -327,14 +281,23 @@ def main():
                 big = im.resize((im.width * args.scale, im.height * args.scale), Image.NEAREST)
                 page.paste(big.crop((0, 0, min(big.width, 1000), big.height)), (90, row * H))
                 ImageDraw.Draw(page).text((4, row * H + 4), '%d' % (total + 1), fill=170)
+                said = text_with_bank1(text, use,
+                                       key if src == 'STAGE.DIR' else None)
+                if key != last_key:
+                    if last_key is not None:
+                        plain.write('\n')
+                    plain.write('--- %s ---\n' % key)
+                    last_key = key
+                plain.write('%s\n' % said.replace('#N', '\n'))
                 index.write('%s\t%s\t%s\t0x%X\t%d\t%d\t%s\t%s\n'
                             % ('disc%d' % (disc_ix + 1), src, key, off,
                                len(pages) + 1, row + 1,
-                               text_with_bank1(text, use).replace('\t', ' '), text))
+                               said.replace('\t', ' '), text))
                 row += 1
                 total += 1
             if page is not None:
                 pages.append(page)
+            plain.close()
             if not pages:
                 continue
             inv = [p.point(lambda v: 255 - v) for p in pages]
