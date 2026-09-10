@@ -251,6 +251,40 @@ BANK1 = {
     ('title', 0x9A26): '杯',
 }
 
+# Shape table: 36-byte glyph bitmap (hex) -> character. Bank 1 is per-block, so
+# `code -> shape` differs between blocks, but `shape -> character` is GLOBAL -
+# proven by the 78 stage-archive shapes turning up byte-identical inside
+# RADIO.DAT 150-220 times each. So naming a glyph once names it everywhere.
+# `glyphsheets.py` writes the glyphs out for transcription; fill the `char`
+# column of work/glyphs-to-identify.tsv and this picks them up.
+SHAPES = {}
+
+
+def load_shape_table(path=None):
+    """shape_hex -> character, from a transcribed glyphsheets.py TSV"""
+    path = path or (WORK + '/glyphs-to-identify.tsv')
+    if not os.path.exists(path):
+        return SHAPES
+    with io.open(path, encoding='utf-8') as fh:
+        head = fh.readline().rstrip('\n').split('\t')
+        try:
+            ci, si = head.index('char'), head.index('shape_hex')
+        except ValueError:
+            return SHAPES
+        for line in fh:
+            f = line.rstrip('\n').split('\t')
+            if len(f) > max(ci, si) and f[ci].strip():
+                SHAPES[f[si].strip()] = f[ci].strip()
+    return SHAPES
+
+
+def char_for_shape(raw36):
+    """a glyph bitmap -> character, once the shape table has been filled in"""
+    if not SHAPES:
+        load_shape_table()
+    return SHAPES.get(raw36.hex())
+
+
 STYLE = 0x6000      # colour/emphasis bits, not part of the glyph index
 
 

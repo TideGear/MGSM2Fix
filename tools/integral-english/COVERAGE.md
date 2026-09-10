@@ -556,6 +556,66 @@ text is story narration and dialogue (「そしてテロリストの核発射」
 「け入れられない場合核を発射すると」), not the sound-design commentary the
 single rendered sample had suggested.
 
+### The 1,735: no font can look them up, so they are rendered for transcription
+
+Two reference fonts were tried and both are recorded because the second one was
+the *right* idea and still failed:
+
+| reference | how it was matched | top-1 |
+|---|---|---:|
+| MS Gothic / Meiryo, 96px rasterised then area-averaged to 12x12 | zero-mean normalised correlation, ink-ratio gate | **47%** |
+| **Shinonome 12-dot** (MIT/public domain, native JIS X 0208 at exactly 12 dots) | exact bitmap, then Hamming with ±1 shifts | **0% exact, 5.9% fuzzy** |
+
+Shinonome should have been the answer - a native 12-dot bitmap font is the
+apples-to-apples comparison, and 6,879 glyphs of it were parsed and tested. Not
+one game glyph matches it exactly, and fuzzy matching is *worse* than the
+outline font. **Konami drew their own 12x12 design**, so there is no font on
+earth to look these up in, and the remaining work is recognition by eye.
+
+`glyphsheets.py` therefore renders them for a person - or a multimodal model -
+to read:
+
+    py glyphsheets.py     -> work/glyphs-to-identify.pdf   38 pages, 1,813 glyphs
+                          -> work/glyphpages/pageNN.png    the same, as images
+                          -> work/glyphs-to-identify.tsv   id, occurrences, char, shape_hex
+
+Glyphs are ordered **by how often they occur**, so a partial pass buys the most
+text - the first few hundred cover most of the commentary's characters. Fill the
+`char` column and `jptext.load_shape_table()` picks it up; naming a glyph once
+names it everywhere, because `shape -> character` is global.
+
+**Expect 85-95% accuracy from isolated glyphs, and know where the errors will
+be.** The 238-glyph pass ran at ~99%, but only because consecutive codes there
+spelled words - context was doing the work. Two of its errors (書 read as 告,
+間 as 問) survived a second look at the bitmap and fell instantly to a sentence
+that had to make sense. At 12x12, 線/緑, 鏡/鎌 and 間/問 are the same picture.
+So a transcription pass should be **checked against context afterwards**, not
+trusted on its own.
+
+### Rendering sentences instead: better, and blocked on one number
+
+Reading a sentence beats reading a glyph, for the same reason context beat
+eyesight above: each image carries several unknown kanji, and the kana are
+already known exactly, so a transcript whose kana do not line up is *detected*
+rather than silently accepted. That needs each conversation's table base, and
+the base work is close but not finished:
+
+* conversations grouped: **389**; bases pinned: **333**
+* the alignment signal is **phase** - at the true base every glyph cell's
+  bottom row is blank, because the font leaves a bottom margin. Picking the
+  phase took known-glyph agreement from 3 conversations to **317**
+* conversation 0's base comes out `0x1B1`, matching the value proved
+  independently from the 本/出 adjacency
+* but repeated sentences - 1,085 groups appearing 2+ times with *different*
+  code assignments - agree only **61.5%** of the time after coordinate ascent
+  over ±4 index shifts
+
+Some of that 38% is not misalignment: the grouping key strips codes, so two
+sentences with the same kana skeleton and genuinely different kanji are counted
+as disagreeing. Separating those two causes is the next step, and until it is
+done sentence rendering would produce a confident-looking document with wrong
+glyphs in it - which is the failure mode this whole exercise is trying to avoid.
+
 ## Reproduce the inventory
 
 ```powershell
