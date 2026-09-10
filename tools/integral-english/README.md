@@ -3790,8 +3790,14 @@ NEW GAME loads. The log agrees: `scene_name "title" -> "d00a"`.
 **Language.** The 1P game ran in Japanese although English was selected. The
 language is GM_CONFIG_ENGLISH (0x0100) in GM_Configuration (linkvarbuf[2],
 0x800B4D9C; MGSM2Fix's `language_setting` define is that word's high byte,
-0xB4D9D, mask 1; `radio.c`, `radiomes.c`, `jimctrl.c`, `movie.c`,
-`font_draw_string` all test the bit at draw time). Everything that could clear
+0xB4D9D, mask 1. Exactly four places act on the bit: `radiomes.c:526` picks
+the English half of a codec fragment, `radio.c:1320` picks `NO RESPONSE` over
+its Japanese twin, `movie.c:54` `MovieType` and `jimctrl.c:390` pick the
+stream. `opt.c` sets it and reflects it into the option row; nothing else in
+the decomp reads it. **`font_draw_string` does not** - an earlier version of
+this line said it did, and the correction matters: no text draws differently
+because of this bit, so nothing this port wrote in place depends on it).
+Everything that could clear
 the bit was checked against the decomp and the binaries, and nothing on this
 path does:
 
