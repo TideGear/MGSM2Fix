@@ -3764,6 +3764,28 @@ the true (label −8) address. This is also why the USA release build's
 `demo_rank` chain read as nonsense on first sight ("default 4"): the labels
 were off, not the code.
 
+### The briefing row box is broken on a real disc (open, 2026-09-10)
+
+`en_brf`'s `ROW_H` - eleven instructions at `0x800C69C8`, inside
+`set_row_box(work, i, y, advance)` at `0x800C69B4` - corrupts the briefing's
+right column on hardware and on an accurate emulator. The Master Collection
+renders the same bytes cleanly, which is why it went unnoticed: the failure
+depends on what the primitive buffer already held.
+
+Retail sets the box to `[y, y+13]` and normalises the quad's X corners. The
+port made the box `[y - (v0 & 7), + (v2 - v0)]`, reading the row's height and
+shift out of the polygon's own texture coordinates, and dropped the X
+normalisation to afford the arithmetic. Both new terms are wrong, for the
+same underlying reason: **that routine also draws rows that are not textured
+labels**, and for those the UV bytes mean nothing. Tested separately on
+screen - the shift alone misaligns rows, the height alone smears them.
+
+`NextSteps.md` §24 has the full bisect, the four diagnostic switches in
+`brf_build.py`, the proven way to deliver a longer replacement (a routine
+appended past the overlay's end, reached by a jump - the game itself loads
+169 KB overlays at that address, so the room is real), and the reason the next
+step is reverse engineering the callers rather than another formula.
+
 ### 1P MODE (Integral only): its Japanese pages, and the language it starts in
 
 Selecting 1P MODE on the SPECIAL page runs the title script's `-s` proc

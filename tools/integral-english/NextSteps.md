@@ -8,7 +8,9 @@ disc was tested on screen and the three items that were still open all closed:
 the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12), and through
 2026-09-09, when the untranslated Japanese was dumped and the glyph
 identification was set up as the one open task (§17), and on 2026-09-10,
-when that task was finished - all 1,200 bank-1 glyphs named, 100% of the
+when the raw disc booted for the first time and the briefing turned out to
+be broken on it (§24 - `ROW_H`, still open), and when that task was
+finished - all 1,200 bank-1 glyphs named, 100% of the
 Japanese readable as text, and the fragment map §17 rested on found to be
 wrong for 93% of strings and rebuilt (§18), and then the export itself
 finished: the byte scanner retired for a walk of the game's own records, a
@@ -257,7 +259,8 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 |---|---|
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
-| ~~**real engineering**~~ | **The raw disc BOOTED 2026-09-10** and the image is valid (5.4). What is left is not engineering: **submit the pull request** (5.6, five-way split there), and look at the three raw-only screens now that they are reachable |
+| **real engineering** | **The briefing is broken on a real disc and the fix is open** - `ROW_H`, 11 instructions, §24. A good build exists without it (`repro25nocounts`), missing only row spacing. The delivery mechanism for a fix is proven; what is needed is reverse engineering of `0x800C69B4`'s callers, not another formula. Also: **submit the pull request** (5.6), and look at the other two raw-only screens |
+| **needs a fresh pair of eyes** | §24's four untested groups (`s00`, `s00x`, `unshare`, `memadv`, `advances`) - switched off as collateral, never individually retested |
 | ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete, on all three discs: 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. §18 and §19 |
 | **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
@@ -2821,7 +2824,130 @@ A scan for the runtime uploads that `brf_800CAC7C()` performs found nothing
 in the stage - it pages content in from `BRF.DAT` by sector, so the data is
 outside every payload this toolchain parses.
 
-### The split being tested now
+### RESOLVED TO ONE ROUTINE - read this part first
+
+The bisect finished. **`ROW_H` is the fault**: 11 instructions at `0x800C69C8`,
+inside `set_row_box(work, i, y, advance)` at `0x800C69B4`. Everything else in
+`en_brf` - the texture swap, the VRAM placement, the quad widths, the xl
+moves, the five block rewrites - is innocent.
+
+| build (all disc 1, SwanStation software renderer) | briefing |
+|---|---|
+| retail, unpatched | clean |
+| `en_brf` removed entirely | clean, Japanese |
+| textures + VRAM placement only | clean English, badly squashed |
+| + quad/xl/rule/anim/start-y/connectors (`INTEGRAL_BRF_NO_COUNTS=1`) | **clean English, correct sizes, row spacing wrong** |
+| + counts, - the five block rewrites | striped |
+| `ROW_H` alone | striped |
+| full set | striped |
+
+**`TEST - Disc 1 no counts.bin` is a good disc.** Correct English everywhere;
+the only visible flaw is that `next-generation / special force unit` sits
+cramped, because `ROW_H` - the thing that fixes row spacing - is off in it.
+That build is `D:/mgsbuild/repro25nocounts`.
+
+### What ROW_H does, and why both halves of it are wrong
+
+Retail's eleven words set the row's box to `[y, y+13]` and normalise the
+quad's X corners (left pair take x0, right pair take x3). The port replaced
+them with:
+
+    height = v2 - v0        (bytes at poly+0x1D and poly+0x0D)
+    above  = v0 & 7
+    box    = [y - above, y - above + height]
+
+and, needing six words for that arithmetic in an eleven-word hole, **deleted
+the four X-normalisation stores**.
+
+Tested on screen, each term alone, through the stub described below:
+
+| box | on screen |
+|---|---|
+| `[y, y+13]` - retail, via the stub | **clean** |
+| `[y - above, +13]` - only the shift | bad: rows shifted and overlapping |
+| `[y, y + (v2-v0)]` - only the height | **really bad**: smears |
+| both | bad |
+
+Two different failures with one root cause: **the routine asks the polygon
+for per-label information the polygon does not reliably carry.**
+
+* `above` reads `v0 & 7`, but only the sixteen `br_s*` labels ever had their
+  VRAM row chosen to encode anything (`row_ok`). Every other row this routine
+  draws - and it draws plain decoration too - gets a meaningless 0-7 shift.
+  A 7px shift cannot smear, which is why this failure is layout, not garbage.
+* `height` reads `v2 - v0`, which is the texture height only when the poly is
+  a textured label. On anything else it is two arbitrary bytes.
+
+Guarding on the GPU code byte (`poly+7 & 4`, set for POLY_FT4) so only
+textured quads take the UV path was tried and **did not fix it** - it changed
+the failure from vertical smears to a diagonal fan.
+
+### The delivery mechanism works, and is proven
+
+There is no room at `0x800C69C8` and no free space inside the overlay - not
+one 32-byte zero run in 127,702 bytes. There is room **after** it: every stage
+overlay loads at `0x800C3208`, and the game itself loads `init_ve`
+(169,568 bytes) there against brf's 127,702, so ~41 KB past brf's end is
+scratch. So `ROW_H` becomes `j <stub>` + `nop`, and the stub is appended to the
+overlay, ending `jr $ra` / `addu $v0,$a2,$a3` (the original return value).
+
+**This was verified with a control**: a stub containing retail's exact eleven
+instructions rendered exactly like retail. The jump, the appended memory, the
+return - all sound. `brf_build.py` grows the overlay, `nsect` is recomputed
+from the payload sizes, and the stage goes from 138 to 139 sectors, which
+DUMMY3M slot 128 absorbs (next stage at 384).
+
+So whatever the right formula turns out to be, there is unlimited room to
+write it. That constraint is gone.
+
+### What to do next, and why it is not another formula
+
+The information the routine needs - this row's height and shift - is
+per-label, and the **caller** knows which label it is drawing. The port
+smuggled it through the texture's VRAM position only because it had no spare
+instructions. That constraint no longer applies.
+
+The next step is reverse engineering rather than iteration: disassemble every
+`jal 0x800C69B4` site in `brf_800C62B0` and `brf_800C6E88`, work out what each
+one draws and what poly index it uses, and pass the height in properly. A
+static table indexed by poly slot will **not** work - the same slot draws
+different labels on different pages.
+
+Six formula guesses were tried on screen before this was accepted. Do not try
+a seventh.
+
+### The diagnostic switches, all in `brf_build.py`
+
+    INTEGRAL_BRF_NO_CODE=1        textures + placement only, no geometry
+    INTEGRAL_BRF_NO_REWRITES=1    skip the five block rewrites
+    INTEGRAL_BRF_NO_COUNTS=1      skip all six count/index groups
+    INTEGRAL_BRF_SKIP=a,b,c       skip named groups: rowh s00 s00x
+                                  unshare memadv advances
+    INTEGRAL_BRF_ROWH_MODE=       retail | above | height | both (default)
+    INTEGRAL_BRF_ROWH_PASSTHROUGH=1   the stub runs retail's own eleven words
+
+They are diagnostics, not features. `INTEGRAL_BRF_NO_CODE` also relaxes the
+quad==texture assertion, because with the geometry discarded they legitimately
+disagree.
+
+### Four groups were never tested alone
+
+`INTEGRAL_BRF_NO_COUNTS` turns off six groups. Only `rowh` was isolated and
+shown guilty. **`s00`, `s00x`, `unshare`, `memadv` and `advances` may be
+perfectly fine** - they were switched off as collateral and never individually
+retested. Before shipping anything with `rowh` disabled, turn those four back
+on and check, or the disc is missing layout work it did not need to lose.
+
+### A measurement that lied, worth keeping
+
+Scoring the screenshots programmatically - lit pixels and tall runs in the
+right column - reported the `above` build as **cleaner than the control**. It
+was not; the user's eyes said bad. Corrupted rows overlapping each other light
+*fewer* pixels than correct text does, so the metric was anti-correlated with
+correctness in exactly the case it was built to judge. §21 already records two
+metrics that failed this way. Three now.
+
+### The old plan, kept for its reasoning
 
 `en_brf` does two separable things, and only one of them was tuned by eye:
 
@@ -2848,3 +2974,73 @@ months ago and will not change the renderer underneath it. And the fix, when
 it comes, belongs in `en_brf` and not in MGSM2Fix - the two builds share this
 patch byte for byte, and fixing it in the ASI would repair one environment,
 leave every other one broken, and split a file that is currently identical.
+
+## 25. The 2026-09-10 working state, for whoever opens this next
+
+Written at the end of the session that booted the raw disc. **Read §24 first**
+- it is the open problem. This is only where things are.
+
+### Discs and images
+
+| what | where |
+|---|---|
+| Redump dumps (zipped, MODE2/2352) | `C:\Users\Tideg\Desktop\MGS1 Integral` |
+| extracted | `D:\mgsbuild\redump` |
+| built images | `D:\mgsbuild\patched` |
+| RetroArch screenshots | `C:\Users\Tideg\My Drive\RetroArch\Screenshots` |
+
+The three shipped images in `patched\` (`MGS Integral English (Disc 1/2/3)`)
+are from `repro21raw` **with the briefing bug in them**. They boot; the
+briefing is wrong. Do not treat them as final.
+
+### The builds that matter
+
+| directory | what it is |
+|---|---|
+| `repro21raw` | the full raw set before any of this; what the shipped images came from |
+| `repro25nocounts` | **the good one** - `INTEGRAL_BRF_NO_COUNTS=1`, briefing clean, row spacing wrong |
+| `repro29control` | the stub running retail's own row-box code; proves the mechanism |
+| `repro30`, `repro31above`, `repro31height` | the three failed fix attempts |
+| `repro20` | the last **collection** build (not raw) |
+
+Every `mkimage.py` run used `--english-default yes`.
+
+### The emulator, and why its settings matter
+
+SwanStation in RetroArch, and the settings are the accurate end of the scale -
+`GPU_Renderer = Software`, `ResolutionScale 1`, `TextureFilter Nearest`, no
+PGXP, no TrueColor, no dithering, no widescreen hack, texture replacements
+off. Core options live at
+`C:\Users\Tideg\My Drive\RetroArch\Core Config\retroarch-core-options.cfg`,
+not in the RetroArch folder. **Retail Integral and retail USA both render the
+briefing correctly under these settings**, which is what proves the port is at
+fault rather than the emulator.
+
+### What the Master Collection has to do with it
+
+Nothing, in the end. MC renders the same bytes cleanly, so the bug hid there
+for as long as the family has existed - but MC is not inaccurate, it just left
+different garbage in the primitive buffer. M2 shipped a final patch months ago
+and will not change, so the collection build is not at risk of regressing; the
+reason to fix `ROW_H` is that it is wrong, and that the raw disc shows it.
+
+The fix belongs in `en_brf`, **not** in MGSM2Fix. The two builds share that
+patch byte for byte (276,482 bytes, zero differing offsets), and repairing it
+in the ASI would fix one environment, leave every other one broken, and split
+a file that is currently identical.
+
+### Where the session's own mistakes are recorded
+
+§24 has them, and they are worth reading before repeating them: six formula
+guesses, a fix tested in a full build where other disabled groups could mask
+it, a mechanism trusted because its *bytes* disassembled correctly rather than
+because it had been shown to *execute*, and a screenshot metric that scored a
+broken build cleaner than the control. The two results that actually moved
+this forward both came from controls - removing `en_brf` entirely, and running
+retail's own code through the new stub.
+
+One more, from the user rather than the assistant, and it is the reason the
+bug was found at all: the 26-shot-pair verification that signed `en_brf` off
+compared Integral-on-MC against USA-on-MC. Both sides were drawn by the same
+renderer, so its behaviour cancels out of the difference. That check proves
+agreement, never correctness.
