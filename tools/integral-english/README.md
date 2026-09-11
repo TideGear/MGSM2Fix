@@ -3145,8 +3145,12 @@ at the pixel centre, half-way down a two-row span, and takes row 1. The
 brighter" is that row showing through - grey 23 - and was recorded as "faint"
 without asking why. `br_line2` (the rules and the L-connector drops) keeps its
 bright texel in a column drawn 1:1 across the quad's 4-px width, so both
-renderers agree on it. Nothing to fix: the discs are right and the collection
-is the odd one out.
+renderers agree on it. The discs are right and the collection was the odd one
+out - and since 2026-09-11 MGSM2Fix corrects it at the source: `[Patches]
+ThinTexturedQuads` hooks M2's GP0 polygon dispatch and gives a one-pixel
+textured polygon the texel of its leading edge, for USA and Integral alike
+(NextSteps §26, UPSTREAM.md). With it the connectors and the L-connectors'
+bars draw on the collection as they do on hardware.
 
 ### The vertical rule
 

@@ -32,7 +32,12 @@ dumps of all three discs were measured against the collection's embedded
 copies - identical outside the hollowed-out executables, which those dumps also
 supply at the exact hash the builder demands - and `mkimage.py` closed the gap
 between a raw build and an actual patched disc image, from either source
-(§22). Written for whoever
+(§22) - and late that night and into 2026-09-11, when the briefing's
+connector left ends were found to have been Integral's under USA's boxes and
+were moved (§26), and the collection's faint connector lines were traced to
+M2's renderer sampling the wrong texel of a one-pixel quad and fixed at the
+source in MGSM2Fix as `[Patches] ThinTexturedQuads`, then confirmed with every
+briefing unlocked, twenty pairs at 0.00% against USA (§26). Written for whoever
 picks this up cold: a later session of the same assistant, a different model, or
 a person. It says where everything
 is, what the user's rules are (verbatim), how far each piece is verified, what
@@ -216,6 +221,7 @@ equivalence, not a new gameplay test.
 | `[Patches] PreserveConfiguration` | `= true` | three clean runs; the race it guards has not been caught in the act |
 | `[Game] UnlockBriefing` | `= false` | tested; seeds new-game `var_buf` |
 | `[Patches] BrightnessText` (tri-state `fixed` / `original` / `collection`) | `= fixed` | USA only; fixed and original verified on disc 1. Integral's paragraph is built into its PPF independently of this setting |
+| `[Patches] ThinTexturedQuads` (2026-09-11) | `= true` | a mid-hook on M2's GP0 polygon dispatch: a textured polygon one pixel tall (or wide) takes the texel of its leading edge, which is what the PlayStation GPU draws; the collection sampled another and drew MGS1's briefing connector lines faint. All PSX titles; seen on screen 00:07 and in twenty unlocked-briefing pairs 00:13-00:17 (§26). Deployed as `MGSM2Fix64.asi` SHA-256 `9ea87429…` |
 | Ketchup built-in disc patches + `SetPatchRangeBlacklist` | — | shipping (the USA four-line brightness fix) |
 | `SQHook::SetPatchWatch` (logs collection patches landing in a region) | — | in use; watches on `option`, `abst`, `change`, `demosel`, `title` and `camera` spans on both main discs, and since 2026-09-06 on the VR disc's `option`, `camera`, `vrtitle`, `movie` and `vrsave` spans (ASI rebuilt and deployed 2026-09-06 00:25) |
 | `Ketchup::Audit` (every byte of every RAM run, read-only, every ~5 s) | — | in use; it caught two of the three item faults on 2026-09-05. Since both exe PPFs own whole regions it now sees every byte of both pools |
