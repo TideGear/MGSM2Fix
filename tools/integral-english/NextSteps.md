@@ -263,7 +263,7 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
 | ~~**real engineering**~~ | **The briefing: FIXED 2026-09-10 late** - `ROW_H` was an R3000 **load-delay hazard**, `subu` reading `a1` in the slot right after `lbu a1`; one `nop` in place, no stub, and `hazards.py` now scans every rewritten block on every build (§24, top). Build `repro32raw`, images in `D:\mgsbuild\patched`. **Seen on screen 22:38, matching the MC set** for every reachable state; the six flag-gated items and their connectors still want a save with them earned on the raw disc. Still real work: **submit the pull request** (5.6), and look at the other two raw-only screens |
-| **needs a fresh pair of eyes** | the briefing's six flag-gated indented items and their L-connectors on the raw disc (a save with them earned, or a raw-disc unlock aid that does not exist yet); the reachable states were seen 2026-09-10 22:38 and match |
+| **needs a fresh pair of eyes** | the briefing's six flag-gated indented items and their L-connectors on the **raw disc** (a save with them earned, or a raw-disc unlock aid that does not exist yet). On the collection they were seen 2026-09-11 00:13-00:17 with `ThinTexturedQuads`, twenty pairs, 0.00% against USA (§26) |
 | ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete, on all three discs: 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. §18 and §19 |
 | **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
@@ -3227,5 +3227,20 @@ on screen 00:07**: the log has `[PSX] GPU_PolygonCommand hook succeeded`, the
 outline connector on the collection measures +205 over the background (it was
 +0 the night before, and +25 on the detailed one), it starts at the box edge,
 and nothing else in the shot changed. The collection's briefing now matches
-SwanStation's. Still unseen anywhere: the six flag-gated items and their
-L-connector bars, whose one-pixel quads this same rule covers.
+SwanStation's.
+
+**00:13-00:17, every briefing unlocked (`UnlockBriefing`, achievements off),
+twenty Integral shots against twenty-one USA shots on the collection.** They
+pair one-to-one in order (one spare USA shot is a repeated state) and the
+submenu column differs **0.00%** in every pair at a 40/255 threshold; the
+FILE column's 0.1% is JPEG noise on the box borders. Seen for the first time
+with the fix: all six flag-gated items - `time limit`, `support crew`,
+`Meryl`, `genetic strengthening`, `the reason for unanimous approval`,
+`Liquid Snake` - each with a complete L-connector, drop **and** foot, where
+the 09-02 shots had the drop alone; the member submenu on its five-item
+17-row branch; the detailed submenu with nine items. So `ThinTexturedQuads`
+covers the bars too, as predicted. Caveat, the §24 one: both sides of these
+pairs are the collection with the same ASI, so they prove Integral equals
+USA there, not hardware; hardware truth for the connectors is the
+SwanStation measurement, and the flag-gated items are still unseen on
+SwanStation because the raw disc has no unlock aid.
