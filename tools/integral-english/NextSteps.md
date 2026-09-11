@@ -3297,3 +3297,79 @@ text - the EXORCISE textures are the known case), English stored in font
 codes rather than ASCII in an overlay (none known; GCL text is swept
 separately), and the Master Collection's leniency as a CPU and a GPU, which
 §24 and §26 record and which only an accurate emulator can catch.
+
+## 27. The 2026-09-11 cross-check against the MGS1 Translation Toolkit
+
+The user pointed at <https://github.com/DoktorDeSparkle/mgs1-translation-toolkit>
+(a PySide6 front end) and its library
+<https://github.com/drsparklegasm/mgs1-scripts>, asking whether it reveals
+anything we did not know - with the rule that nothing is taken from it and
+that a useful reference is credited. Both are GPL v3. Nothing was copied;
+CREDITS.md has the entry.
+
+**How much weight it carries.** Not much on its own, and the user said so:
+its README states that most of the GUI is "vibe coded by Claude", and its
+glyph table is OCR (credited to Green_goblin) with "~30 kanji yet to
+identify, numerous others are wrong" in its own words. So a disagreement
+with it is a prompt to look again, never a verdict. Every change below was
+decided by re-reading our tile and re-reading our sentence, and would have
+been made the same way had the prompt come from anywhere else.
+
+**What it is.** Tooling for an *undub*: English subtitles into the Japanese
+release's RADIO.DAT, DEMO.DAT, VOX.DAT and ZMOVIE.STR, with a font editor for
+the 440-slot kana/kanji font and a `.tbl` encoder. Different scope from this
+port, which never touches subtitles. Its README lists its own open issues:
+Integral's RADIO.DAT does not recompile (sector-aligned calls, extra
+graphics padding), "~30 kanji yet to identify, numerous others are wrong".
+
+**What it revealed: three of our glyph readings were wrong.** Their
+`graphicsData` maps 6,877 codec-glyph bitmaps (Japanese disc 1) to
+characters. Hashing their bitmaps with `jptext.shape_key` and looking them
+up in `bank1-glyphs.tsv`: **all 1,214 of our shapes occur in their table,
+1,208 agree, 6 differ.** The six were adjudicated by rendering the tile
+beside 12-px reference glyphs of both candidates (three system fonts, ±1 px
+alignment, best pixel agreement) and by re-reading the export's sentences:
+
+| id | uses | ours | theirs | pixels | decision |
+|---|---:|---|---|---|---|
+| g518 | 80 | 京 | 涼 | 62.5 / 70.1 | **changed** - the tile has three dots down its left edge, the water radical 氵, which 京 has no room for; the one context is a staff credit, `モーション 吉村京子`, and 吉村涼子 is as good a name, so the sentence cannot decide and the pixels do |
+| g1030 | 8 | 綺 | 華 | 54.9 / 71.5 | **changed** - the tile is horizontal bars the full width with one central vertical, the shape of 華; 綺 would have a thread radical 糸 down the left, and there is none. The one sentence, `確かに綺麗すぎです。反省…` ("it really is too clean; I'll take that on board") reads at least as well as 確かに華麗すぎです ("it really is too showy"), a fair self-criticism, so sense does not rule it out |
+| g1156 | 2 | 瀕 | 餓 | 59.0 / 66.0 | **changed** - the left component is boxed like 食, not the three dots of 氵; the two uses are in text the export does not cover, so pixels alone decided |
+| g210 | 656 | 綿 | 緻 | 57.6 / 61.1 | **undecided, ours kept** - 綿密な配慮 and 緻密な配慮 are both real collocations and the 12x12 tile does not separate 帛 from 致 reliably |
+| g1045 | 6 | 輌 | 輛 | 63.9 / 65.3 | variant forms of one character; ours kept |
+| g658 | 44 | 〝 | ” | - | the same double quotation mark in two typographic conventions; ours kept |
+
+**Do the sentences still make sense after the swap?** Asked, and yes:
+吉村涼子 is a name where 吉村京子 was a name; 華麗すぎ is a real word where
+綺麗すぎ was; and 餓 has no sentence to fit. The sentence test is what let
+these through in the first place - a name and a near-synonym pass it either
+way - which is why the pixels carried the decision, and why 綿/緻 is kept:
+there the pixels are as ambiguous as the sentence.
+
+`bank1-glyphs.tsv` is corrected for g518, g1030, g1156 (the table loads and
+`selftest.py` passes). The export in `work/jpdump/` was written with the old
+readings and is not regenerated - it is a reading aid outside the repository,
+and the three characters occur in 90 of its 68,242 lines; `py radiotext.py
+--dump` rewrites it whenever it is next wanted. §19's claim stands as
+written - zero *unresolved* codes - but its 78/78 holdout and "read against a
+full sentence" could not see these, because a name and a near-synonym pass
+both tests. A second reading could, and did. That is the lesson, and its limit: for
+the 1,208 that agree, two readings of the same pixels made separately are
+stronger evidence than either alone; for the 6 that differ, neither is
+right by default.
+
+**What it corroborates, from its docs, without changing anything here.**
+The font block layout (12-byte header, 96-entry variable-width ASCII table,
+12-px 2bpp glyphs, 36-byte kana/kanji tiles) matches what `widths.py` and
+`jptext.py` model. The 0x80-prefixed style-flag bytes (`0x80 0x22`, `0x80
+0x2D`) they note as USA/Integral-specific are the ones `game_text` strips,
+as `font.c` does. Their codec subtitle limit is **260 px and 4 lines per
+block**; this port's 240-px figure is the *menu* renderer's `u8 max_width`
+path and a different limit, so neither corrects the other. Their DEMO.DAT
+parser names chunk type `0x04` "a second language chunk" - the dual-language
+mechanism behind Integral's (En,Ja) cutscenes, which §23's language bit
+selects. Integral's RADIO.DAT calls are 0x800-aligned with graphics padding,
+which is the fragment geometry `radiomap.py` walks.
+
+**Nothing to take.** Their tables are their transcription work under GPL v3
+and this port's are its own; the digests met in the middle and that is all.

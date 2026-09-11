@@ -550,6 +550,18 @@ cautionary result - without an anchor to start from, the test cannot tell a font
 cell from any other 36 bytes, and the answer was garbage rather than merely
 imprecise.
 
+### 2026-09-11: three readings corrected by an independent table
+
+Every bank-1 shape was hashed and looked up in the MGS1 Translation Toolkit's
+codec-glyph table (`graphicsData`, 6,877 bitmaps; NextSteps §27): all 1,214
+present, 1,208 agree, 6 differ. Their table is OCR with acknowledged errors, so
+each of the six was re-read here rather than taken: three of ours changed on
+the pixels - 京→涼, 綺→華, 瀕→餓, a name and two near-synonyms that the sentence
+test cannot separate, and the sentences read as well after the swap - two
+are variant or typographic forms, one (綿/緻) is undecidable at 12x12 and kept.
+`bank1-glyphs.tsv` carries the corrections. Nothing of theirs is copied;
+CREDITS.md.
+
 ### DONE (2026-09-10): the 12.8% is identified, and the count was wrong
 
 **Everything from here to "The dump, and the scope it is drawn to" is the record
