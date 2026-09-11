@@ -3220,6 +3220,10 @@ the method is what matters: log address -> module record -> constructor ->
 displacement scan over `.pdata` function ranges -> single caller.
 
 **Deployed 2026-09-11 00:02** as `MGSM2Fix64.asi` (SHA-256 `9ea87429…`), the
-previous ASI kept beside it as `MGSM2Fix64.asi.bak-before-thinquads`. Not yet
-seen on screen: the check is the briefing connectors on the collection, and
-the log line `[PSX] GPU_PolygonCommand hook succeeded` at start-up.
+previous ASI kept beside it as `MGSM2Fix64.asi.bak-before-thinquads`. **Seen
+on screen 00:07**: the log has `[PSX] GPU_PolygonCommand hook succeeded`, the
+outline connector on the collection measures +205 over the background (it was
++0 the night before, and +25 on the detailed one), it starts at the box edge,
+and nothing else in the shot changed. The collection's briefing now matches
+SwanStation's. Still unseen anywhere: the six flag-gated items and their
+L-connector bars, whose one-pixel quads this same rule covers.
