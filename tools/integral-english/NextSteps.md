@@ -260,8 +260,8 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 |---|---|
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
-| ~~**real engineering**~~ | **The briefing: FIXED 2026-09-10 late** - `ROW_H` was an R3000 **load-delay hazard**, `subu` reading `a1` in the slot right after `lbu a1`; one `nop` in place, no stub, and `hazards.py` now scans every rewritten block on every build (§24, top). Build `repro32raw`, images in `D:\mgsbuild\patched`. **Not yet seen on screen.** Still real work: **submit the pull request** (5.6), and look at the other two raw-only screens |
-| **needs a fresh pair of eyes** | the briefing from the `repro32raw` images on SwanStation - the first accurate-renderer run with every geometry group on; the five groups `INTEGRAL_BRF_NO_COUNTS` switched off during the bisect were never the fault and are all back |
+| ~~**real engineering**~~ | **The briefing: FIXED 2026-09-10 late** - `ROW_H` was an R3000 **load-delay hazard**, `subu` reading `a1` in the slot right after `lbu a1`; one `nop` in place, no stub, and `hazards.py` now scans every rewritten block on every build (§24, top). Build `repro32raw`, images in `D:\mgsbuild\patched`. **Seen on screen 22:38, matching the MC set** for every reachable state; the six flag-gated items and their connectors still want a save with them earned on the raw disc. Still real work: **submit the pull request** (5.6), and look at the other two raw-only screens |
+| **needs a fresh pair of eyes** | the briefing's six flag-gated indented items and their L-connectors on the raw disc (a save with them earned, or a raw-disc unlock aid that does not exist yet); the reachable states were seen 2026-09-10 22:38 and match |
 | ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete, on all three discs: 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. §18 and §19 |
 | **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
@@ -2810,11 +2810,18 @@ hazard anywhere in the port**. (The scanner reports four "branch-slot" hits
 inside the relocated string pools at `0x80011E00`-`0x80012200`; those are
 text bytes, not code.)
 
-**Not yet seen on screen.** The fix is static: mechanism, scan, tests. The
-build is `D:\mgsbuild\repro32raw`; §25 says which images came from it. Look
-at the briefing on SwanStation with the same settings as before. Every group
-is on, so this is also the first time the full geometry set runs on an
-accurate renderer.
+**SEEN ON SCREEN 22:38 the same night.** Seven SwanStation shots of the
+`repro32raw` disc 1 image (outline, member and detailed submenus, with
+`infiltration method`, `person in charge of the operation` and `hostages`
+highlighted, and EXIT) read against the 2026-09-02 MC set: label art at true
+size, single- and two-line highlight boxes, the 16/26 and 20 row advances,
+rules and horizontal connectors all match. The save on that disc has none of
+the six flag-gated indented items earned (the user confirmed it), so the
+L-connectors and the member block's 17-row branch (`FRAME_NEW`, `MEMBER_NEW`,
+`DETAIL_NEW`) are still unseen on an accurate renderer; `hazards.py` clears
+them and MC drew them right, but seeing them on the raw disc needs a save with
+those briefings earned - `UnlockBriefing` is an ASI feature and does not
+exist there.
 
 **The lesson is new for this project.** The Master Collection is not only a
 different renderer; it is a **lenient CPU**. Anything written by hand in
@@ -3071,8 +3078,9 @@ parity over every touched sector (418 / 418 / 2,004), and the fixed eleven
 words were read back out of both main-disc images, once each, at the
 relocated `brf` stage, with the old sequence absent. `TEST - Disc 1 no
 counts.bin` beside them is the 17:05 diagnostic build (`repro25nocounts`) and
-can go once the new disc 1 has been seen. **The briefing on these images has
-not been looked at yet** - that is the one check owed.
+can go. **The briefing on disc 1 was looked at 22:38**: seven shots, every
+reachable state matching the MC set (§24, top). Unseen: the flag-gated
+indented items, which that disc's save has not earned.
 
 ### The builds that matter
 
