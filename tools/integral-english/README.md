@@ -1416,9 +1416,10 @@ it from both sides:
 So a plain gameplay area (s11a) debug-loads clean, an event stage (s14e)
 hangs, and neither touches the disc. **The only way onto disc 2, and the only
 way to see whether the swap prompt appears, is to play across the break** -
-from any late disc-1 save (Comm Tower A is the last disc-1 area): Comm Tower
-A -> B -> Hind D -> Sniper Wolf -> capture, then watch the transition and read
-the log for `Disk ID` becoming 1.
+from a late disc-1 save, then watch the transition and read the log for
+`Disk ID` becoming 1. (Where the break falls in the story has not been
+checked here; an earlier version of this paragraph gave a route from memory
+and it was wrong.)
 
 `StageSelect` therefore accepts three kinds of name, documented in the ini:
 `true` (the top menu - TITLE / DEMO ALL / SOUND TEST only), a **menu**

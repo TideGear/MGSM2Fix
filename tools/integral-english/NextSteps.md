@@ -313,8 +313,9 @@ right:**
   `《MP 5 SD》 サブマシンガン。□ボタンを押すと発砲。押しつづけると、フルオート連射。サプレッサー装備。`
 
 ### 5.2 The disc-2 run (needs the user at the controller; nothing to build)
-Play through the actual story disc break from any late disc-1 save (no debug;
-Comm Tower A is the last disc-1 area, so a save there is the shortest route). Watch whether the game's own swap flow draws (`Now Checking...` /
+Play through the actual story disc break from a late disc-1 save (no debug).
+Where exactly the break falls in the story has not been checked here; do not
+take a route from this file. Watch whether the game's own swap flow draws (`Now Checking...` /
 `Insert DISC 2.`) or the collection swaps silently; then read the log for
 `Disk ID is 1`. This validates disc 2 and the normal swap path. It does **not**
 establish reachability of all four copies: title/wrong-disc, demo-theater and
