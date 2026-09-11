@@ -1,7 +1,7 @@
 # Rebuilding and packaging the current collection patch
 
 `rebuild.py` builds the whole port in a fresh directory - nine patch families
-for both main discs, and since 2026-09-07 the VR disc's seven as well - and it
+for both main discs, and since 2026-09-07 the VR disc's (eight since 2026-09-11) as well - and it
 never installs patches or changes game files. M2Package packages the ASI
 separately and is not the Integral asset packager.
 
@@ -122,8 +122,8 @@ A failed comparison retains the report and does not create a ZIP.
 
 ## Outputs
 
-- `Integral-English-<variant>.zip`: the PPFs in installation paths (collection: 20 main + 7 VR; raw adds `en_menu3` × 2 and a
-  `zz_ecc` per disc, 32 in all), README, `build-report.json` and `SHA256SUMS.txt`.
+- `Integral-English-<variant>.zip`: the PPFs in installation paths (collection: 20 main + 8 VR; raw adds `en_menu3` × 2 and a
+  `zz_ecc` per disc, 33 in all), README, `build-report.json` and `SHA256SUMS.txt`.
 - `package/`: the same unpacked files for review.
 - `work/`, `decomp/`, `build.log`: extracted inputs, intermediate assets and
   compiler/build evidence, retained for diagnosis.
@@ -281,6 +281,8 @@ extents. `NextSteps.md` §5.4, §5.10 and §5.13.
 
 | run | date | what changed since the previous run | matched the deployed set | ZIP SHA-256 |
 |---|---|---|---|---|
+| `repro34` | 2026-09-11 | collection build with `vr_en_memcard`; 28 PPFs, 20 main + 8 VR | 28 of 28 | `73838eec29929a26877177adfa57d456f6032462d69e6c704c5e5e274b81100c` |
+| `repro34raw` | 2026-09-11 | **raw variant**; `vr_en_memcard` added (`vr_memcard.py`: the `vrsave` and `selectvr` memory-card captions), 33 PPFs, 24 main + 9 VR; disc 3 image rewritten from it | n/a (raw) | `a6fc5a29b43ffca3ca6d8990399082554ec927378041cd7a998c9858cd54b6cd` |
 | `repro33raw` | 2026-09-10 | **raw variant**; the three horizontal connectors' left ends at USA's values (`CONNECTOR_LEFT`); what the images in `D:\mgsbuild\patched` are built from | n/a (raw) | `0d2eab58e7141ff8d716c374f1920d6059cb39cdd69dce352c4d1f20594daef5` |
 | `repro33` | 2026-09-10 | collection build of the same; `--compare-deployed` reported exactly the two `en_brf` PPFs as different (the intended change) and so made no ZIP; those two were **deployed** from its `package/` at 23:24, the previous pair kept as `workrf_deployed_before_connector_disc{1,2}.ppf` | 25 of 27, the two `en_brf` by design | none (no ZIP) |
 | `repro32raw` | 2026-09-10 | **raw variant**; `en_brf` `ROW_H` with the load-delay `nop` (the briefing fix), every geometry group on; 32 PPFs, 24 main + 8 VR | n/a (raw builds are not compared to the deployed collection set) | `a2ebded662372497df4864e0981c17556559f2143ab2832794b86e8324c3173f` |

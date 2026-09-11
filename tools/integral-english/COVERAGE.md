@@ -273,6 +273,18 @@ the raw-disc variant, and the `abst` caption, which is an open question.
 | `chara 5667` | `vrtitle` | 4 | the PocketStation help line, its prompt and はい/いいえ - USA's fifth EXTRA item is STAFF CREDIT, a different feature (§6) |
 | `chara 81C7` | `camera` | 1 | the same PHOTOGRAPHING prompt as the main discs |
 
+**These figures count GCL records, and on 2026-09-11 that was shown to be
+the wrong unit for one class of text.** Three VR overlays (`vrsave`,
+`selectvr`, `vrtitle`) each carry a memory-card caption module in their
+`.rodata` - not records, so not in this table - and the byte inventory that
+did see them judged per *string*: the same Japanese caption sits in
+`vrtitle`, where USA has it in Japanese too, so the copies in `vrsave` and
+`selectvr`, where USA has English, inherited "identical in USA" and were
+never compared as stages. `vr_en_memcard` ports those two; `vrtitle`'s stays
+by rule. `py overlaydiff.py [--vr]` is the per-stage check that would have
+caught it, and its 2026-09-11 run over both discs and both executables found
+nothing else of the kind (NextSteps §26).
+
 ### The executables
 
 Measured the same way, on the deployed executable:
@@ -294,7 +306,10 @@ untranslated indices, the MP5, the mine-detector difficulty line).
 
 ### Not covered by any of this
 
-Texture lettering - Japanese drawn as art rather than stored as text - is
+Overlay `.rodata` string pools were outside every tool here until
+2026-09-11; `overlaydiff.py` covers them now, per stage, as English USA has
+that Integral lacks. Texture lettering - Japanese drawn as art rather than
+stored as text - is still
 outside every tool here. The VR camera's EXORCISE textures are the known case
 and are deferred; nothing else has been inventoried.
 

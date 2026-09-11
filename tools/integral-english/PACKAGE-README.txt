@@ -3,7 +3,7 @@ Integral English text - Master Collection build (collection variant)
 Copy the mods folder into your MGS1 game folder. It holds three sets:
   mods/INTEGRAL/INTEGRAL/0   Integral disc 1 - ten INTEGRAL_disc1_en_*.ppf
   mods/INTEGRAL/INTEGRAL/1   Integral disc 2 - ten INTEGRAL_disc2_en_*.ppf
-  mods/INTEGRAL/VR-DISK      Integral's VR disc (SLPM-86249) - seven INTEGRAL_vr_en_*.ppf
+  mods/INTEGRAL/VR-DISK      Integral's VR disc (SLPM-86249) - eight INTEGRAL_vr_en_*.ppf
 Replace older copies of the same files, and first remove any duplicate or
 experimental PPF from those folders, including any en_menu3, *_movie_e3 or
 *_unlock_* file. Every patch in this package writes its own bytes and no two of
@@ -53,5 +53,5 @@ Every English string is copied verbatim from Konami's USA release. Nothing has
 been translated, and no game data is redistributed with these patches.
 
 Uninstall: remove the ten INTEGRAL_discN_en_*.ppf files from each numbered
-folder and the seven INTEGRAL_vr_en_*.ppf files from VR-DISK.
+folder and the eight INTEGRAL_vr_en_*.ppf files from VR-DISK.
 SHA256SUMS.txt and build-report.json identify the packaged build and validation.

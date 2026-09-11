@@ -29,9 +29,9 @@ FAMILIES = ('items', 'menu', 'menu2', 'preope', 'brf', 'option', 'savemsg', 'cam
 # The VR disc's own port (2026-09-06/07). Its tools are separate because the disc
 # is a separate game - its own executable, overlays and containers - but the
 # build is the same discipline, so it belongs in the same isolated run.
-VR_SCRIPTS = ('vr_windows.py --build', 'vr_exe.py', 'vr_option.py', 'vr_menus.py',
+VR_SCRIPTS = ('vr_windows.py --build', 'vr_exe.py', 'vr_option.py', 'vr_menus.py', 'vr_memcard.py',
               'vr_camera.py', 'vr_movie.py')
-VR_FAMILIES = ('missions', 'items', 'savemsg', 'option', 'title', 'camsave', 'movie')
+VR_FAMILIES = ('missions', 'items', 'savemsg', 'option', 'title', 'camsave', 'movie', 'memcard')
 VR_EXE_HASHES = {
     # Integral's VR executable is not on the collection's disc in usable form,
     # so it is BUILT from the decomp here (obj_vr/_mgsi.exe) and checked against
@@ -269,7 +269,7 @@ def main():
     print('Building %d patch families (%s)...' % (len(families), args.variant),flush=True)
     for script in scripts:
         run([sys.executable,TOOLS/script],TOOLS,env,log)
-    print('Building the VR disc: seven patches (vr_windows rebuilds 92 stages)...',flush=True)
+    print('Building the VR disc: eight patches (vr_windows rebuilds 92 stages)...',flush=True)
     for script in VR_SCRIPTS:
         parts = script.split()
         # Order matters: vr_windows ports the `movie` stage and hands it to

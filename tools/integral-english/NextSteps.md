@@ -175,6 +175,7 @@ and the EXIT box after its move — §5.5's list 1 and §5.4a.
 | `vr_en_savemsg` | the VR executable's 12 save and 12 load messages | statically; indices 1 and 9 stay Japanese (USA draws nothing) |
 | `vr_en_option` | the option screen's 7 help lines and the whole KEY CONFIG screen | **the option screen is verified on screen 2026-09-06** after three faults, all found by bisecting the PPF: the DAR's entry sizes were not 4-aligned and crashed the stage at `load option`; record 3 doubled the vibration-test sentence; and Integral's colon/values were lit beside the English while the lines sat off-centre. Fixed by padding every DAR payload to 4 (paid for with `pcx4`'s real 63-byte run cap), blanking record 3 as the main game does, unlighting the colon/values via the state switch, and giving each ported entry USA's `{num 1, x 160, y 196}`. All five rows now read as one centred English line, measured within 0.3 game px of centre. **KEY CONFIG verified on screen 2026-09-07** with `DisableRAM`/`DisableCDROM` on: Integral's own screen draws, all eight labels English through all three button types, and `key_syukan`'s +11 clears the curve. One fault found and fixed the same day — the selection highlight on the `first person view` row was 24 px short (88 against USA's 112) because it is drawn by hardcoded `glow(work, x, y, w, h, ...)` calls rather than an `Init_Res` quad, so the transplant never touched it; measured 113 px against USA's 114 after the fix |
 | `vr_en_title` | the EXTRA menu's four help lines | statically; record 6 (PocketStation) deliberately kept — USA's `See the staff credits.` is a different feature |
+| `vr_en_memcard` | the memory-card captions of the `vrsave` and `selectvr` overlays (SAVE / LOAD / REPLAY DATA screens): 12 save + 12 load each, USA's English index for index, 1/9 and the prompts kept | **built and deployed 2026-09-11 11:29**, 7 records, both pools 390/492 bytes; verified by reading every slot back. Found from the CLEAR DATA screen - whose own copy, in `vrtitle`, is Japanese in USA too and stays. Not yet seen on screen: its captions are the error and edge states (Save failed, No save file, No empty block...), which the 22 shots of 11:11 did not reach |
 | `vr_en_camsave` | the PHOTOGRAPHING mode's memory-card messages | statically; 429 of the pool's 492 bytes used. Never seen on screen |
 | `vr_en_movie` | the MOVIE selection captions | **all three ported 2026-09-07**, the two TGS ones as USA's two lines. The line count was never data: USA calls the actor's own `highlight(work, i)` twice — for `clip*2` and `clip*2+1` — where Integral calls it once, so the port retargets that one `jal` at a 16-word stub in the overlay's own sector padding. **Verified on screen 2026-09-07**, all three clips: both TGS captions on two rows with correct attribution and real typographic quotes, E3 on one. Line 1's ink then overlapped the EXIT box by 2 rows, because Integral's caption face is taller than USA's; the box moved up 4 px to USA's own y with the user's approval (§5.4a, §6), and **that part is not yet seen on screen** |
 | `vr_unlock_movies` | the EXTRA movies unlocked (test aid) | **verified in game 2026-09-06: all three thumbnails appear.** One instruction in the `movie` overlay: its own `count / 3` score gate, separate from the mission one. Writes no progress; delete the PPF to relock |
@@ -1341,6 +1342,7 @@ an explicit answer before anything changes.
 | `shotcmp_brightness.py A.jpg [B.jpg]` | measures brightness-screen shots |
 | `preope_usa.py` | Previous Operations directly from retail, USA pagination; stages PPFs unless `--deploy` is supplied |
 | `brf_build.py`, `brf_widen.py` | briefing labels and quads; the build asserts zero load-delay hazards against retail |
+| `overlaydiff.py [--vr] [--all] [--stage NAME] [--debug]` | **per-stage English-vs-Integral overlay comparison**: which printable strings USA's copy of each stage overlay has that Integral's lacks, net of what the deployed PPFs already write, with debug/symbol strings and the four other languages filtered. The question the 2026-09-11 memory-card finding showed nobody had asked; a byte inventory that judges per string cannot ask it. Also worth running over the executables (the same three lines of Python, in §26) |
 | `hazards.py <built> <base-hex> [--retail <retail>]` | **R3000 load-delay scanner** for hand-written MIPS: a load followed at once by a read of the loaded register, a non-load write in that slot, a branch in a branch's delay slot, mfhi/mflo too close to a mult. With `--retail`, only word pairs the port changed are judged. The Master Collection's emulator does not model the delay, so no screenshot taken there can catch this class of bug - this is the check. `selftest.py` proves it catches the 2026-09-10 briefing bug at its own address |
 | `savemsg.py`, `camsave.py` | the two memory-card caption ports |
 | `abst_build.py [--deploy]` | the MISSION LOG port: rewrites both GCX scripts in the `abst` stage with USA's pages, swaps the bottom-bar art, packs the stage with `obj/abst.bin`, relocates to DUMMY3M slot 462, verifies, stages/deploys the PPFs |
@@ -3084,7 +3086,9 @@ cause and the fix are there. This is only where things are.
 
 The three images in `patched\` (`MGS Integral English (Disc 1/2/3)`) were
 rebuilt at 23:24 from **`repro33raw`** (`repro32raw`'s briefing fix plus the
-connector left ends of §26; the 22:31 images were removed first); all three passed `mkimage.py`'s before-and-after
+connector left ends of §26; the 22:31 images were removed first) - and disc 3
+again at 11:37 on 2026-09-11 from **`repro34raw`**, which adds
+`vr_en_memcard` (9 VR PPFs, 2,009 sectors verified); all three passed `mkimage.py`'s before-and-after
 parity over every touched sector (418 / 418 / 2,004), and the fixed eleven
 words were read back out of both main-disc images, once each, at the
 relocated `brf` stage, with the old sequence absent. `TEST - Disc 1 no
@@ -3253,3 +3257,43 @@ pairs are the collection with the same ASI, so they prove Integral equals
 USA there, not hardware; hardware truth for the connectors is the
 SwanStation measurement, and the flag-gated items are still unseen on
 SwanStation because the raw disc has no unlock aid.
+
+### 11:11, the VR disc with the three unlock aids: 22 shots, and a family nobody had seen
+
+Seen and right: all four EXTRA help lines (`View the movie.`, `Take a
+picture.`, `See the album.`, `Return to the title screen.`; PocketStation's
+Japanese is the open §6 item), the RESULT window in every highlight state
+with its 1ST/2ND/3RD and RECORD, `SAVE REPLAY DATA` with `NEW FILE [NEED 1
+BLOCK]`, LOAD DATA and SAVE DATA with `LOADING...` / `SAVING...` /
+`COMPLETE`, the by-rule Japanese at indices 1 and 9, and the `OVERWRITE OK?`
+caption that is Integral-only. That closes §5.5's list except the moved
+MOVIE EXIT box, which was not in the set.
+
+**And one thing wrong: CLEAR DATA's `NO FILE` caption is Japanese.** Chasing
+it found that the memory-card module is compiled into three VR overlays as
+well as the executable, each with its own caption tables, and only the
+executable's had been ported. `vr_en_memcard` (new, `vr_memcard.py`) ports
+`vrsave` and `selectvr`, where USA's copies are English; `vrtitle` - the
+CLEAR DATA screen itself - is Japanese in USA's own table and stays. README,
+"The memory-card modules". Built, deployed to `mods\INTEGRAL\VR-DISK\`
+(31 files clean), in `repro34raw` (33 PPFs, 24 main + 9 VR) and the disc 3
+image rewritten from it at 11:37.
+
+**How it was missed, and what else could be.** Asked directly, so answered
+directly. The sweeps read GCL records; overlay pools are not records. The
+byte inventory saw the strings but judged each *string*, and this one also
+lives in `vrtitle` where USA has the same Japanese, so all three copies
+inherited that verdict. The general form of the hole is "text USA has in
+*this stage* that Integral's copy lacks", and `overlaydiff.py` now asks
+exactly that, per stage, both discs, net of deployed PPFs. Its full run on
+2026-09-11: disc 1 clean (22 candidates, all debug strings); VR disc clean
+apart from this family (881 candidates, all USA's debug symbol tables and
+printf strings, plus the other four languages in the three memory-card
+stages); both executables clean (a boot string, debug prints, and two item
+names that ARE ported). One residue: USA `selectvr`'s `SAVE?` menu record
+where Integral's is empty - probably an unused window, to be looked at, not
+read. Other blind spots that remain by nature: texture lettering (art, not
+text - the EXORCISE textures are the known case), English stored in font
+codes rather than ASCII in an overlay (none known; GCL text is swept
+separately), and the Master Collection's leniency as a CPU and a GPU, which
+§24 and §26 record and which only an accurate emulator can catch.

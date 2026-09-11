@@ -2190,6 +2190,7 @@ have no letter beside it — otherwise `C4` and `E3` are read as numbers.
 | the staff-credit roll | a USA-only feature; Integral has PocketStation there |
 | the PocketStation help line and prompt | Integral-only, no USA counterpart |
 | `vrtitle`'s four debug windows, `vrsave`'s one | USA carries the identical Japanese |
+| `vrtitle`'s memory-card captions (the CLEAR DATA screen: `セーブファイルがありません。` and its 23 siblings) | USA's `vrtitle` table carries the identical Japanese (2026-09-11); the same module in `vrsave` and `selectvr` IS English in USA and is ported by `vr_en_memcard` |
 | MP5, frozen items, the mine-detector line | no USA text exists |
 
 ### Sweep: is any VR text still Japanese? (`vr_sweep.py`, 2026-09-06)
@@ -2227,6 +2228,51 @@ every record at a nonsense offset, and reported a finished port as almost
 entirely unported — including "0 records applied" for two stages whose PPFs were
 demonstrably correct. Anything that reads a deployed PPF back has to use
 `image_offset`'s geometry.
+
+### The memory-card modules in `vrsave`, `selectvr` and `vrtitle` (`vr_en_memcard`, 2026-09-11)
+
+Found from a CLEAR DATA screenshot on the collection: `セーブファイルがありません。`
+under `NO FILE`, on a disc whose executable table for that caption had read
+`No save file.` since 2026-09-06. The VR disc's memory-card module
+(`savemngr.c`: SAVE DATA / LOAD DATA / SAVE REPLAY DATA / LOAD REPLAY DATA /
+CLEAR DATA) is compiled into **three stage overlays** as well as the
+executable, each with its own 12 save and 12 load captions and the two
+prompts, exactly the shape `vr_en_camsave` ported in `camera`:
+
+| stage | Integral tables (overlay offset) | USA tables | USA text |
+|---|---|---|---|
+| `vrsave` | save `+0x8B8`, load `+0x8E8`, prompts `+0x918`; pool `+0xFF4C..+0x10138` | `+0xA58`, `+0xA88`, `+0xAB8` | English |
+| `selectvr` | save `+0xD6B8`, load `+0xD6E8`, prompts `+0xD718`; pool `+0x1F264..+0x1F450` | `+0xD978`, `+0xD9A8`, `+0xD9D8` | English |
+| `vrtitle` | save `+0x948`, load `+0x978`, prompts `+0x9A8` | `+0x8D0` | **Japanese** |
+
+`vr_memcard.py` ports the first two index for index, USA's tables identified by
+their strings (`Save failed.` at 2, `No save file.` at load 4, `Now checking
+Memory Card.` at 10), indices 0/1/9 and both prompts empty in USA and so kept
+Integral's, as `en_savemsg` and `vr_camera` decided; each pool takes the
+English plus the kept Japanese in 390 of its 492 bytes, in place, sector count
+unchanged. One PPF, `INTEGRAL_vr_en_memcard.ppf`, 7 records across the two
+stages. `vrtitle` is the CLEAR DATA screen, and **USA's own `vrtitle` table
+holds the identical Japanese** - USA VR Missions draws the same
+`セーブファイルがありません。` there - so it stays by the standing rule; it is the
+same category as its four debug windows.
+
+**How it was missed, exactly.** `vr_sweep.py` and `mainsweep.py` read GCL
+records, and these are overlay `.rodata` pools. `jplist.py`, the byte
+inventory, did see them, but it classified by *string*: the caption also
+lives in `vrtitle`, where USA carries the identical Japanese, so every copy
+inherited "USA has the same Japanese" and the two stages where USA has
+English were never compared as stages. The per-stage question - what
+English does USA's copy of *this* overlay have that Integral's lacks? - is
+what `overlaydiff.py` now asks, over every stage on both discs and over the
+executables, net of what the deployed PPFs already write. Run on 2026-09-11
+it found this family and nothing else of its kind: the 881 other VR
+candidates are USA's debug symbol tables and printf strings, disc 1's 22 are
+the same, and the executables' residue is a boot string and debug prints.
+
+One string is left to look at rather than read: USA's `selectvr` has a menu
+record at `+0xCAB4` whose text is `SAVE?`, where Integral's counterpart record
+carries an empty string. Probably an unused window; not text the player is
+known to see.
 
 ### The collection's own patches to the VR disc
 
