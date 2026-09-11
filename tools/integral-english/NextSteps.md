@@ -66,7 +66,7 @@ authoritative**; if they disagree with a memory file, the memory file is stale.
 | Ketchup mods | `D:\Steam\SteamApps\common\MGS1\mods\INTEGRAL\INTEGRAL\0` (disc 1) and `\1` (disc 2); the VR disc is `mods\INTEGRAL\VR-DISK\` and the USA VR disc `mods\VR-DISK_US\` | Ketchup loads every PPF in the folder, so each patch is its own file and can be removed individually. Its `RootPath` adds a version folder only when a title has more than one version and a disk folder only when a version has more than one disk, which is why the two VR folders have no numbered subdirectory |
 | deployed ini | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.ini` is a **Vortex symlink**; edit the target: `%APPDATA%\Vortex\metalgearsolidmc\mods\MGSM2Fix-5-3-6-0-1774482213\MGSM2Fix.ini` | edit with Python or via `realpath`; `sed -i` on the link would replace the link with a file. The repo's `MGSM2Fix.ini` is the committed default, not what the game reads |
 | deployed ASI | same Vortex folder, `MGSM2Fix64.asi` | |
-| build | `"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe" MGSM2Fix.sln /p:Configuration=Release /p:Platform=x64` → `x64\Release\MGSM2Fix.asi` → copy to the Vortex folder as `MGSM2Fix64.asi`; compare hashes | if MSBuild times out it can leave `cl.exe` processes behind — stop them by PID |
+| build | `"C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\MSBuild\Current\Bin\MSBuild.exe" MGSM2Fix.sln /p:Configuration=Release /p:Platform=x64` → `x64\Release\MGSM2Fix.asi` → copy to the Vortex folder as `MGSM2Fix64.asi`; compare hashes | **Run it from PowerShell**: Git Bash rewrites `/p:` into paths (MSB1008). Since the 2026-09-10 rebase the Zydis prebuild needs the toolset passed through (`build_zydis.cmd` second argument, done 2026-09-11). The post-build step calls `python M2Install.py`, which is not on this PATH (`py` is), so MSBuild reports exit 1 with error 9009 **after** the ASI is linked - the `.asi` is good; deploy by hand. If MSBuild times out it can leave `cl.exe` processes behind — stop them by PID |
 | log | `D:\Steam\SteamApps\common\MGS1\MGSM2Fix.log` (rotates to `.prev`) | **Corrected 2026-09-07.** The boot-time `Error parsing ini file ... at these lines: 12` was recorded here as a harmless inipp quirk on the `[Internal Resolution]` header at line 12. It was neither. inipp prints the offending line's **content**, not its number, and the content really was a bare `12` — the deployed ini's `[Update Notifications]` section header had been overwritten by it at some point. It was not harmless: with the header gone, `CheckForUpdates = true` fell into `[Game]` and the fix read `bShouldCheckForUpdates: false`. Header restored; the file now has all ten sections and no unparseable line. **If that message comes back, read the line it quotes as text and go find it.** |
 | screenshots | `C:\Program Files (x86)\Steam\userdata\7924217\760\remote\2131630\screenshots` | 3840×2160; 9 display px per game px, x offset 480 |
 | USA source data | `work\usa1_stage.dir` / `usa2_stage.dir` (real USA discs, extracted from `windata\alldata.bin`); `work\us1_stage.dir` is **European** despite its name — do not source text from it | README "Toolchain and environment" and the source-discs note |
@@ -3198,3 +3198,28 @@ both titles, no disc patch, upstream-worthy. Cost unknown: it needs the point
 in M2's GPU code where primitives are consumed, which MGSM2Fix has not
 mapped. Next step if wanted: a scoping pass to find that hook point before
 writing anything.
+
+**Done, 2026-09-10 late: `[Patches] ThinTexturedQuads` in MGSM2Fix.** The
+scoping pass took the emulator apart from the log's `gpu` system-module
+record: constructor `0x140102B30` (registers `dev/gpu`, `gpu:vram`), the GPU
+struct's FIFO at `+0x2C` and depth at `+0x6C` (both in the header already),
+the FIFO push at `0x1401064D0` whose tail dispatches on the command byte -
+polygons via an eight-entry word-count table `[4,7,5,9,6,9,8,12]` at
+`0x1407689E8`, indexed by the textured/quad/gouraud bits - to the polygon
+handler `0x140103EE0`, which has exactly one caller: `mov rcx, rbx; call` at
+`0x140106AF9`, with `rdx` still pointing at the FIFO words. That is the hook.
+`PSX::GPU_PolygonCommand` (psx.cpp) rewrites the words in place before M2
+reads them: textured polygon, Y extent exactly 1, top-edge vertices agreeing
+on V -> every vertex takes that V; the same for U with X extent 1; nothing
+else touched, so two-pixel lines keep their shadow row. Signature
+`48 C1 E8 02 4C 8D 15 ?? ?? ?? ?? 83 E0 07 42 0F B6 84 10 ?? ?? ?? ?? 44 3B
+C0 7C 0F 48 8B CB E8` +0x1C, one hit in the MGS1 executable. Default on;
+`iEmulatorLevel >= 2` logs each snap. UPSTREAM.md has the entry. The
+scanning scripts are in the session scratchpad only (`gpu_scan1..5.py`);
+the method is what matters: log address -> module record -> constructor ->
+displacement scan over `.pdata` function ranges -> single caller.
+
+**Deployed 2026-09-11 00:02** as `MGSM2Fix64.asi` (SHA-256 `9ea87429…`), the
+previous ASI kept beside it as `MGSM2Fix64.asi.bak-before-thinquads`. Not yet
+seen on screen: the check is the briefing connectors on the collection, and
+the log line `[PSX] GPU_PolygonCommand hook succeeded` at start-up.

@@ -8,6 +8,14 @@ set "PLAT=%~1"
 if "%PLAT%"=="" set "PLAT=%Platform%"
 if "%PLAT%"=="" set "PLAT=x64"
 
+REM --- Toolset (arg 2): build Zydis with the same toolset as the main project.
+REM     Zydis.vcxproj hardcodes v143; a machine with only a newer Visual Studio
+REM     cannot build it as written, and the main project already knows which
+REM     toolset it is using.
+set "TOOLSET=%~2"
+set "TOOLSET_ARG="
+if not "%TOOLSET%"=="" set "TOOLSET_ARG=/p:PlatformToolset=%TOOLSET%"
+
 REM --- Locate Zydis project file ---
 set "ZY_PROJECT=%~dp0src\extern\zydis\msvc\zydis\Zydis.vcxproj"
 if not exist "%ZY_PROJECT%" (
@@ -53,7 +61,7 @@ if exist "%HASH_FILE%" (
 REM --- Build if needed ---
 if "%NEED_BUILD%"=="1" (
     echo [Zydis] Building Release MT %PLAT%
-    msbuild "%ZY_PROJECT%" %MSBUILD_ARGS%
+    msbuild "%ZY_PROJECT%" %MSBUILD_ARGS% %TOOLSET_ARG%
     if errorlevel 1 (
         echo ERROR: Zydis Release MT %PLAT% build failed
         exit /b 1
