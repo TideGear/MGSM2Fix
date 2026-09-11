@@ -270,6 +270,8 @@ assert len(MEMBER_OLD) == len(MEMBER_NEW) == 44
 # The detailed submenu's horizontal connector (poly 41) ends at the rule in USA
 # (`sh zero` into x1/x3); Integral stores fp = 20 and the connector runs 20 px
 # past the rule as a faint additive line - one row +24 brighter from x 160 on,
+# (faint only on the collection: its renderer samples br_line1's dark row 23
+# into the one-pixel quad; hardware and SwanStation draw the bright row - README)
 # 25 screenshot pixels over threshold. fp is br_s00's advance reused as an x,
 # like s4 was for polys 25/39.
 CONNECTOR_END = [(0x800C7180, 0xA63E0678, 0xA6200678, 'poly 41 x1: fp (20) -> 0'),

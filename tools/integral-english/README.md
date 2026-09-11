@@ -3130,6 +3130,24 @@ label row bands, rule extents and highlight boxes identical, and a pixel diff of
 the right-column region (game x 150-320, y 55-190, tolerance 60/255) is 0.00%
 on every pair. The FILE column was already identical.
 
+### The horizontal connector is dim on the collection, and bright on hardware (2026-09-10)
+
+Poly 25, the connector from the selected FILE button to the submenu's rule,
+draws at full brightness on SwanStation and as a faint line on the Master
+Collection - for USA, retail Integral and the port alike, so it is not the
+port. Its texture `br_line1` is 4x2 with two **different rows**: row 0 grey
+135, row 1 grey 23. The layout makes the quad one pixel tall (`y` -41 to -40)
+while its V coordinates span both rows, so the one screen row has to pick a
+texel and the renderer's interpolation decides which. Hardware and
+SwanStation's software renderer take row 0; the collection's renderer samples
+at the pixel centre, half-way down a two-row span, and takes row 1. The
+2026-09-02 measurement of the connector's overrun past the rule as "+24
+brighter" is that row showing through - grey 23 - and was recorded as "faint"
+without asking why. `br_line2` (the rules and the L-connector drops) keeps its
+bright texel in a column drawn 1:1 across the quad's 4-px width, so both
+renderers agree on it. Nothing to fix: the discs are right and the collection
+is the odd one out.
+
 ### The vertical rule
 
 The rule left of the submenu items is **poly 26** (the first `br_line2`), found
