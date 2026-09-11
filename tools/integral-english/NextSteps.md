@@ -3155,7 +3155,9 @@ All six writers (layout and reveal animation, three submenus) now take USA's
 value; the detailed one needed its own register because its layout store
 shared `s7` with the outline's. `hazards.py` clean. README, "The connectors'
 left ends". Built as `repro33raw` / `repro33` (see §25 for what was written
-where).
+where). **Seen on the collection 23:26** in all three submenus: the line now
+begins at the box edge, and the member gap is gone. Not yet seen on
+SwanStation from the `repro33raw` images.
 
 ### The dim connector on the Master Collection is the collection's, not ours
 
@@ -3166,7 +3168,11 @@ pixel tall with V spanning both rows, so the renderer's texture-coordinate
 rounding picks the row: hardware takes the bright one, M2's renderer the dark
 one (measured: MC's line sits +25 over the background, the dark texel's
 value). Not dithering - that cannot move a texel from 135 to 23 - and not the
-USA `BrightnessText` patch, which never touches this stage. README, "The
+USA `BrightnessText` patch, which never touches this stage. **Not the
+upscaler either**: the user's 23:25 shots were taken at Resolution
+"Original", Smoothing off, Pixel Perfect, Screen Filter off, and the line is
+just as dim, so it is M2's base renderer. MGSM2Fix's own renderer options
+(internal-resolution override, widescreen) are off in the live ini. README, "The
 horizontal connector is dim on the collection". Fixable in MC by pinning the
 three connectors' UVs to the bright texel (code, needs room; a USA stub would
 ride the built-in disc-patch mechanism) - offered, not done: it is cosmetic,
