@@ -721,7 +721,9 @@ with a checkout. `git submodule sync --recursive && git submodule update
 --init --recursive` populates the new paths; the old
 `src/{imgui,inipp,json,safetyhook,spdlog,zydis}` checkouts are left behind as
 untracked duplicates - 53 MB, including a built `Zydis.lib` that
-`build_zydis.cmd` regenerates at the new path on the next build.
+`build_zydis.cmd` regenerates at the new path on the next build. **Deleted
+2026-09-11 00:25** after they surfaced as six "new" items in GitHub Desktop;
+the live submodules under `src/extern/` were verified present first.
 
 **The lesson for the estimate.** Nothing about the 2026-09-07 reasoning was
 careless: it read the rename percentages and the line counts and concluded the
