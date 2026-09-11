@@ -452,6 +452,7 @@ ROW_H_OLD = [0x84440008,   # lh   a0,  8(v0)      x0   <- redundant
              0xA4450020]   # sh   a1, 32(v0)      x3 = x3  <- redundant
 ROW_H_NEW = [0x9044001D,   # lbu  a0, 29(v0)      v2
              0x9045000D,   # lbu  a1, 13(v0)      v0  (= py % 256)
+             0x00000000,   # nop                  LOAD DELAY: a1 is not readable yet
              0x00851823,   # subu v1, a0, a1      v1 = texture height
              0x30A50007,   # andi a1, a1, 7       above = py % 8  (see USA_ABOVE)
              0x00C52023,   # subu a0, a2, a1      top    = y - above
@@ -459,8 +460,19 @@ ROW_H_NEW = [0x9044001D,   # lbu  a0, 29(v0)      v2
              0xA444000A,   # sh   a0, 10(v0)      y0
              0xA4440012,   # sh   a0, 18(v0)      y1
              0xA443001A,   # sh   v1, 26(v0)      y2
-             0xA4430022,   # sh   v1, 34(v0)      y3
-             0x00000000]
+             0xA4430022]   # sh   v1, 34(v0)      y3
+# The nop is the whole 2026-09-10 fix. The R3000 delivers a load one
+# instruction late: the instruction right after `lbu a1` still sees the OLD
+# a1, which here is the caller's poly index (9..24), so the height came out
+# as v2 - idx (100 rows and more) and every label was stretched into a column
+# of sampled VRAM. The Master Collection's emulator does not model the delay,
+# so the arithmetic ran as written there and the 26 shot pairs it was checked
+# against could never show it; SwanStation and hardware do model it. Retail's
+# eleven words never read a register in the slot after loading it, and neither
+# does any other block this port rewrites - `hazards.py` checks that on every
+# build. The x normalisation retail spent four words on is still dropped:
+# setXY4 leaves x2 == x0 and x1 == x3 and nothing else writes these x's except
+# the br_s00 / br_s01 reveals, which write all four consistently.
 # br_s00 has no stored quad: its right edge is animated as x1 = 52n/6 + 26,
 # with the 52 baked into a shift/add chain at 800C7658.  Rebuilding the chain
 # as 100n (using $at as scratch, same five slots) gives it USA's 100 px width.

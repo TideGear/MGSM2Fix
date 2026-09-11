@@ -9,7 +9,8 @@ the MOVIE captions, `en_menu3` and the VR KEY CONFIG (§12), and through
 2026-09-09, when the untranslated Japanese was dumped and the glyph
 identification was set up as the one open task (§17), and on 2026-09-10,
 when the raw disc booted for the first time and the briefing turned out to
-be broken on it (§24 - `ROW_H`, still open), and when that task was
+be broken on it (§24 - `ROW_H`; **fixed late the same day**: an R3000
+load-delay hazard, one `nop`, and a scanner so it cannot recur), and when that task was
 finished - all 1,200 bank-1 glyphs named, 100% of the
 Japanese readable as text, and the fragment map §17 rested on found to be
 wrong for 93% of strings and rebuilt (§18), and then the export itself
@@ -259,8 +260,8 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 |---|---|
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
 | **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
-| **real engineering** | **The briefing is broken on a real disc and the fix is open** - `ROW_H`, 11 instructions, §24. A good build exists without it (`repro25nocounts`), missing only row spacing. The delivery mechanism for a fix is proven; what is needed is reverse engineering of `0x800C69B4`'s callers, not another formula. Also: **submit the pull request** (5.6), and look at the other two raw-only screens |
-| **needs a fresh pair of eyes** | §24's four untested groups (`s00`, `s00x`, `unshare`, `memadv`, `advances`) - switched off as collateral, never individually retested |
+| ~~**real engineering**~~ | **The briefing: FIXED 2026-09-10 late** - `ROW_H` was an R3000 **load-delay hazard**, `subu` reading `a1` in the slot right after `lbu a1`; one `nop` in place, no stub, and `hazards.py` now scans every rewritten block on every build (§24, top). Build `repro32raw`, images in `D:\mgsbuild\patched`. **Not yet seen on screen.** Still real work: **submit the pull request** (5.6), and look at the other two raw-only screens |
+| **needs a fresh pair of eyes** | the briefing from the `repro32raw` images on SwanStation - the first accurate-renderer run with every geometry group on; the five groups `INTEGRAL_BRF_NO_COUNTS` switched off during the bisect were never the fault and are all back |
 | ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete, on all three discs: 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. §18 and §19 |
 | **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
 | **held open on purpose** | §6's **three** remaining **[open 2026-09-07]** items: the READ MISSION LOG? caption and USA's `1/2` counter, the VR number substitutions, and VR EXTRA record 6. The fourth, the `abst` location names, was decided on 2026-09-08 (use USA's). Raised, considered beside the `SCARF` case, and held on purpose — see the note at the head of §6 |
@@ -1328,7 +1329,8 @@ an explicit answer before anything changes.
 | `verify_integral_option.py`, `verify_usa_brightness.py` | read the deployed PPFs / built-in patch back and check them |
 | `shotcmp_brightness.py A.jpg [B.jpg]` | measures brightness-screen shots |
 | `preope_usa.py` | Previous Operations directly from retail, USA pagination; stages PPFs unless `--deploy` is supplied |
-| `brf_build.py`, `brf_widen.py` | briefing labels and quads |
+| `brf_build.py`, `brf_widen.py` | briefing labels and quads; the build asserts zero load-delay hazards against retail |
+| `hazards.py <built> <base-hex> [--retail <retail>]` | **R3000 load-delay scanner** for hand-written MIPS: a load followed at once by a read of the loaded register, a non-load write in that slot, a branch in a branch's delay slot, mfhi/mflo too close to a mult. With `--retail`, only word pairs the port changed are judged. The Master Collection's emulator does not model the delay, so no screenshot taken there can catch this class of bug - this is the check. `selftest.py` proves it catches the 2026-09-10 briefing bug at its own address |
 | `savemsg.py`, `camsave.py` | the two memory-card caption ports |
 | `abst_build.py [--deploy]` | the MISSION LOG port: rewrites both GCX scripts in the `abst` stage with USA's pages, swaps the bottom-bar art, packs the stage with `obj/abst.bin`, relocates to DUMMY3M slot 462, verifies, stages/deploys the PPFs |
 | `abstscan.py [page N]` | mission-log scoping data, both games (retail data; the port's own checks are in `abst_build.py`) |
@@ -1366,7 +1368,7 @@ an explicit answer before anything changes.
 | `bridge.py` | the Squirrel-debugger client for live RAM reads/pokes (README "Toolchain and environment"); writes `sqcmd/`, `sqout/`, `bridge.log` beside itself (git-ignored) |
 | `gcldump.py`, `gclprocs.py` | dump a stage script's command tree / every proc with decoded values (used to read the title script's 1P MODE path) |
 | `pcx4.py` | encode/decode the 4-plane RLE PCX the texture loader expects (how `sc_text` and the KEY CONFIG art were read and written) |
-| `selftest.py` | **23 tests over the pieces that need no game data** — the PPF emitter's two split boundaries, the record chain, the PCX codec, the EDC/ECC algebra, the width model. `py selftest.py`, a hundredth of a second. Ground truth lives elsewhere: `cdecc.py` against the real discs, `rebuild.py --compare-deployed` against the deployed set |
+| `selftest.py` | **44 tests over the pieces that need no game data** — the PPF emitter's two split boundaries, the record chain, the PCX codec, the EDC/ECC algebra, the width model, the language default, the load-delay scanner. `py selftest.py`, a tenth of a second. Ground truth lives elsewhere: `cdecc.py` against the real discs, `rebuild.py --compare-deployed` against the deployed set |
 | `cdecc.py` | EDC and P/Q parity for raw Mode 2 Form 1 sectors. `py cdecc.py` is the check that proves both the sums and the retail executables: it rebuilds each zero-filled executable extent from the supplied retail file and matches the parity the collection left behind (313/313, 313/313, 308/308) |
 | `rawdisc.py` | the raw-disc EDC/ECC pass. As a library `rebuild.py --variant raw` uses it to emit each disc's `*_zz_ecc.ppf`; as a command, `py rawdisc.py <package>` applies a finished raw set in memory and confirms every touched sector verifies |
 | `widths.py` | how wide a ported line renders and how wide it may be: the `vrwindow` budget derived step by step from the decomp, the 255-px `max_width` ceiling, and the pool line separator. Read its docstring before adding a width assert — the per-window budget is **not** an invariant, retail exceeds it |
@@ -2760,6 +2762,73 @@ right except the **briefing**, whose right column renders as vertical stripes
 of sampled VRAM. This section is written while the fault is still open,
 because the eliminations are worth more than the conclusion will be.
 
+### FIXED, late 2026-09-10: one `nop`. Read this before the rest of §24
+
+The fault was never the arithmetic. It was the **R3000 load delay**: the
+instruction after a load still sees the register's *old* value, and the
+port's eleven words read `a1` in the very slot after `lbu a1, 13(v0)`:
+
+    lbu  a0, 29(v0)      v2
+    lbu  a1, 13(v0)      v0
+    subu v1, a0, a1      <- a1 is still the caller's poly index (9..24)
+
+So `height` came out as `v2 - idx` - a hundred rows and more - and every
+label was stretched down the column: vertical stripes of sampled VRAM.
+Retail's eleven words never touch a register in the slot after loading it
+(the compiler schedules for this), and neither does any other block the port
+rewrote in this overlay. `hazards.py` now proves that on every build.
+
+Every observation below falls out of it, with nothing left over:
+
+| observation | why |
+|---|---|
+| the same bytes render cleanly on the Master Collection | its emulator does not model the load delay, so the arithmetic ran as written - the 26 shot pairs could never have shown it |
+| SwanStation and hardware break | both model the delay |
+| `height` alone: smears | `subu a0, a0, a1` right after `lbu a1`: height = v2 - idx |
+| `above` alone: rows shifted | `andi a1, a1, 7` right after `lbu a1`: above = idx & 7, 0..7 by row |
+| the POLY_FT4 code-byte guard made a diagonal fan | `lbu` then `andi` on the code byte - one more hazard |
+| the stub running retail's own words: clean | retail's words have no hazard |
+| the stub's restored X normalisation did not help | `lh a1, 8(v0)` then `sh a1, 0x18(v0)`: x2 took the row's top y |
+
+The premise this section built on - that the routine "also draws rows that
+are not textured labels" - is **false**. `b_select.c` decompiles
+`brf_800C69B4`, and the register simulation over `brf_800C6E88` (its only
+caller) lists sixteen call sites, every one with a poly index 9..24: the
+sixteen `br_sNN` labels, all textured, all with valid UVs. The reverse
+engineering §24 asked for was done and found nothing to fix.
+
+The fix is in place, eleven words, no stub and no stage growth: `lbu a0`,
+`lbu a1`, **`nop`**, then the same arithmetic and the four stores. The
+overlay is retail's 127,702 bytes again. `brf_widen.py` `ROW_H_NEW` carries
+the words and the explanation; `brf_build.py` asserts zero load-delay
+hazards against retail before it writes the stage; `hazards.py` is the
+scanner and `selftest.py` proves it catches exactly this pattern at exactly
+this address. Scanned the same way the same evening: `en_items`,
+`en_savemsg`, `vr_en_items`, `vr_en_savemsg`, the language default on both
+executables, the VR MOVIE stub and the VR option call sites - **no other
+hazard anywhere in the port**. (The scanner reports four "branch-slot" hits
+inside the relocated string pools at `0x80011E00`-`0x80012200`; those are
+text bytes, not code.)
+
+**Not yet seen on screen.** The fix is static: mechanism, scan, tests. The
+build is `D:\mgsbuild\repro32raw`; §25 says which images came from it. Look
+at the briefing on SwanStation with the same settings as before. Every group
+is on, so this is also the first time the full geometry set runs on an
+accurate renderer.
+
+**The lesson is new for this project.** The Master Collection is not only a
+different renderer; it is a **lenient CPU**. Anything written by hand in
+MIPS and verified only there can be wrong in exactly this way, which is why
+the scan was run on every family and not only `brf`. And §16's rule applies
+to the theory in the rest of this section: six formula guesses were made
+against a routine whose arithmetic was right all along, and the one
+sentence that would have ended it - "what does the instruction after the
+load see?" - was never asked.
+
+*The rest of §24 is the record of the bisect as it stood before the cause was
+found. The eliminations were sound; the conclusions drawn from them ("both
+halves are wrong", "reverse engineer the callers") were not.*
+
 ### What is established
 
 | | |
@@ -2923,20 +2992,25 @@ a seventh.
     INTEGRAL_BRF_NO_COUNTS=1      skip all six count/index groups
     INTEGRAL_BRF_SKIP=a,b,c       skip named groups: rowh s00 s00x
                                   unshare memadv advances
-    INTEGRAL_BRF_ROWH_MODE=       retail | above | height | both (default)
-    INTEGRAL_BRF_ROWH_PASSTHROUGH=1   the stub runs retail's own eleven words
+
+(`INTEGRAL_BRF_ROWH_MODE` and `INTEGRAL_BRF_ROWH_PASSTHROUGH` went with the
+stub when the cause was found; the row box is eleven words in place again.)
 
 They are diagnostics, not features. `INTEGRAL_BRF_NO_CODE` also relaxes the
 quad==texture assertion, because with the geometry discarded they legitimately
 disagree.
 
-### Four groups were never tested alone
+### Four groups were never tested alone (moot since the fix)
 
 `INTEGRAL_BRF_NO_COUNTS` turns off six groups. Only `rowh` was isolated and
 shown guilty. **`s00`, `s00x`, `unshare`, `memadv` and `advances` may be
 perfectly fine** - they were switched off as collateral and never individually
 retested. Before shipping anything with `rowh` disabled, turn those four back
 on and check, or the disc is missing layout work it did not need to lose.
+
+*With the cause found (top of §24) nothing is disabled: `hazards.py` finds no
+hazard in any of them, and `repro32raw` ships them all. The one check still
+owed is the full set on screen.*
 
 ### A measurement that lied, worth keeping
 
@@ -2977,8 +3051,9 @@ leave every other one broken, and split a file that is currently identical.
 
 ## 25. The 2026-09-10 working state, for whoever opens this next
 
-Written at the end of the session that booted the raw disc. **Read §24 first**
-- it is the open problem. This is only where things are.
+Written at the end of the session that booted the raw disc, and updated late
+the same night when the briefing was fixed. **Read the top of §24 first** - the
+cause and the fix are there. This is only where things are.
 
 ### Discs and images
 
@@ -2989,19 +3064,26 @@ Written at the end of the session that booted the raw disc. **Read §24 first**
 | built images | `D:\mgsbuild\patched` |
 | RetroArch screenshots | `C:\Users\Tideg\My Drive\RetroArch\Screenshots` |
 
-The three shipped images in `patched\` (`MGS Integral English (Disc 1/2/3)`)
-are from `repro21raw` **with the briefing bug in them**. They boot; the
-briefing is wrong. Do not treat them as final.
+The three images in `patched\` (`MGS Integral English (Disc 1/2/3)`) were
+rebuilt at 22:31 from **`repro32raw`**, the build with the briefing fix and
+every geometry group on; all three passed `mkimage.py`'s before-and-after
+parity over every touched sector (418 / 418 / 2,004), and the fixed eleven
+words were read back out of both main-disc images, once each, at the
+relocated `brf` stage, with the old sequence absent. `TEST - Disc 1 no
+counts.bin` beside them is the 17:05 diagnostic build (`repro25nocounts`) and
+can go once the new disc 1 has been seen. **The briefing on these images has
+not been looked at yet** - that is the one check owed.
 
 ### The builds that matter
 
 | directory | what it is |
 |---|---|
-| `repro21raw` | the full raw set before any of this; what the shipped images came from |
-| `repro25nocounts` | **the good one** - `INTEGRAL_BRF_NO_COUNTS=1`, briefing clean, row spacing wrong |
-| `repro29control` | the stub running retail's own row-box code; proves the mechanism |
-| `repro30`, `repro31above`, `repro31height` | the three failed fix attempts |
-| `repro20` | the last **collection** build (not raw) |
+| **`repro32raw`** | **the fix**: `ROW_H` with the load-delay `nop`, in place, every group on; 32 PPFs, ZIP `a2ebded6…`; what the images in `patched\` are built from |
+| `repro21raw` | the full raw set before any of this; what the first (broken) images came from |
+| `repro25nocounts` | the bisect's clean build - `INTEGRAL_BRF_NO_COUNTS=1`, briefing clean, row spacing wrong; superseded |
+| `repro29control` | the stub running retail's own row-box code; proved the append-and-jump mechanism, which is no longer used |
+| `repro30`, `repro31above`, `repro31height` | the three failed fix attempts - each carried the hazard (§24, top) |
+| `repro20` | the last **collection** build (not raw). The collection build shares `en_brf` byte for byte, so it carries the same bug until it is rebuilt and redeployed; MC hides it, but the fix should go there too |
 
 Every `mkimage.py` run used `--english-default yes`.
 

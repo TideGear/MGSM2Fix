@@ -2986,9 +2986,13 @@ and `x1 == x3`. The two `lh` and the two `sh` that copy x are dead:
 
     lbu  a0, 29(v0)      v2
     lbu  a1, 13(v0)      v0
+    nop                  the R3000 load delay: a1 is not readable yet
     subu v1, a0, a1      v1 = texture height
     addu v1, a2, v1      v1 = y + height
     sh a2,10 / a2,18 / v1,26 / v1,34
+
+(The `nop` was missing until 2026-09-10 and the Master Collection never
+showed it - see "The briefing row box on a real disc" below.)
 
 The quad is now the texture height per label — the same rule USA uses — so the
 highlight matches without approximation, and every canvas is USA's art at USA's
@@ -3764,27 +3768,42 @@ the true (label −8) address. This is also why the USA release build's
 `demo_rank` chain read as nonsense on first sight ("default 4"): the labels
 were off, not the code.
 
-### The briefing row box is broken on a real disc (open, 2026-09-10)
+### The briefing row box on a real disc: a load-delay hazard (found and fixed 2026-09-10)
 
 `en_brf`'s `ROW_H` - eleven instructions at `0x800C69C8`, inside
-`set_row_box(work, i, y, advance)` at `0x800C69B4` - corrupts the briefing's
-right column on hardware and on an accurate emulator. The Master Collection
-renders the same bytes cleanly, which is why it went unnoticed: the failure
-depends on what the primitive buffer already held.
+`brf_800C69B4(work, idx, y, advance)` - drew the briefing's right column as
+vertical stripes of sampled VRAM on SwanStation's software renderer, while
+the Master Collection rendered the same bytes cleanly. The bisect (NextSteps
+§24) narrowed it to those eleven words and then spent six formula guesses on
+them. The arithmetic was right. **The scheduling was wrong.**
 
-Retail sets the box to `[y, y+13]` and normalises the quad's X corners. The
-port made the box `[y - (v0 & 7), + (v2 - v0)]`, reading the row's height and
-shift out of the polygon's own texture coordinates, and dropped the X
-normalisation to afford the arithmetic. Both new terms are wrong, for the
-same underlying reason: **that routine also draws rows that are not textured
-labels**, and for those the UV bytes mean nothing. Tested separately on
-screen - the shift alone misaligns rows, the height alone smears them.
+The R3000 delivers a load one instruction late: the instruction in the slot
+after `lbu a1, 13(v0)` reads the *old* `a1`, which here is the caller's poly
+index (9..24). The port's `subu v1, a0, a1` sat in that slot, so the height
+came out as `v2 - idx` - a hundred rows and more - and every label was
+stretched down the column. Retail's words never read a register in the slot
+after loading it, because the compiler schedules for the delay; the port's
+were written by hand and did not. The fix is one `nop` between the second
+load and the subtraction, eleven words in place, no stub, no stage growth.
 
-`NextSteps.md` §24 has the full bisect, the four diagnostic switches in
-`brf_build.py`, the proven way to deliver a longer replacement (a routine
-appended past the overlay's end, reached by a jump - the game itself loads
-169 KB overlays at that address, so the room is real), and the reason the next
-step is reverse engineering the callers rather than another formula.
+**Why the collection hid it.** M2's emulator does not model the load delay,
+so the arithmetic ran as written there, and the 26 shot pairs that signed
+`en_brf` off were drawn by it. The collection is not only a different
+renderer; it is a **lenient CPU**, and no screenshot taken there can catch
+this class of bug. That makes the check static: `hazards.py` scans every
+word the port writes against retail's for a load followed at once by a read
+of the loaded register (and three rarer patterns), `brf_build.py` asserts
+zero before it writes the stage, and `selftest.py` proves the scanner
+catches the 2026-09-10 pattern at its own address. The same scan over every
+other hand-patched object - both executables' pools, the language default,
+the VR MOVIE stub, the VR option call sites - found nothing else.
+
+**What the failed attempts had in common**, for anyone who meets the
+symptom again: every variant that broke had a load-use pair (`lbu` then
+`andi`, `lbu` then `subu`, `lh a1` then `sh a1`), and every variant that was
+clean had none. A hand-written MIPS sequence that "should work" and does
+not, on hardware or an accurate emulator but not on the collection, is this
+until proved otherwise.
 
 ### 1P MODE (Integral only): its Japanese pages, and the language it starts in
 

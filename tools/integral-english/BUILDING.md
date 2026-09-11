@@ -27,11 +27,20 @@ is the collection build.
 
 ## Tests
 
-`py selftest.py` runs 23 tests over the parts that need no game data — the PPF
+`py selftest.py` runs 44 tests over the parts that need no game data — the PPF
 emitter's two split boundaries (255 bytes and the 2048-byte payload edge), the
-record chain, the PCX codec's run cap, the EDC/ECC algebra, the width model. It
-takes a hundredth of a second and needs nothing installed, so there is no excuse
-for skipping it before a build.
+record chain, the PCX codec's run cap, the EDC/ECC algebra, the width model,
+the language-default patch over a synthetic executable, and the R3000
+load-delay scanner (`hazards.py`), which must catch the 2026-09-10 briefing
+bug at its own address and pass retail's words and the fix. It takes a tenth
+of a second and needs nothing installed, so there is no excuse for skipping it
+before a build.
+
+The build itself runs the scanner: `brf_build.py` asserts zero load-delay
+hazards in the rewritten overlay against retail, and the same command works on
+any hand-patched object - `py hazards.py <built> <base-hex> --retail <retail>`.
+The Master Collection's emulator does not model the delay, so this is the only
+check that class of bug has.
 
 It is deliberately not a check against ground truth. `py cdecc.py` is that, for
 the checksums, against the real discs; `rebuild.py --compare-deployed` is that
@@ -272,6 +281,7 @@ extents. `NextSteps.md` §5.4, §5.10 and §5.13.
 
 | run | date | what changed since the previous run | matched the deployed set | ZIP SHA-256 |
 |---|---|---|---|---|
+| `repro32raw` | 2026-09-10 | **raw variant**; `en_brf` `ROW_H` with the load-delay `nop` (the briefing fix), every geometry group on; 32 PPFs, 24 main + 8 VR | n/a (raw builds are not compared to the deployed collection set) | `a2ebded662372497df4864e0981c17556559f2143ab2832794b86e8324c3173f` |
 | `repro20` | 2026-09-08 | packaged README: the uninstall count too | 27 of 27 | `9dff48498d2be474685f490b12df77f301dc107b5a49e5790898639bb459bce3` |
 | `repro19` | 2026-09-08 | packaged README corrected (ten PPFs a disc; the split VR pair) | 27 of 27 | `c8df6f1e…556a` (superseded by repro20) |
 | `repro18` | 2026-09-08 | USA's four `abst` location names | 27 of 27 | `0044ed814c81d18308e3969b5f342aa10ba4d3b17561881efc399300216eda3e` |

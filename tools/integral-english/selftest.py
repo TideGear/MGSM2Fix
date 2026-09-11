@@ -26,6 +26,7 @@ import unittest
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import cdecc
+import hazards
 import langdefault
 import pad2
 import pcx4
@@ -363,6 +364,60 @@ class LangDefault(unittest.TestCase):
         doubled[off + 0x400:off + 0x400 + 72] = exe[off:off + 72]
         with self.assertRaises(AssertionError):
             langdefault.patch_for(bytes(doubled))
+
+
+class Hazards(unittest.TestCase):
+    """hazards.py, the R3000 load-delay scanner every rewritten block goes through.
+
+    The eleven words below mirror brf_widen.ROW_H_OLD / ROW_H_NEW (brf_widen
+    needs the game data to import, so they are copied, and brf_build.py asserts
+    the live ones on every build). BUGGY is what the port shipped from
+    2026-09-02 to 2026-09-10: `subu` reads a1 in the slot right after `lbu a1`.
+    """
+    BASE = 0x800C69C8
+    RETAIL = [0x84440008, 0x84450020, 0x24C3000D, 0xA446000A, 0xA4460012, 0xA443001A,
+              0xA4430022, 0xA4440008, 0xA4450010, 0xA4440018, 0xA4450020]
+    BUGGY = [0x9044001D, 0x9045000D, 0x00851823, 0x30A50007, 0x00C52023, 0x00831821,
+             0xA444000A, 0xA4440012, 0xA443001A, 0xA4430022, 0x00000000]
+    FIXED = [0x9044001D, 0x9045000D, 0x00000000, 0x00851823, 0x30A50007, 0x00C52023,
+             0x00831821, 0xA444000A, 0xA4440012, 0xA443001A, 0xA4430022]
+
+    def scan(self, words, retail=None):
+        pack = lambda ws: b''.join(struct.pack('<I', w) for w in ws)
+        return [(a, k) for a, k, _ in hazards.scan(pack(words), self.BASE,
+                                                   None if retail is None else pack(retail))]
+
+    def test_the_briefing_bug_is_caught_at_its_own_address(self):
+        self.assertEqual(self.scan(self.BUGGY), [(self.BASE + 4, 'load-use')])
+
+    def test_the_fix_and_retail_are_both_clean(self):
+        self.assertEqual(self.scan(self.FIXED), [])
+        self.assertEqual(self.scan(self.RETAIL), [])
+
+    def test_a_store_in_the_slot_is_a_use(self):
+        # the stub's X normalisation: lh a1, 8(v0) then sh a1, 0x18(v0)
+        self.assertEqual(self.scan([0x84450008, 0xA4450018]), [(self.BASE, 'load-use')])
+
+    def test_a_branch_in_the_slot_is_a_use(self):
+        # lw v0, 0(a0) then bne v0, s3
+        self.assertEqual(self.scan([0x8C820000, 0x14530002]), [(self.BASE, 'load-use')])
+
+    def test_a_gap_of_one_instruction_is_enough(self):
+        self.assertEqual(self.scan([0x8C820000, 0x00000000, 0x14530002]), [])
+
+    def test_a_second_load_into_the_register_is_the_compiler_s_idiom(self):
+        self.assertEqual(self.scan([0x808D0000, 0x808D0000]), [])          # lb t5; lb t5
+
+    def test_a_non_load_writer_in_the_slot_is_reported(self):
+        self.assertEqual(self.scan([0x8C820000, 0x24020001]), [(self.BASE, 'load-write')])
+
+    def test_a_branch_in_a_branch_s_delay_slot_is_reported(self):
+        self.assertEqual(self.scan([0x03E00008, 0x08030000]), [(self.BASE, 'branch-slot')])
+
+    def test_words_identical_to_retail_are_not_judged(self):
+        self.assertEqual(self.scan(self.BUGGY, retail=self.BUGGY), [])
+        one_off = list(self.BUGGY); one_off[1] ^= 1          # the load itself differs
+        self.assertEqual(self.scan(self.BUGGY, retail=one_off), [(self.BASE + 4, 'load-use')])
 
 
 _TMP = os.path.join(os.environ.get('TEMP') or '/tmp', 'integral-english-selftest')
