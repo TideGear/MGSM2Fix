@@ -3322,7 +3322,7 @@ port, which never touches subtitles. Its README lists its own open issues:
 Integral's RADIO.DAT does not recompile (sector-aligned calls, extra
 graphics padding), "~30 kanji yet to identify, numerous others are wrong".
 
-**What it revealed: three of our glyph readings were wrong.** Their
+**What it revealed: all six of our disputed readings were wrong.** Their
 `graphicsData` maps 6,877 codec-glyph bitmaps (Japanese disc 1) to
 characters. Hashing their bitmaps with `jptext.shape_key` and looking them
 up in `bank1-glyphs.tsv`: **all 1,214 of our shapes occur in their table,
@@ -3330,33 +3330,44 @@ up in `bank1-glyphs.tsv`: **all 1,214 of our shapes occur in their table,
 beside 12-px reference glyphs of both candidates (three system fonts, ±1 px
 alignment, best pixel agreement) and by re-reading the export's sentences:
 
-| id | uses | ours | theirs | pixels | decision |
+| id | uses | was | now | pixels | why |
 |---|---:|---|---|---|---|
-| g518 | 80 | 京 | 涼 | 62.5 / 70.1 | **changed** - the tile has three dots down its left edge, the water radical 氵, which 京 has no room for; the one context is a staff credit, `モーション 吉村京子`, and 吉村涼子 is as good a name, so the sentence cannot decide and the pixels do |
-| g1030 | 8 | 綺 | 華 | 54.9 / 71.5 | **changed** - the tile is horizontal bars the full width with one central vertical, the shape of 華; 綺 would have a thread radical 糸 down the left, and there is none. The one sentence, `確かに綺麗すぎです。反省…` ("it really is too clean; I'll take that on board") reads at least as well as 確かに華麗すぎです ("it really is too showy"), a fair self-criticism, so sense does not rule it out |
-| g1156 | 2 | 瀕 | 餓 | 59.0 / 66.0 | **changed** - the left component is boxed like 食, not the three dots of 氵; the two uses are in text the export does not cover, so pixels alone decided |
-| g210 | 656 | 綿 | 緻 | 57.6 / 61.1 | **undecided, ours kept** - 綿密な配慮 and 緻密な配慮 are both real collocations and the 12x12 tile does not separate 帛 from 致 reliably |
-| g1045 | 6 | 輌 | 輛 | 63.9 / 65.3 | variant forms of one character; ours kept |
-| g658 | 44 | 〝 | ” | - | the same double quotation mark in two typographic conventions; ours kept |
+| g518 | 80 | 京 | 涼 | 62.5 / 70.1 | three dots down the left edge, the water radical 氵, which 京 has no room for. The one context is a staff credit, `モーション 吉村京子`, and 吉村涼子 is as good a name, so the sentence cannot decide and the pixels do |
+| g1030 | 8 | 綺 | 華 | 54.9 / 71.5 | horizontal bars the full width with one central vertical, the shape of 華; 綺 would have a thread radical 糸 down the left, and there is none. `確かに綺麗すぎです` ("too clean") and 確かに華麗すぎです ("too showy") both read as self-criticism, so sense does not rule it out |
+| g1156 | 2 | 瀕 | 餓 | 59.0 / 66.0 | the left component is boxed like 食, not the three dots of 氵. The two uses are in text the export does not cover, so pixels alone decided |
+| g210 | 624 | 綿 | 緻 | 51.0 / 54.6 | **right half only** - 綿 and 緻 share 糸, so a whole-tile score is mostly agreement about the half not in dispute. On the right half the tile is dense with diagonals, which is 攵 in 致; 帛 would leave a clean white box interior and there is none. 緻密な配慮 and 綿密な配慮 are equally real, so again the pixels decide |
+| g1045 | 6 | 輌 | 輛 | 53.6 / 54.1 | **a tie on pixels, adopted for want of anything against it.** At 12x12 両 and 兩 differ only by an inner stroke and no reading is measurably better; 0.5 points is noise. Nothing supported 輌 either, and the two are one word, so nothing turns on it |
+| g658 | 44 | 〝 | ” | 12.5 / 66.7 | **the clearest of the six, and the one called a "variant" without looking.** The tile's marks are thick at the top and step down to the left, which is ”; 〝 leans the other way. Decisive corroboration: the table holds **one** quote glyph and the text uses it at *both* ends - `彼の髪形は〝タコ〝`, `〝隠れる事〝` - and a 〝…〟 pair needs two. One symmetric mark used for open and close is ”, not 〝 |
 
-**Do the sentences still make sense after the swap?** Asked, and yes:
-吉村涼子 is a name where 吉村京子 was a name; 華麗すぎ is a real word where
-綺麗すぎ was; and 餓 has no sentence to fit. The sentence test is what let
-these through in the first place - a name and a near-synonym pass it either
-way - which is why the pixels carried the decision, and why 綿/緻 is kept:
-there the pixels are as ambiguous as the sentence.
+**Do the sentences still make sense?** Asked twice, and checked both times.
+吉村涼子 is a name where 吉村京子 was one. 華麗すぎ is a real word where 綺麗すぎ
+was. 緻密な配慮が必要 means what 綿密な配慮が必要 meant. 輛 is the same word as
+輌. `彼の髪形は"タコ"ということで` and `ゲームの基本ルールである"隠れる事"を` read
+*better* than before, because 〝…〝 was never valid typography and "…" is.
+餓 has no sentence to fit. Sense never objected to any of the six, which is
+exactly the point: the sentence test cannot see a misread that lands on a
+name, a near-synonym, a variant form or a quotation mark.
 
-`bank1-glyphs.tsv` is corrected for g518, g1030, g1156 (the table loads and
+`bank1-glyphs.tsv` is corrected for all six (the table loads and
 `selftest.py` passes). The export in `work/jpdump/` was written with the old
 readings and is not regenerated - it is a reading aid outside the repository,
 and the three characters occur in 90 of its 68,242 lines; `py radiotext.py
 --dump` rewrites it whenever it is next wanted. §19's claim stands as
 written - zero *unresolved* codes - but its 78/78 holdout and "read against a
-full sentence" could not see these, because a name and a near-synonym pass
-both tests. A second reading could, and did. That is the lesson, and its limit: for
-the 1,208 that agree, two readings of the same pixels made separately are
-stronger evidence than either alone; for the 6 that differ, neither is
-right by default.
+full sentence" could not see these, because a name, a near-synonym, a variant
+form and a quotation mark all pass a sentence test either way.
+
+**The second lesson is about the first pass at this section, not the table.**
+It first adopted three of the six and kept three, calling 綿/緻 "undecided"
+and 輌/輛 and 〝/” "variants" - which sounds like judgment and was closer to
+defending the existing entry. The user looked at the picture and said all
+three of those were the toolkit's to win. Re-tested properly they were: the
+whole-tile score for a compound character is dominated by the radical both
+candidates share, so **the test has to exclude the shared component**, and on
+the right half alone 緻 wins; and the "variant" 〝/” was never scored at all,
+which is how a 12.5-versus-66.7 miss stayed in the table wearing the word
+"variant". A disagreement is not settled by being renamed. Score the half
+that differs, score every row, and keep the count honest: **six of six.**
 
 **What it corroborates, from its docs, without changing anything here.**
 The font block layout (12-byte header, 96-entry variable-width ASCII table,
