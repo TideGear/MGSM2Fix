@@ -3156,8 +3156,8 @@ value; the detailed one needed its own register because its layout store
 shared `s7` with the outline's. `hazards.py` clean. README, "The connectors'
 left ends". Built as `repro33raw` / `repro33` (see §25 for what was written
 where). **Seen on the collection 23:26** in all three submenus: the line now
-begins at the box edge, and the member gap is gone. Not yet seen on
-SwanStation from the `repro33raw` images.
+begins at the box edge, and the member gap is gone. **Seen on SwanStation
+from the `repro33raw` disc 1 image at 23:45** as well: both targets confirmed.
 
 ### The dim connector on the Master Collection is the collection's, not ours
 
@@ -3177,3 +3177,24 @@ horizontal connector is dim on the collection". Fixable in MC by pinning the
 three connectors' UVs to the bright texel (code, needs room; a USA stub would
 ride the built-in disc-patch mechanism) - offered, not done: it is cosmetic,
 MC-only, and outside the port's scope until the user says otherwise.
+
+**Is it only the briefing?** Surveyed 23:42: every `*line*` texture on disc 1
+drawn as a stretched quad. The two-row line texture is a house style - the
+option screen's `line` (4x2, 135 over 23) and the title's `sp_line` use it
+as **2-px** quads, which show bright row plus shadow on every renderer;
+`b_line1`, `cam_line1..3` and `sub_sline` have uniform rows and cannot
+disagree. The briefing is the only place that squeezes a two-row texture
+into a **1-px** quad (`br_line1` connectors, `br_line2` bars), so within the
+main disc it is one menu's misuse of a shared asset.
+
+**The user's objection, and it is right:** pinning UVs in the disc bytes is a
+band-aid that would only ever run in the collection, because the raw disc is
+already correct - and anything that runs only in the collection can live in
+MGSM2Fix, which already hooks M2's emulated GPU (smoothing, internal
+resolution). The fix at the source is an ASI rule on the GPU's primitive
+path: a textured quad one pixel tall whose V spans more than one texel gets
+its V collapsed to the first row, which is what hardware draws. One rule,
+both titles, no disc patch, upstream-worthy. Cost unknown: it needs the point
+in M2's GPU code where primitives are consumed, which MGSM2Fix has not
+mapped. Next step if wanted: a scoping pass to find that hook point before
+writing anything.
