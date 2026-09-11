@@ -230,7 +230,7 @@ equivalence, not a new gameplay test.
 
 ### Deployed ini right now, and the play defaults
 
-**Live at 2026-09-11 00:11 — a TEST SESSION is open**: `UnlockBriefing = true`, `DisableRAM = true`, `DisableCDROM = true` (achievements off), to look at the six flag-gated briefing items and their L-connector bars on the collection with `ThinTexturedQuads`. `[Patches] ThinTexturedQuads = true` is also in the live ini now. Put the three back to the play defaults below when the session is over. Note `DisableCDROM` also drops the collection's KEY CONFIG interception, so Integral's own KEY CONFIG shows meanwhile - expected.
+**Live at 2026-09-11 00:11 — a TEST SESSION is open**: `UnlockBriefing = true`, `DisableRAM = true`, `DisableCDROM = true` (achievements off), to look at the six flag-gated briefing items and their L-connector bars on the collection with `ThinTexturedQuads`. **11:09: the three VR unlock aids** (`INTEGRAL_vr_unlock_{missions,movies,extras}.ppf`) **are deployed to `mods\INTEGRAL\VR-DISK\`** for §5.5's remaining VR checks; delete them when the session ends, before achievements go back on. `[Patches] ThinTexturedQuads = true` is also in the live ini now. Put the three back to the play defaults below when the session is over. Note `DisableCDROM` also drops the collection's KEY CONFIG interception, so Integral's own KEY CONFIG shows meanwhile - expected.
 
 **Before that, live at 2026-09-08 22:20 — back at the play defaults, and the test session was over.** `DisableRAM = false`, `DisableCDROM = false` (achievements live), `GiveItems` and `GiveWeapons` both empty, and **no `_unlock_` PPF anywhere under `mods\`** — all four aids (`INTEGRAL_vr_unlock_{missions,movies,extras}.ppf` and `VRUS_unlock_missions.ppf`) were deleted. Remember the ini the game reads is the **Vortex symlink target**, `%APPDATA%\Vortex\...\MGSM2Fix.ini`; write that, not the link. **27 PPFs are deployed and `ppfcheck.py --deployed` is clean over all of them**: 20 main (the ten families × two discs) and the VR disc's seven. The VR seven were redeployed from `repro17` the same evening, which is what finally put the **disjoint** `vr_en_missions` / `vr_en_movie` pair on disk — the deployed pair had still been the old overlapping build, 686 bytes shared and every one of them conflicting, working only because Ketchup applies a folder in name order. They now share **0 bytes**, and the whole VR set was proved equal in effect to what it replaced before it went on (`vr_set_effect_equal`, no differences).
 
@@ -313,8 +313,8 @@ right:**
   `《MP 5 SD》 サブマシンガン。□ボタンを押すと発砲。押しつづけると、フルオート連射。サプレッサー装備。`
 
 ### 5.2 The disc-2 run (needs the user at the controller; nothing to build)
-Load the **Comm Twr A** save (no debug) and play through the actual story disc
-break. Watch whether the game's own swap flow draws (`Now Checking...` /
+Play through the actual story disc break from any late disc-1 save (no debug;
+Comm Tower A is the last disc-1 area, so a save there is the shortest route). Watch whether the game's own swap flow draws (`Now Checking...` /
 `Insert DISC 2.`) or the collection swaps silently; then read the log for
 `Disk ID is 1`. This validates disc 2 and the normal swap path. It does **not**
 establish reachability of all four copies: title/wrong-disc, demo-theater and

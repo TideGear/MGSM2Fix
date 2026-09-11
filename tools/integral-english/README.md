@@ -1416,9 +1416,9 @@ it from both sides:
 So a plain gameplay area (s11a) debug-loads clean, an event stage (s14e)
 hangs, and neither touches the disc. **The only way onto disc 2, and the only
 way to see whether the swap prompt appears, is to play across the break** -
-the user holds a Comm Tower A save (disc 1) for exactly that: Comm Tower A ->
-B -> Hind D -> Sniper Wolf -> capture, then watch the transition and read the
-log for `Disk ID` becoming 1.
+from any late disc-1 save (Comm Tower A is the last disc-1 area): Comm Tower
+A -> B -> Hind D -> Sniper Wolf -> capture, then watch the transition and read
+the log for `Disk ID` becoming 1.
 
 `StageSelect` therefore accepts three kinds of name, documented in the ini:
 `true` (the top menu - TITLE / DEMO ALL / SOUND TEST only), a **menu**
@@ -2776,7 +2776,7 @@ standing and is itself unattributed.
   developer menu cannot get there: disc 2 is set only by `change.c`'s CD check,
   which only the real story swap runs, so every debug load stays `Disk ID 0`
   (two attempts 2026-09-04: s11a playable but DISC 1; s14e hung). See "The
-  disc-swap text: four copies". The route is the Comm Tower A save played
+  disc-swap text: four copies". The route is a late disc-1 save played
   across the break. Neither has any *other* title's disc 2 been launched, which
   is why no disc-2 patch candidate has ever appeared in a log. What the port
   touches is measured identical across the two discs (2026-09-03):
