@@ -228,7 +228,7 @@ MEMBER_NEW = [0x8E420088,   # lw    v0, 136(s2)     br_s03 flag
               0x24040003,   # addiu a0, zero, 3     (delay) n = 3
               0x24040004,   # addiu a0, zero, 4
               0x8E420090,   # lw    v0, 144(s2)     br_s05 flag
-              0x2408FFE8,   # addiu t0, zero, -24   connector left end (load slot)
+              0x2408FFE0,   # addiu t0, zero, -32   p39 connector LEFT end: USA's (Integral -24), see CONNECTOR_LEFT
               0x14530002,   # bne   v0, s3, +2
               0x2405000B,   # addiu a1, zero, 11    (delay) br_s02's poly
               0x24840001,   # addiu a0, a0, 1
@@ -334,7 +334,7 @@ DETAIL_NEW = [0x8E4200A4,   # lw    v0, 164(s2)     br_s10 flag
               0x24040006,   # addiu a0, zero, 6
               0x24040007,   # addiu a0, zero, 7
               0x8E4200B0,   # lw    v0, 176(s2)     br_s13 flag
-              0x00000000,
+              0x2409FFE5,   # addiu t1, zero, -27   p41 connector LEFT end, USA's - in the load-delay slot (does not read v0)
               0x14530003,   # bne   v0, s3, +3
               0x00000000,
               0x24840001,   # addiu a0, a0, 1
@@ -360,8 +360,9 @@ assert len(DETAIL_OLD) == len(DETAIL_NEW) == 22
 # The submenu group's x: the vertical rules (polys 26/40/42) take theirs from
 # s6/s5, and the horizontal connectors (polys 25/39/41) run from the FILE column
 # to the rule, taking their right end from s4.  Shift the rule and that right
-# end by -20 so they land on USA's; the connectors' left ends (-46 at 800C6F14,
-# -24 at 800C700C) are anchored to the FILE column and stay put.
+# end by -20 so they land on USA's.  The connectors' left ends were believed to
+# anchor to the FILE column and were left at Integral's values until 2026-09-10;
+# CONNECTOR_LEFT below is the correction.
 GROUP_DX = -20
 RULE_X = [(0x800C6F28, 19, 19 + GROUP_DX, 'vertical rule left  (s6, polys 26/40/42)'),
           (0x800C6F38, 23, 23 + GROUP_DX, 'vertical rule right (s5, polys 26/40/42)')]
@@ -375,8 +376,8 @@ RULE_S4 = (0x800C6F18, 0x00E0A021, 0x24140000 | ((20 + GROUP_DX) & 0xFFFF),
 # at 800C74C0.  For the outline submenu that block is still active once settled,
 # so its constants won and the rule stayed at game x 20 - inside the text -
 # while the others followed s6/s5 to 0.  Shift the animated constants by the
-# same -20.  The connectors' LEFT ends (-46, -24) anchor to the FILE column and
-# are left alone; only their animated right ends move.
+# same -20.  The connectors' LEFT ends are a separate matter - see CONNECTOR_LEFT
+# below; only their animated right ends move here.
 ANIM_X = [(0x800C73A0, -46, -66, 'p25 connector right end'),
           (0x800C7424, -24, -44, 'p39 connector right end'),
           (0x800C745C, -46, -66, 'p41 connector right end'),
@@ -397,6 +398,27 @@ RULE = [(0x800C6F34, -2, -4, 'operation-outline rule top'),
         (0x800C7028, -18, -16, 'operation-member rule bottom'),
         (0x800C7174, -2, -4, 'detailed-information rule top'),
         (0x800C7178, 2, 14, 'detailed-information rule bottom')]
+
+# The three horizontal connectors' LEFT ends (polys 25 / 39 / 41: the line from
+# the selected FILE button to the submenu's rule).  Integral starts them at -46,
+# -24 and -46; USA at -39, -32 and -27.  Until 2026-09-10 the port kept
+# Integral's, on the belief that they "anchor to the FILE column" - but the FILE
+# column's boxes are USA's now (br_f00..03 at USA's widths), so the outline and
+# detailed lines ran 7 px INTO their box and the member line stopped 8 px short
+# of its.  Found by the user on SwanStation and in MC alike; the 26 shot pairs
+# that signed the family off compared game x 150-320, and the left ends sit at
+# 114-136.  Each end has two writers: the layout block and the reveal animation
+# (`x = 11p - K`), and both take USA's value.  p39's layout value lives in
+# MEMBER_NEW[6]; p41's layout store shared s7 with p25 (both -46) and now takes
+# t1, loaded with -27 in DETAIL_NEW's load-delay slot (t1 is free there: the
+# member block's mult is done and the frame function that clobbers t0/t1 is
+# only called after the stores).
+CONNECTOR_LEFT = [(0x800C6F14, -46, -39, 'p25 outline, layout (s7)'),
+                  (0x800C7390, -46, -39, 'p25 outline, reveal'),
+                  (0x800C73F0, -24, -32, 'p39 member, reveal'),
+                  (0x800C744C, -46, -27, 'p41 detailed, reveal')]
+CONNECTOR_LEFT_P41 = [(0x800C717C, 0xA6370670, 0xA6290670, 'p41 x0: sh s7 -> sh t1 (-27)'),
+                      (0x800C7184, 0xA6370680, 0xA6290680, 'p41 x2: sh s7 -> sh t1 (-27)')]
 
 HILITE = [(0x800C6944, 10,  5, 'bar top / box bottom'),
           (0x800C6950, 11,  6, 'bar bottom'),

@@ -26,7 +26,8 @@ from brf_widen import (stage, parse, geo, units, ufits, vfits, strcode, pad, BAS
                        FRAME_NEW, USA_ABOVE, OUTLINE_T8_ADDR, OUTLINE_T8_OLD, OUTLINE_T8_NEW,
                        MEMBER_ADDR, MEMBER_OLD, MEMBER_NEW, MEMBER_ADV, CONNECTOR_X,
                        S01_ADDR, S01_OLD, S01_NEW, CONNECTOR_END,
-                       RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX, ANIM_X)
+                       RULE_X, RULE_S4, S00_X_OLD, S00_X_NEW, GROUP_DX, ANIM_X,
+                       CONNECTOR_LEFT, CONNECTOR_LEFT_P41)
 
 si, ti, Fi, pi = stage(WORK + '/int1_stage.dir')
 su, tu, Fu, pu = stage(WORK + '/usa1_stage.dir')
@@ -174,6 +175,18 @@ for addr, old_w, new_w, what in ([] if 'memadv' in _SKIP else MEMBER_ADV):
     assert struct.unpack('<I', ovl[o:o+4])[0] == old_w, 'member adv %08X' % addr
     struct.pack_into('<I', ovl, o, new_w)
     print('row advance @%08X: 20 -> t9 (20 | 17)  %s' % (addr, what))
+for addr, old_v, new_v, what in CONNECTOR_LEFT:
+    o = addr - BASEADDR
+    w = struct.unpack('<I', ovl[o:o+4])[0]
+    cur = w & 0xFFFF; cur -= 0x10000 if cur >= 0x8000 else 0
+    assert (w >> 26) == 9 and ((w >> 21) & 31) == 0 and cur == old_v, 'connector left %08X: %08X' % (addr, w)
+    struct.pack_into('<I', ovl, o, (w & 0xFFFF0000) | (new_v & 0xFFFF))
+    print('connector @%08X: left end %+d -> %+d  (%s, USA)' % (addr, old_v, new_v, what))
+for addr, old_w, new_w, what in CONNECTOR_LEFT_P41:
+    o = addr - BASEADDR
+    assert struct.unpack('<I', ovl[o:o+4])[0] == old_w, 'connector left p41 %08X' % addr
+    struct.pack_into('<I', ovl, o, new_w)
+    print('connector @%08X: %s  (USA)' % (addr, what))
 for addr, old_w, new_w, what in CONNECTOR_END:
     o = addr - BASEADDR
     assert struct.unpack('<I', ovl[o:o+4])[0] == old_w, 'connector end %08X' % addr

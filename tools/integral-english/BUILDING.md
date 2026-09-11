@@ -281,6 +281,8 @@ extents. `NextSteps.md` §5.4, §5.10 and §5.13.
 
 | run | date | what changed since the previous run | matched the deployed set | ZIP SHA-256 |
 |---|---|---|---|---|
+| `repro33raw` | 2026-09-10 | **raw variant**; the three horizontal connectors' left ends at USA's values (`CONNECTOR_LEFT`); what the images in `D:\mgsbuild\patched` are built from | n/a (raw) | `0d2eab58e7141ff8d716c374f1920d6059cb39cdd69dce352c4d1f20594daef5` |
+| `repro33` | 2026-09-10 | collection build of the same; `--compare-deployed` reported exactly the two `en_brf` PPFs as different (the intended change) and so made no ZIP; those two were **deployed** from its `package/` at 23:24, the previous pair kept as `workrf_deployed_before_connector_disc{1,2}.ppf` | 25 of 27, the two `en_brf` by design | none (no ZIP) |
 | `repro32raw` | 2026-09-10 | **raw variant**; `en_brf` `ROW_H` with the load-delay `nop` (the briefing fix), every geometry group on; 32 PPFs, 24 main + 8 VR | n/a (raw builds are not compared to the deployed collection set) | `a2ebded662372497df4864e0981c17556559f2143ab2832794b86e8324c3173f` |
 | `repro20` | 2026-09-08 | packaged README: the uninstall count too | 27 of 27 | `9dff48498d2be474685f490b12df77f301dc107b5a49e5790898639bb459bce3` |
 | `repro19` | 2026-09-08 | packaged README corrected (ten PPFs a disc; the split VR pair) | 27 of 27 | `c8df6f1e…556a` (superseded by repro20) |

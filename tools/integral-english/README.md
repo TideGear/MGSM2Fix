@@ -3209,15 +3209,37 @@ constants need the same shift:
     800C75B8  -47 -> -67   p42 detailed rule x0/x2
     800C75C4  -43 -> -63   p42 detailed rule x1/x3
 
-The connectors' **left** ends (`-46` and `-24`, separate immediates) anchor to
-the FILE column and stay. Lesson: after moving anything in this menu, check for
-a second writer — the settled frame and the reveal animation set the same fields
-from different code, and which one wins varies by submenu.
+The connectors' **left** ends are a separate matter and were wrong until
+2026-09-10 - see "The connectors' left ends" below. Lesson: after moving
+anything in this menu, check for a second writer — the settled frame and the
+reveal animation set the same fields from different code, and which one wins
+varies by submenu.
 
 `s4` is `addu s4, a3, zero` — it reuses `br_s00`'s **advance** of 20 as an x
 coordinate, so it needs a real load rather than an edited immediate, and `a3`
-must keep its 20. The connectors' left ends (`-46` at `800C6F14`, `-24` at
-`800C700C`) are anchored to the FILE column and stay put.
+must keep its 20.
+
+### The connectors' left ends (found by the user 2026-09-10)
+
+The horizontal connector from the selected FILE button to the submenu's rule
+(polys 25 / 39 / 41) starts at a hardcoded x, and this file used to say those
+left ends "anchor to the FILE column and stay put". They anchor to the FILE
+**boxes**, and the port gave the FILE column USA's boxes (`br_f00..03` at USA's
+widths) while leaving the left ends at Integral's. Measured on SwanStation, the
+outline connector began 7 game px inside the `operation outline` box (display
+704 against a box edge at 750, where retail USA's begins at 741); in the
+member submenu it stopped 8 px short of the box instead, because Integral's
+value there is *right* of USA's. Both are the same bug seen from either side.
+
+| connector | poly | Integral | USA | writers |
+|---|---|---|---|---|
+| outline | 25 | -46 | **-39** | `800C6F14` (layout, `s7`) and `800C7390` (reveal) |
+| member | 39 | -24 | **-32** | `MEMBER_NEW[6]` (layout, `t0`) and `800C73F0` (reveal) |
+| detailed | 41 | -46 | **-27** | layout stored `s7`, shared with the outline; now `t1`, loaded with -27 in `DETAIL_NEW`'s load-delay slot, stored at `800C717C`/`800C7184`; reveal `800C744C` |
+
+`CONNECTOR_LEFT` / `CONNECTOR_LEFT_P41` in `brf_widen.py`. Why it survived the
+26 shot pairs: those compared game x 150-320, and the left ends sit at 114-136.
+The right ends (`ANIM_X`, moved by `GROUP_DX`) were already USA's.
 
 At USA's `xl` nothing overflows (family A 10 + 128 = 138, family B 29 + 120 =
 149), so the earlier right-edge clamp is gone and both families sit at USA's

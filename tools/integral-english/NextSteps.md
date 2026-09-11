@@ -3072,8 +3072,8 @@ cause and the fix are there. This is only where things are.
 | RetroArch screenshots | `C:\Users\Tideg\My Drive\RetroArch\Screenshots` |
 
 The three images in `patched\` (`MGS Integral English (Disc 1/2/3)`) were
-rebuilt at 22:31 from **`repro32raw`**, the build with the briefing fix and
-every geometry group on; all three passed `mkimage.py`'s before-and-after
+rebuilt at 23:24 from **`repro33raw`** (`repro32raw`'s briefing fix plus the
+connector left ends of §26; the 22:31 images were removed first); all three passed `mkimage.py`'s before-and-after
 parity over every touched sector (418 / 418 / 2,004), and the fixed eleven
 words were read back out of both main-disc images, once each, at the
 relocated `brf` stage, with the old sequence absent. `TEST - Disc 1 no
@@ -3086,7 +3086,8 @@ indented items, which that disc's save has not earned.
 
 | directory | what it is |
 |---|---|
-| **`repro32raw`** | **the fix**: `ROW_H` with the load-delay `nop`, in place, every group on; 32 PPFs, ZIP `a2ebded6…`; what the images in `patched\` are built from |
+| **`repro33raw`** / **`repro33`** | `repro32raw` plus the connectors' left ends (§26). The raw one is what the images in `patched\` are built from; the collection one's two `en_brf` PPFs are **deployed** in `mods\` since 23:24 (the pair they replaced is `workrf_deployed_before_connector_disc{1,2}.ppf`) |
+| `repro32raw` | the `ROW_H` fix alone: the load-delay `nop`, in place, every group on; 32 PPFs, ZIP `a2ebded6…` |
 | `repro21raw` | the full raw set before any of this; what the first (broken) images came from |
 | `repro25nocounts` | the bisect's clean build - `INTEGRAL_BRF_NO_COUNTS=1`, briefing clean, row spacing wrong; superseded |
 | `repro29control` | the stub running retail's own row-box code; proved the append-and-jump mechanism, which is no longer used |
@@ -3134,3 +3135,39 @@ bug was found at all: the 26-shot-pair verification that signed `en_brf` off
 compared Integral-on-MC against USA-on-MC. Both sides were drawn by the same
 renderer, so its behaviour cancels out of the difference. That check proves
 agreement, never correctness.
+
+## 26. The 2026-09-10 late pass: the connectors' left ends, and the collection's dim line
+
+Two things the user saw once the briefing rendered on an accurate emulator.
+
+### The horizontal connectors started in the wrong place - a port bug, fixed
+
+The line from the selected FILE button to the submenu's rule begins at a
+hardcoded x per submenu. Integral: -46 / -24 / -46; USA: -39 / -32 / -27. The
+port kept Integral's, on the recorded belief that they "anchor to the FILE
+column" - but the FILE column's boxes are USA's now, so the outline and
+detailed lines ran 7 px into their box and the member line stopped 8 px short
+of its. Retail USA on SwanStation starts the line exactly at the box edge; so
+did retail Integral against its own, wider box. The 26 shot pairs that signed
+`en_brf` off compared game x 150-320 and never looked at x 114-136.
+
+All six writers (layout and reveal animation, three submenus) now take USA's
+value; the detailed one needed its own register because its layout store
+shared `s7` with the outline's. `hazards.py` clean. README, "The connectors'
+left ends". Built as `repro33raw` / `repro33` (see §25 for what was written
+where).
+
+### The dim connector on the Master Collection is the collection's, not ours
+
+On MC the same connector draws faint (USA and Integral alike, patched or not);
+on SwanStation and hardware it is full brightness. Its texture `br_line1` is
+4x2 with a bright row (grey 135) over a dark one (grey 23) and the quad is one
+pixel tall with V spanning both rows, so the renderer's texture-coordinate
+rounding picks the row: hardware takes the bright one, M2's renderer the dark
+one (measured: MC's line sits +25 over the background, the dark texel's
+value). Not dithering - that cannot move a texel from 135 to 23 - and not the
+USA `BrightnessText` patch, which never touches this stage. README, "The
+horizontal connector is dim on the collection". Fixable in MC by pinning the
+three connectors' UVs to the bright texel (code, needs room; a USA stub would
+ride the built-in disc-patch mechanism) - offered, not done: it is cosmetic,
+MC-only, and outside the port's scope until the user says otherwise.
