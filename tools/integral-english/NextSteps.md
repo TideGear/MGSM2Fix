@@ -1266,7 +1266,9 @@ own English is not wrong, it is just not USA's.
 The user's measured fuse is approximately four seconds on both discs. Integral's
 `DELAY 5.2` decal and five-second briefing are original authoring errors. The
 standalone fix now covers **both assets**, as requested on 2026-09-11. It remains
-outside the English package and the MGSM2Fix upstream PR.
+outside the collection English package and the MGSM2Fix upstream PR. Since
+2026-09-12 the raw English package includes it by the user's explicit request
+(§5.17).
 
 - **Texture:** USA's exact decoded `DELAY 4.0` texture, in `selectvr`'s second
   DAR, `4D80.p`. Fits Integral's existing slot losslessly. **Confirmed good
@@ -1345,6 +1347,33 @@ planner/real-disc checks an observed play test. README "Optional PPF controls"
 and BUILDING "Tests" document operation and rerunning verification.
 
 ---
+
+### 5.17 Raw package includes both grenade corrections, 2026-09-12
+
+The user found the missing texture after making raw images. Readback of all
+three BINs in `D:/mgsbuild/patched` matched all 33 PPFs in `repro34raw` exactly;
+that package predated the correction. Its VR image still had Integral's
+original texture and all five English fuse digits were 5. The raw packager
+also omitted the standalone texture addon even with current source.
+
+At the user's request, raw builds now include
+`INTEGRAL_vr_fix_grenade_delay_english.ppf`: the USA DELAY 4.0 decal and five
+agreeing briefing writes. The English mission builder already corrects those
+digits. The new payload joins the package **before** `INTEGRAL_vr_zz_ecc.ppf`
+is generated, so parity describes the entire English set. No standalone raw
+parity addon or INI control is needed. Collection packaging remains separate.
+
+**Built and verified:** `D:/mgsbuild/repro35raw/Integral-English-raw.zip`, 34
+PPFs (24 main, 10 VR). Only the VR mission PPF, new grenade PPF and VR ECC PPF
+differ from `repro34raw`; main-disc patches are identical. The new VR BIN was
+built from the retail dump with English power-on retained: all 2,015 touched
+sectors pass parity, decoded texture pixels match USA exactly, all five
+briefings differ only at 5 -> 4, and every other stage is unchanged. The BIN
+in `D:/mgsbuild/patched` was replaced and hash-verified; its previous copy is
+in `repro35raw/previous-image`. Report: `repro35raw/raw-grenade-verification.json`.
+Image SHA-256: `90a50dfb7ec1ed99ebae609590e119b4d3cfb8f13227f4268552b2b47380b894`.
+The 49 self-tests pass. **Confirmed working in game by the user, 2026-09-12:**
+"Good it works." Both grenade corrections are now verified in the raw English build.
 
 ## 6. Decisions that are the user's — ask, do not assume
 

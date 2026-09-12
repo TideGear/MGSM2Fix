@@ -16,6 +16,7 @@ edited by hand):
 | `SC_KEEP_LINES` (`optsctext.py`) | 4 - the collection drops USA's two ○-button lines | 6 - USA's own text |
 | `OPTION_MC_CONTROL_SETTINGS` (`opt.c`) | 1 - reproduce the KEY CONFIG doorbell | 0 - nothing to intercept, and no RAM at 0x80200000 |
 | `en_menu3` (the `title` disc-swap copy) | **excluded** - the collection patches that block itself and the two layouts kill the title stage | included |
+| VR grenade correction | separate texture addon; English mission text includes the corrected numeral | included: DELAY 4.0 texture and all five four-second briefings, with parity computed for the complete package |
 
 The switch is `INTEGRAL_ENGLISH_VARIANT`, resolved in `workdir.py` next to
 `WORK`/`GAME`/`DECOMP`, so a tool run by hand honours it too:

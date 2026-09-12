@@ -72,6 +72,15 @@ raw-disc only" below.
 
 ## Standalone VR grenade delay correction
 
+**Raw packages now include this fix (2026-09-12).** `rebuild.py --variant raw`
+packages the English-layout texture/fuse PPF and computes its parity together
+with the whole English set in `INTEGRAL_vr_zz_ecc.ppf`. Applying the complete
+raw package therefore includes DELAY 4.0 and all five four-second briefings;
+no separate addon or INI setting is needed. The standalone commands below
+remain useful for Japanese images or separately assembled patch sets.
+Both corrections in the raw English build were confirmed working in game by
+the user on 2026-09-12 (`repro35raw`).
+
 `py vr_grenade.py` builds the standalone grenade fix in `WORK`. The default
 `INTEGRAL_vr_fix_grenade_delay.ppf` works on **original Japanese Integral**:
 USA's `DELAY 4.0` texture plus the corrected briefing numeral. It is independent

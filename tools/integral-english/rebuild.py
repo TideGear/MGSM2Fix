@@ -358,6 +358,21 @@ def main():
                 report['outputs'][name]['difference_count'] = len(mismatch)
                 report['outputs'][name]['difference_addresses'] = [hex(p) for p in sorted(mismatch)[:12]]
         if raw:
+            # Include the standalone correction in raw packages. Use payload
+            # records only: the final shared ECC pass must include every English
+            # patch, rather than a standalone addon's narrower sector base.
+            from vr_grenade import raw_package_records
+            name = 'INTEGRAL_vr_fix_grenade_delay_english.ppf'
+            records = raw_package_records(
+                (work/'vrint_stage.dir').read_bytes(),
+                (work/'vrus_stage.dir').read_bytes(), vrimage,
+                vrmods/'INTEGRAL_vr_en_missions.ppf')
+            data = make_ppf(records, 'Integral VR grenade: four-second decal and text', vrblock)
+            (vrmods/name).write_bytes(data)
+            problems, n, span, desc = check(vrmods/name)
+            assert not problems, (name, problems)
+            report['outputs'][name] = dict(sha256=sha256(data), bytes=len(data),
+                                           records=n, changed_bytes=len(effects(vrmods/name, vrimage)))
             vrlba,_ = next((l,s) for n,l,s,d in vrimage.walk()
                            if not d and n.upper() == '/MGS/SLPM_862.49;1')
             substitutes = rawdisc.Substitutes()

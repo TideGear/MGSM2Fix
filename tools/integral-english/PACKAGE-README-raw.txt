@@ -83,6 +83,11 @@ WHAT DIFFERS FROM THE COLLECTION BUILD
   - KEY CONFIG is Integral's own screen with USA's English labels, because
     there is no Control Settings panel here to intercept it;
   - en_menu3 is included: the title screen's disc-swap prompt in English.
+  - the VR grenade correction is included: USA's DELAY 4.0 texture and
+    "4 seconds" in all five copies of the grenade briefing. The texture/fuse
+    PPF is INTEGRAL_vr_fix_grenade_delay_english.ppf; its sector parity is
+    included in the package's final INTEGRAL_vr_zz_ecc.ppf. No separate grenade
+    addon is needed. MGSM2Fix.ini does not control raw images.
 
 VERIFIED, AND NOT
 

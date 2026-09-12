@@ -142,6 +142,30 @@ def build_stage(original, usa):
     return result
 
 
+def raw_package_records(isd, usd, disc, missions):
+    """English raw package payload; rebuild.py computes parity for the full set."""
+    original = v.stage_bytes(isd, STAGE)
+    modified = build_stage(original, v.stage_bytes(usd, STAGE))
+    lba = v.stage_lba(disc, isd, STAGE)
+    records = v.inplace_records(lba, original, modified, merge_gap=0)
+    usa_briefing = v.stage_bytes(usd, 'vr_grn02')
+    assert usa_briefing[briefing_offset(usa_briefing, 'english')] == ord('4')
+    for name in BRIEFING_STAGES:
+        lba = v.stage_lba(disc, isd, name)
+        stage = portio.patched_file(v.stage_bytes(isd, name), lba, [missions])
+        pos = briefing_offset(stage, 'english')
+        assert stage[pos] == ord('4'), 'English mission builder must correct the fuse'
+        records.extend(portio.map_runs(lba, [(pos, b'4')]))
+    # The only shared writes must be the five agreeing briefing digits.
+    owned = {off + k: byte for off, data in portio.read_ppf(missions)
+             for k, byte in enumerate(data)}
+    overlaps = [(off + k, byte) for off, data in records
+                for k, byte in enumerate(data) if off + k in owned]
+    assert len(overlaps) == 5
+    assert all(owned[off] == byte == ord('4') for off, byte in overlaps)
+    return records
+
+
 def write_variant(out, records, expected, base_records=()):
     """Verify the payload PPF and raw parity against this variant's text base."""
     block = portio.blockcheck_of(v.INT_CONTAINER, v.INT_VR_BASE)

@@ -2313,3 +2313,32 @@ preserved verbatim here. Validation passed: Release x64 build, 49 Python
 self-tests, all Python compile checks, native option checks, the four real-disc
 English/grenade configurations, and structural checks of all 38 installed PPFs.
 No new in-game test or game deployment was performed during this commit review.
+
+## 33. Both grenade corrections included in raw packages, 2026-09-12
+
+The user's newly patched raw VR image still showed DELAY 5.2. Inspection found
+all 33 `repro34raw` PPFs applied exactly, but that older package predated the
+briefing fix and the raw packager never included the standalone texture addon.
+All five English briefing copies still read 5. The user explicitly requested
+both corrections in the raw patch.
+
+`rebuild.py --variant raw` now packages the English-layout grenade payload
+before computing the complete set's shared ECC patch. The helper verifies the
+USA texture round trip and exactly five agreeing writes shared with the English
+mission patch. The standalone raw addon's narrower parity is not reused.
+
+Clean build `D:/mgsbuild/repro35raw` produced 34 PPFs. Compared with `repro34raw`,
+only the mission PPF, new grenade PPF and VR ECC PPF changed. `mkimage.py` built
+the VR BIN from the retail dump with English power-on retained and verified
+all 2,015 touched sectors before and after patching. Finished-image readback
+proved exact USA decoded pixels, only five 5 -> 4 briefing edits, and no changes
+to any other stage. All 34 PPFs pass structural checks; all 49 self-tests pass.
+
+The usual VR BIN in `D:/mgsbuild/patched` was replaced and hash-verified; the
+previous BIN is retained in `repro35raw/previous-image`. The existing CUE and
+both main-disc images remain valid. Verification report:
+`repro35raw/raw-grenade-verification.json`. New image SHA-256:
+`90a50dfb7ec1ed99ebae609590e119b4d3cfb8f13227f4268552b2b47380b894`.
+ZIP SHA-256: `5d276e7c178ba359c94e66d4dfff72681ef450c538840fcfeb23eff84ea3b523`.
+The user confirmed the raw build works on 2026-09-12: "Good it works."
+The collection installation was not changed.
