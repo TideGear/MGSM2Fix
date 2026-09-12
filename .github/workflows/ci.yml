@@ -11,6 +11,29 @@ permissions:
   actions: write
 
 jobs:
+  integral-english-tools:
+    runs-on: windows-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install tool dependencies
+      run: py -m pip install -r tools/integral-english/requirements.txt
+
+    - name: Self-test (data-free - PPF emitter, PCX codec, width model, load-delay scanner)
+      run: py tools\integral-english\selftest.py
+
+    - name: Compile-check every tool script
+      shell: bash
+      run: |
+        cd tools/integral-english
+        py -m py_compile *.py
+
   make:
     runs-on: windows-latest
     outputs:

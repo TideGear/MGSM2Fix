@@ -9,8 +9,8 @@ where its lines sit and that the (8,8,8) seam filler is still in rows 0..1.
 DUMMY3M is blank on the retail image, which emit() asserts, so the records
 alone rebuild the stage.
 """
-import struct, sys
-sys.path.insert(0, r'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
+import os, struct, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pcx4
 from optsctext import (dar_entries, img_off, SC_TEXT, SC_KEEP_LINES, SC_ROWS,
                        SLOT, DISCS, MODS, HDR, pad)

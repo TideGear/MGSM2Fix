@@ -10,7 +10,6 @@ import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from workdir import WORK
 import sys, struct
-sys.path.insert(0, 'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 from optscan import stage
 
 FIELD = {8: 'x0', 10: 'y0', 16: 'x1', 18: 'y1', 24: 'x2', 26: 'y2', 32: 'x3', 34: 'y3'}

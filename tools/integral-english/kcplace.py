@@ -12,8 +12,6 @@ CLUTs are 16 entries -> 16 words on one row, at a 16-word-aligned x.
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from workdir import WORK
-import sys
-sys.path.insert(0, 'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 from optscan import stage, parse, geo, strcode
 
 LAB = ['key_sykan', 'key_button', 'key_syukan', 'key_buki', 'key_reverse',

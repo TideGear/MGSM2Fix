@@ -17,7 +17,6 @@ import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from workdir import WORK
 import sys, struct, re, json
-sys.path.insert(0, 'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 from optscan import stage, parse, strcode
 import pcx4
 

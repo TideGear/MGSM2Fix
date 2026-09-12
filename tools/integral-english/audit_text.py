@@ -14,6 +14,7 @@ import struct
 from iso import Disc
 from portio import (INTEGRAL_IMAGES, USA_IMAGES, USA_VR_IMAGE, entries, stage,
                     read_ppf, sha256)
+from workdir import GAME, WORK
 
 
 def game_text(data):
@@ -190,10 +191,13 @@ def save_titles(work):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--game', type=Path, default=Path('D:/Steam/SteamApps/common/MGS1'))
-    parser.add_argument('--executables',type=Path,default=Path('D:/mgsbuild/integral-english-work/work'))
+    parser.add_argument('--game', type=Path, default=Path(GAME) if GAME else None)
+    parser.add_argument('--executables', type=Path, default=Path(WORK))
     parser.add_argument('--output',type=Path,required=True)
     args = parser.parse_args()
+    if args.game is None:
+        parser.error('Cannot find the Master Collection MGS1 directory; '
+                      'pass --game, or set INTEGRAL_ENGLISH_GAME (see workdir.py).')
     japan = args.game/'windata/dlc/dlc_japan.bin'
     usa = args.game/'windata/alldata.bin'
     vr = find_vr(japan)

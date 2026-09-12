@@ -6,20 +6,45 @@ texture that results. Nothing here trusts the build tools' intent.
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-from workdir import WORK
+from workdir import WORK, GAME
 import re, struct, sys, io
-sys.path.insert(0, r'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 import pcx4
 from optsctext import ents, dar_entries, pad, SC_TEXT
 
-ASI = (r'C:/Users/Tideg/AppData/Roaming/Vortex/metalgearsolidmc/'
-       r'mods/MGSM2Fix-5-3-6-0-1774482213/MGSM2Fix64.asi')
+REPO = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))  # .../MGSM2Fix
+
+
+def _find_asi():
+    """The built .asi holding the shipped brightness table: $INTEGRAL_ENGLISH_ASI,
+    then this repo's own build output, then the author's Vortex staging folder
+    as a last resort (kept so this still runs unmodified on the author's
+    machine)."""
+    env = _os.environ.get('INTEGRAL_ENGLISH_ASI')
+    candidates = [env] if env else []
+    candidates += [
+        REPO + '/x64/Release/MGSM2Fix.asi',
+        REPO + '/Release/MGSM2Fix.asi',
+        r'C:/Users/Tideg/AppData/Roaming/Vortex/metalgearsolidmc/'
+        r'mods/MGSM2Fix-5-3-6-0-1774482213/MGSM2Fix64.asi',
+    ]
+    for c in candidates:
+        if c and _os.path.isfile(c):
+            return c
+    raise SystemExit(
+        'Cannot find a built MGSM2Fix .asi.\n'
+        '  Looked in: $INTEGRAL_ENGLISH_ASI, %s/x64/Release/MGSM2Fix.asi,\n'
+        '  %s/Release/MGSM2Fix.asi.\n'
+        '  Build MGSM2Fix first, or set INTEGRAL_ENGLISH_ASI to its path.'
+        % (REPO, REPO))
+
+
+ASI = _find_asi()
 HDR, SIZE, PAY_OFF = 24, 5852, 0x1064
 DISCS = [(1, WORK + '/usa1_stage.dir', 132344, 0x165A4790, 0xF12F8000),
          (2, WORK + '/usa2_stage.dir', 100801, 0x11EE3E40, None)]
 
 # --- the patch bytes, and the offsets, straight out of the header the build used
-hdr = io.open(r'C:/Users/Tideg/My Drive/Development/MGSM2Fix/src/mgs1.h',
+hdr = io.open(REPO + '/src/games/mgs1.h',
               encoding='utf-8', newline='').read().replace('\r\n', '\n')
 i = hdr.index('MGS1_BrightnessTextData[426] = {')
 want = bytes(int(x, 16) for x in re.findall(r'0x([0-9A-Fa-f]{2}),', hdr[i:hdr.index('};', i)]))
@@ -72,10 +97,13 @@ for no, path, lba, off_expect, alldata_base in DISCS:
     assert got_off == off_expect
 
     if alldata_base is not None:
-        f = open('D:/Steam/SteamApps/common/MGS1/windata/alldata.bin', 'rb')
-        f.seek(alldata_base + got_off)
-        assert f.read(426) == bytes(d[fo:fo + 426]), 'alldata.bin disagrees with the dump'
-        print('        the collection\'s own alldata.bin holds those same pre-patch bytes')
+        if not GAME:
+            print('        (skipped: collection install not found - set INTEGRAL_ENGLISH_GAME)')
+        else:
+            f = open(GAME + '/windata/alldata.bin', 'rb')
+            f.seek(alldata_base + got_off)
+            assert f.read(426) == bytes(d[fo:fo + 426]), 'alldata.bin disagrees with the dump'
+            print('        the collection\'s own alldata.bin holds those same pre-patch bytes')
 
     # apply, then decode
     d[fo:fo + 426] = data

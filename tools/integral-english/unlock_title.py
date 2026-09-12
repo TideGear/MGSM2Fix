@@ -35,13 +35,13 @@ usage: unlock_title.py [--deploy]
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-from workdir import WORK
+from workdir import WORK, GAME
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from optscan import ents
 
 HDR = 24
-MODS = 'D:/Steam/SteamApps/common/MGS1/mods'
+MODS = (GAME + '/mods') if GAME else None
 
 # (address, old word, new word, note) per game; all addresses in the overlay
 INT_SITES = [
@@ -108,6 +108,10 @@ def main():
         out = WORK + '/' + os.path.basename(rel); open(out, 'wb').write(blob)
         print('%s: %d words -> %s' % (name, len(recs), out))
         if deploy:
+            if not MODS:
+                raise SystemExit('Cannot find the Master Collection MGS1 directory; '
+                                  'run workdir.py to see what was searched, or set '
+                                  'INTEGRAL_ENGLISH_GAME.')
             p = os.path.join(MODS, rel); os.makedirs(os.path.dirname(p), exist_ok=True)
             open(p, 'wb').write(blob); print('   deployed %s' % p)
     if not deploy: print('\nNOT DEPLOYED. Re-run with --deploy to install.')

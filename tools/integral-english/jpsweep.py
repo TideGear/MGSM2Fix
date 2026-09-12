@@ -13,7 +13,6 @@ import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
 from workdir import WORK
 import sys, struct
-sys.path.insert(0, 'C:/Users/Tideg/My Drive/Development/MGSM2Fix/tools/integral-english')
 from optscan import ents, stage
 
 BASE_I, BASE_U = 0x800C3208, 0x800C5968

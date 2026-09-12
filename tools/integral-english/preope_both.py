@@ -21,16 +21,15 @@ line breaks.
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
-from workdir import WORK
+from workdir import WORK, require_decomp
 import struct, sys
-sys.path.insert(0,'.')
 from gclparse import parse_script, containers_over, be16, be32
 from gcldec import chain_at
 def pad(x,a=2048): return (x+a-1)//a*a
 
 REF=open(WORK + '/int1_stage.dir','rb').read()
 US =open(WORK + '/us1_stage.dir','rb').read()
-OVL=open('D:/mgsbuild/d/obj/preope.bin','rb').read()
+OVL=open(require_decomp() + '/obj/preope.bin','rb').read()
 IB,UB=0x6A71*2048,0x7659*2048
 scr_off=2048+pad(24911)+pad(113716)          # 0x23000
 body=IB+scr_off+0x172

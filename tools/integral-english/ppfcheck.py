@@ -18,8 +18,10 @@ original image before the first record, which Ketchup skips and this follows.
 Records are u64 offset, u8 length, then that many bytes, to end of file.
 """
 import glob, os, struct, sys
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from workdir import GAME
 
-MODS = 'D:/Steam/SteamApps/common/MGS1/mods'
+MODS = (GAME + '/mods') if GAME else None
 # No disc image in the collection is anywhere near 1 GB, so an offset past this
 # is not a plausible destination - it is a misparse.
 OFFSET_CEILING = 0x40000000
@@ -70,8 +72,14 @@ def main():
     if not args:
         print(__doc__)
         return 2
-    paths = (sorted(glob.glob(os.path.join(MODS, '**', '*.ppf'), recursive=True))
-             if args == ['--deployed'] else args)
+    if args == ['--deployed']:
+        if not MODS:
+            raise SystemExit('Cannot find the Master Collection MGS1 directory; '
+                              'run workdir.py to see what was searched, '
+                              'or set INTEGRAL_ENGLISH_GAME.')
+        paths = sorted(glob.glob(os.path.join(MODS, '**', '*.ppf'), recursive=True))
+    else:
+        paths = args
     if not paths:
         print('no PPFs found')
         return 2
@@ -79,8 +87,8 @@ def main():
     worst = 0
     for p in paths:
         problems, n, span, desc = check(p)
-        name = os.path.relpath(p, MODS) if p.startswith(MODS.replace('/', os.sep)) or \
-            p.startswith(MODS) else p
+        name = os.path.relpath(p, MODS) if MODS and (p.startswith(MODS.replace('/', os.sep)) or \
+            p.startswith(MODS)) else p
         if problems:
             worst = 1
             print('FAIL %s' % name)
