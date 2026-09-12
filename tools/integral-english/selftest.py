@@ -420,6 +420,62 @@ class Hazards(unittest.TestCase):
         self.assertEqual(self.scan(self.BUGGY, retail=one_off), [(self.BASE + 4, 'load-use')])
 
 
+class GrenadeBriefingTests(unittest.TestCase):
+    """Synthetic GCL proves the correction cannot change another numeral."""
+
+    @staticmethod
+    def stage(line, title=b'GRENADE  LEVEL  02\0'):
+        import vrlib as v
+        import portio
+        records = [b'WEAPON  MODE\0', title, b'\0', line, b'Targets 5\0']
+        strings = b''.join(b'\x07' + bytes([len(r)]) + r for r in records)
+        values = b'\x06\xd4\x4e' + b'\x50b' + bytes([len(strings) + 1]) + strings + b'\0'
+        body = b'\x99\x06\0' + values
+        command = b'\x60' + struct.pack('>H', len(body) + 2) + body
+        script = b'\x40' + struct.pack('>H', len(command) + 2) + command
+        gcx = object.__new__(v.Gcx)
+        gcx.procs, gcx.script, gcx.font = [], script, bytes(36)
+        data = gcx.build()
+        data += bytes(-len(data) % 4)
+        return portio.pack_stage([[0xEA54, ord('c'), ord('g'), 0],
+                                  [0, ord('c'), 255, len(data)]], {1: data})
+
+    def test_japanese_only_changes_the_fuse_digit(self):
+        import vr_grenade as g
+        old = self.stage(g.JP_LINE)
+        new = g.correct_briefing(old, 'japanese')
+        differences = [(a, b) for a, b in zip(old, new) if a != b]
+        self.assertEqual(differences, [(ord('5'), ord('4'))])
+        self.assertIn(g.JP_LINE.replace(b'\x805', b'\x804'), new)
+        self.assertIn(b'Targets 5\0', new)
+
+    def test_english_only_changes_the_fuse_digit(self):
+        import vr_grenade as g
+        old = self.stage(g.EN_LINE)
+        new = g.correct_briefing(old)
+        self.assertEqual(sum(a != b for a, b in zip(old, new)), 1)
+        self.assertIn(b'Grenades explode in 4 ', new)
+        self.assertIn(b'Targets 5\0', new)
+
+    def test_correction_is_idempotent(self):
+        import vr_grenade as g
+        for language, line in [('japanese', g.JP_LINE), ('english', g.EN_LINE)]:
+            fixed = g.correct_briefing(self.stage(line), language)
+            self.assertEqual(g.correct_briefing(fixed, language), fixed)
+
+    def test_wrong_mission_is_rejected(self):
+        import vr_grenade as g
+        with self.assertRaises(AssertionError):
+            g.correct_briefing(self.stage(g.EN_LINE, b'GRENADE LEVEL 03\0'))
+
+    def test_wrong_language_or_unexpected_number_is_rejected(self):
+        import vr_grenade as g
+        with self.assertRaises(AssertionError):
+            g.correct_briefing(self.stage(g.JP_LINE), 'english')
+        with self.assertRaises(AssertionError):
+            g.correct_briefing(self.stage(g.EN_LINE.replace(b'5', b'6')))
+
+
 _TMP = os.path.join(os.environ.get('TEMP') or '/tmp', 'integral-english-selftest')
 
 

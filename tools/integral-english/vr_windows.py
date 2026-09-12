@@ -29,6 +29,9 @@ original sector count.
 usage: vr_windows.py [stage ...]      measure only (no files written)
        vr_windows.py --build          write work/INTEGRAL_vr_en_missions.ppf
        vr_windows.py --deploy         also copy it into the mods folder
+
+Stage filters cannot be combined with --build/--deploy: the runtime companion
+requires all five grenade briefing copies from a complete mission build.
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
@@ -39,6 +42,7 @@ from vrlib import (INT_STAGE, USA_STAGE, int_disc, stage_lba, stage_bytes, stage
                    parse_arg, emit_arg, windows_in, walk_commands, option_bytes, ENGLISH,
                    inplace_records, write_ppf, deploy, Bad, Gcx, WORK, fit_in_place)
 import widths
+from vr_grenade import BRIEFING_STAGES, correct_briefing, write_mission_metadata
 
 # Integral's own advances, because Integral's font is what draws these windows.
 # Measured 2026-09-07: identical to Integral's main-game font for all 96 ASCII
@@ -467,6 +471,12 @@ def port_stage(name, int_sd, pool, per_stage, usa_strings, usa_font):
             if is_local(c) and s2 not in usa_strings.get(name, set()) - set(ported_records):
                 assert index_of(c) <= nglyphs, '%s: code %04X beyond the %d-glyph font' % (name, c, nglyphs)
     new_stage = repack_stage(idata, new_gcx)
+    # Standalone grenade-fix compatibility: Integral's printed five-second
+    # fuse is an authoring error, not a different mechanic. Keep the same
+    # five digits as vr_grenade's English addon so patch order cannot undo it.
+    # This helper also fixes the original Japanese scripts independently.
+    if name in BRIEFING_STAGES:
+        new_stage = correct_briefing(new_stage)
     rep.update(gcx_before=igcx.end - igcx.start, gcx_after=len(new_gcx), font_kept=font_note,
                sectors_before=len(idata)//2048, sectors_after=len(new_stage)//2048)
     return rep, (idata, new_stage)
@@ -489,6 +499,10 @@ HANDOVER = {'movie': 'vr_movie_base.bin'}
 def main():
     build = '--build' in sys.argv or '--deploy' in sys.argv
     only = [a for a in sys.argv[1:] if not a.startswith('--')]
+    if build and only:
+        raise SystemExit('Stage filters are inspection-only: omit --build/--deploy, '
+                         'or omit stage names to build the complete mission PPF '
+                         'and its five-digit companion.')
     int_sd = open(INT_STAGE, 'rb').read()
     usa_sd = open(USA_STAGE, 'rb').read()
     allnames = sorted(portio.entries(int_sd), key=lambda k: portio.entries(int_sd)[k][0])
@@ -539,17 +553,23 @@ def main():
             if (k, inums, unums) in seen:
                 continue
             seen.add((k, inums, unums))
-            print('   %-40s Integral %s USA %s -> %s' % (' | '.join(k) if k else '-', inums, unums,
-                  'Integral numbers in USA text' if len(inums) == len(unums) else 'USA text unchanged (different count: not a number)'))
+            result_note = ('Integral numbers in USA text' if len(inums) == len(unums)
+                           else 'USA text unchanged (different count: not a number)')
+            if name in BRIEFING_STAGES and k == ('WEAPONMODE', 'GRENADELEVEL02') and inums == ('5', '3'):
+                result_note = 'four-second authoring correction (vr_grenade); Targets 3 unchanged'
+            print('   %-40s Integral %s USA %s -> %s' % (
+                ' | '.join(k) if k else '-', inums, unums, result_note))
     if kept:
         print('kept Japanese (no or ambiguous English):')
         for (k, how), stages in sorted(kept.items(), key=lambda kv: str(kv[0])):
             print('   %-40s %s: %s' % (' | '.join(k), how, ','.join(stages)))
     if build and not grown:
         data = write_ppf(_os.path.join(WORK, PPF_NAME), records, DESC)
+        companion = write_mission_metadata(_os.path.join(WORK, PPF_NAME), int_sd, disc)
         print('wrote', _os.path.join(WORK, PPF_NAME), len(data), 'bytes')
         if '--deploy' in sys.argv:
             print('deployed', deploy(PPF_NAME, data))
+            print('deployed', deploy(companion.name, companion.read_bytes()))
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "stdafx.h"
+#include <map>
 
 typedef struct {
 	unsigned int id;
@@ -100,7 +101,7 @@ private:
 
 	// Every write this pass made, with the patch it came from, so that two
 	// patches writing the same disc byte with different values can be reported
-	// once the folder is done. Ketchup applies a folder in directory order, so
+	// once the folder is done. Ketchup applies the selected files in path order, so
 	// such a pair silently resolves by file name - the reason a mod can work
 	// and then stop working because another was added beside it. Dropped as
 	// soon as the report is out; a very large set stops being tracked.
@@ -108,6 +109,8 @@ private:
 	static inline std::vector<Ketchup_Write> Writes = {};
 	static inline std::vector<std::string> WriteSources = {};
 	static inline unsigned int WriteSource = 0;
+	// Per-file overrides, validated against the PPF's companion before loading.
+	static inline std::map<uint64_t, unsigned char> RecordOverrides = {};
 	static inline size_t WriteBytes = 0;
 	static inline bool WritesTruncated = false;
 	constexpr static size_t WriteByteLimit = 32u << 20;

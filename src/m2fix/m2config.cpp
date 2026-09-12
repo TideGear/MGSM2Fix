@@ -124,6 +124,17 @@ void M2Config::Load()
         }
     }
     inipp::get_value(ini.sections["Patches"], "PreserveConfiguration", bPatchesPreserveConfiguration);
+    inipp::get_value(ini.sections["Patches"], "IntegralEnglishPatch", bPatchesIntegralEnglish);
+    inipp::get_value(ini.sections["Patches"], "IntegralVREnglishPatch", bPatchesIntegralVREnglish);
+    inipp::get_value(ini.sections["Patches"], "GrenadeDelayFix", bPatchesGrenadeDelay);
+    inipp::get_value(ini.sections["Game"], "UnlockVRMissions", bGameUnlockVRMissions);
+    inipp::get_value(ini.sections["Game"], "UnlockVRExtras", bGameUnlockVRExtras);
+    inipp::get_value(ini.sections["Game"], "UnlockVRMovies", bGameUnlockVRMovies);
+    inipp::get_value(ini.sections["Game"], "UnlockTitleBonuses", bGameUnlockTitleBonuses);
+    spdlog::info("[Config] IntegralEnglishPatch={}, IntegralVREnglishPatch={}, GrenadeDelayFix={}",
+        bPatchesIntegralEnglish, bPatchesIntegralVREnglish, bPatchesGrenadeDelay);
+    spdlog::info("[Config] UnlockVRMissions={}, UnlockVRExtras={}, UnlockVRMovies={}, UnlockTitleBonuses={}",
+        bGameUnlockVRMissions, bGameUnlockVRExtras, bGameUnlockVRMovies, bGameUnlockTitleBonuses);
 
     {
         // StageSelect is a bool that also accepts a menu name: `true` opens the

@@ -340,6 +340,9 @@ def main():
             name = 'INTEGRAL_vr_en_%s.ppf' % family
             built = work/name
             data = place(vrmods/name,built.read_bytes(),vrblock)
+            if family == 'missions':
+                from vr_grenade import write_mission_metadata
+                write_mission_metadata(vrmods/name, (work/'vrint_stage.dir').read_bytes(), vrimage)
             from ppfcheck import check
             problems,n,span,desc = check(vrmods/name)
             assert not problems, (name,problems)

@@ -73,6 +73,13 @@ public:
     static inline std::string sGameStageSelect;   // the menu stage to open: "select", or select1..4 / selectd
     static inline bool bGameEnglishText;
     static inline bool bGameUnlockBriefing;
+    static inline bool bGameUnlockVRMissions = false;
+    static inline bool bGameUnlockVRExtras = false;
+    static inline bool bGameUnlockVRMovies = false;
+    static inline bool bGameUnlockTitleBonuses = false;
+    static inline bool bPatchesIntegralEnglish = true;
+    static inline bool bPatchesIntegralVREnglish = true;
+    static inline bool bPatchesGrenadeDelay = true;
     static inline std::vector<int> vGameGiveItems;
     static inline std::vector<int> vGameGiveWeapons;
     static inline bool bPatchesDisableRAM;

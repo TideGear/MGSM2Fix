@@ -27,7 +27,29 @@ is the collection build.
 
 ## Tests
 
-`py selftest.py` runs 44 tests over the parts that need no game data — the PPF
+The optional-PPF loader also has a native test executable:
+`test_patch_options.cpp`. Compile it with MSVC C++20, `/EHsc` and
+`/I ../../src/extern/json/single_include` from this directory, using a Visual
+Studio developer prompt. Run it without arguments for data-free classification
+checks. For complete selection/companion checks plus real disc validation, run
+`py verify_patch_options.py <test.exe> <mods/INTEGRAL/VR-DISK>` after installing
+the English set, both grenade collection variants and companions, and the three
+VR unlock assets. The verifier does not edit game data or the INI. It tests all
+four English/grenade combinations and eight VR unlock combinations; native
+scratch fixtures go in the OS temporary directory. The report goes to
+`WORK/verified-patch-options.json`.
+
+The English mission builder now emits `.ppf.json` beside its PPF. Collection
+packages must include it: Ketchup uses the fingerprint and five digit addresses
+to honor `GrenadeDelayFix` independently of the English toggle. `rebuild.py`
+regenerates the companion after packaging, so adding a raw block check cannot
+leave a stale file fingerprint. SHA256SUMS includes these companion files.
+Stage-name filters in `vr_windows.py` are inspection-only. Build/deploy always
+uses the full mission set so its companion can validate all five briefing digits;
+a filtered build is rejected before it can overwrite the existing PPF.
+
+
+`py selftest.py` runs 49 tests over the parts that need no game data — the PPF
 emitter's two split boundaries (255 bytes and the 2048-byte payload edge), the
 record chain, the PCX codec's run cap, the EDC/ECC algebra, the width model,
 the language-default patch over a synthetic executable, and the R3000
