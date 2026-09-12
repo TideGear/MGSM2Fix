@@ -51,13 +51,22 @@ redistributed are not stated anywhere. This port therefore:
 * credits the project here, in `README.md`, in the patch file itself and in the
   README that ships inside every release ZIP.
 
-**That is credit, not permission.** Before this port is released widely, the
-right step is to ask FoxdieTeam directly how they want work derived from
-`mgs_reversing` handled, and to honour whatever they say. If they would rather
-their code were not compiled into a distributed patch, the fallback is to
-express these three overlays as byte patches against the retail overlays, the
-way the VR disc's code changes already are — larger work for `abst`, which is a
-reimplementation rather than a tweak, but possible.
+**That is credit, not permission.** If FoxdieTeam would rather their code were
+not compiled into a distributed patch, the fallback is to express these three
+overlays as byte patches against the retail overlays, the way the VR disc's
+code changes already are — larger work for `abst`, which is a reimplementation
+rather than a tweak, but possible.
+
+## This port's own code
+
+The scripts under `tools/integral-english/` and the documents beside them
+are original to this port — none of them are copied from `mgs_reversing` or
+any other project (the decomp's *output* is compiled by three of them, which
+is the case above). **No separate licence has been selected or added for the
+port's tooling.** The repository retains its existing MIT `LICENSE` under
+nuggslet's copyright. An explicit licensing decision for
+`tools/integral-english/` remains open; this documentation update does not
+choose one or change the repository's licence.
 
 ## Other people's work this port relies on
 

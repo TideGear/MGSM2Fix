@@ -16,6 +16,29 @@ MGS1 decompilation — pinned at `7964de7`. That project states no licence, whic
 is not a settled question. [`CREDITS.md`](CREDITS.md) says exactly what is used,
 what is not, and what still needs asking.
 
+## Quick start
+
+Pick the one that matches what you're here for:
+
+- **Just want to play it?** Read [`PACKAGE-README.txt`](PACKAGE-README.txt) — what
+  the finished package contains, where it goes, and what it requires of
+  MGSM2Fix. This repository does not distribute a built package (see
+  [`CREDITS.md`](CREDITS.md) for why); building one is the next option.
+- **Want to build it yourself?** Read [`BUILDING.md`](BUILDING.md) — the reproducible
+  build and its five inputs (a Windows Master Collection install, four retail
+  executables, a decomp checkout, a PSYQ SDK, and Python with Pillow/ninja) — then
+  `py rebuild.py --output <dir>`. `py selftest.py` runs the data-free test suite
+  first and takes a tenth of a second.
+- **Want to understand or extend it?** [`SCRIPTS.md`](SCRIPTS.md) is a one-line-per-script
+  index of everything in this directory. This README is the technical record —
+  byte formats, mechanisms, every gotcha, indexed by the `##` headings below.
+  [`NextSteps.md`](NextSteps.md) is the map: where things stand, what remains,
+  and which decisions are the user's to make — **read it first if you are
+  picking this up cold.**
+
+This tooling is Windows-only (it locates the Steam install via the registry, and
+its docs assume the `py` launcher and PowerShell/cmd throughout).
+
 ## What ships
 
 | Patch | Contents |
@@ -46,6 +69,123 @@ USA's VR Missions `SLUS-00957`; see "The VR disc (SLPM-86249)"):
 collection patches that same block itself and the two layouts do not mix, which
 kills the title stage. Built and verified 2026-09-07; see "Why `en_menu3` is
 raw-disc only" below.
+
+## Standalone VR grenade delay correction
+
+`py vr_grenade.py` builds the standalone grenade fix in `WORK`. The default
+`INTEGRAL_vr_fix_grenade_delay.ppf` works on **original Japanese Integral**:
+USA's `DELAY 4.0` texture plus the corrected briefing numeral. It is independent
+of the English package and the MGSM2Fix upstream PR. Inputs are the collection's
+Integral and USA VR containers, Python and these scripts; no decomp build or
+extracted executable is needed.
+
+**INI controls (2026-09-11):** deploy with `py vr_grenade.py --deploy` to
+install both collection layouts and their `.ppf.json` companions. Ketchup chooses
+Japanese or English at startup using `[Patches] IntegralVREnglishPatch` and the
+presence of the mission PPF. `[Patches] GrenadeDelayFix = false` skips both
+texture variants and restores the five English briefing digits to 5 while
+loading the mission PPF. True uses the corrected decal and 4 in either language.
+Changing the INI needs a game restart, **not a rebuild**. Rebuild/redeploy only
+when the English mission PPF itself changes.
+
+Companions pin the exact PPF with a 64-bit FNV-1a fingerprint (a stale-layout
+check, not authentication) and the structurally located digit offsets. The
+English addon also pins its mission base. Missing/stale mission metadata skips
+the VR English group with an explanation in the log; a mismatched grenade
+companion skips that addon. `vr_windows.py` and `rebuild.py` generate/package the
+mission companion automatically. The raw PPFs remain separate, fixed disc-image
+patches; an INI cannot control a patch already applied to a BIN.
+
+The weapon-selection grenade uses `selectvr`'s second DAR, entry `4D80.p`:
+200x125, 4bpp. USA's `DELAY 4.0` replaces Integral's inaccurate `DELAY 5.2`.
+The complete source headers match, including VRAM (704, 372) and CLUT (992, 250).
+USA's 10,568-byte PCX losslessly re-encodes to 10,453 bytes, fitting Integral's
+10,512-byte slot with 59 zero bytes of padding. The rest of `selectvr` stays
+byte-identical to Integral. **Confirmed good in game by the user, 2026-09-11.**
+
+The WEAPON MODE / GRENADE LEVEL 02 briefing is duplicated in all five
+`vr_grn01`-`vr_grn05` scripts. Its Japanese fuse digit is `80 35`; only `35`
+changes to `34`, keeping the prefix, all Japanese glyphs, punctuation, target
+count and script sizes intact. The English version likewise changes just the
+`5` in `the goal! Grenades explode in 5 ` to `4`. The builder structurally
+matches the window's titles and exact sentence, checks USA's corresponding
+value is 4, and scans all 105 Integral stages to assert coverage.
+
+| Stage | Japanese digit, stage offset | English digit, current stage offset |
+|---|---|---|
+| `vr_grn01` | `0x6CAA7` | `0x6CAC7` |
+| `vr_grn02` | `0x705FB` | `0x7061B` |
+| `vr_grn03` | `0x7AB1F` | `0x7AB3F` |
+| `vr_grn04` | `0x7BF33` | `0x7BF53` |
+| `vr_grn05` | `0x727C7` | `0x727E7` |
+
+These offsets are evidence, not hardcoded patch addresses: the builder resolves
+positions from parsed GCL each time. It verifies exactly one digit changes in
+each Japanese script and that serialized PPF readback reconstructs the intended
+stages. Tests also reject the wrong mission, language or unexpected numeral.
+
+`vr_windows.py` calls the same `correct_briefing` helper after porting these
+five stages. Its only effective changes from the previous deployed mission PPF
+are those five `5` -> `4` bytes. This prevents it from overwriting the standalone
+fix: the English addon explicitly owns the five corrected digits and both
+patches agree in either order. Other numbers retain the existing substitution
+policy. The loader's usual overlap audit remains active for other mods. It overrides
+only the five validated mission digit writes, so the active grenade and mission
+PPFs agree when enabled; when disabled, no grenade PPF is loaded.
+The English package therefore also carries the corrected sentence when used
+alone; the independent Japanese fix needs no English patch.
+
+Each collection variant has 709 records / 9,509 payload bytes. Each `_raw.ppf`
+variant adds EDC/ECC for all 11 touched sectors; all four PPFs carry Integral VR's
+disc block check. Use the ordinary `_raw` version on a Japanese Integral VR BIN.
+For English raw images, apply the matching English mission patch and its package
+first, then `_english_raw` last: its sector checksums include that exact English
+base. Use only collection variants in Ketchup. To remove the texture correction,
+set `GrenadeDelayFix = false` and restart. This restores both the original
+decal and numeral. The PPF assets can remain installed.
+
+The briefing extension is statically verified in both languages and confirmed
+in game with the English setup; Japanese visual confirmation is pending. The stage
+unlock PPF is back in `mods`, gated by `UnlockVRMissions = false`. The interrupted session's `vab_grn`
+cache-tail theory was incorrect: that tail is `scenerio.gcx`, not texture data.
+See HISTORY sections 29-30 for the investigation and extension.
+
+## Optional PPF controls in MGSM2Fix.ini
+
+These seven options control installed PPF assets; they do not download or embed
+game data. Restart the game after changing them. Keep the supplied filenames.
+
+| Section | Setting | Default | Scope |
+|---|---|---|---|
+| Patches | `IntegralEnglishPatch` | true | All known main-game `en_*` families on both Integral discs |
+| Patches | `IntegralVREnglishPatch` | true | All eight Integral VR English families |
+| Patches | `GrenadeDelayFix` | true | Grenade decal and all five briefing copies; auto-selects Japanese/English |
+| Game | `UnlockVRMissions` | false | Integral and USA VR mission unlock PPFs |
+| Game | `UnlockVRExtras` | false | Integral VR EXTRA menu unlock PPF |
+| Game | `UnlockVRMovies` | false | Integral VR movie unlock PPF |
+| Game | `UnlockTitleBonuses` | false | Integral and USA title bonuses on both story discs |
+
+`EnglishText` still selects Integral's own language bit; it is not the English
+PPF master switch. `UnlockBriefing` remains a separate existing control. All
+four new unlock settings are false in the installed INI. The eight unlock PPFs
+(two Integral title, two USA title, two VR mission, extras and movies) are installed
+but skipped until enabled; copies parked earlier remain available as backups.
+Disabling an unlock does not erase progress already stored in a save.
+
+If Integral's title-screen BRIEFING items remain unlocked with these four
+controls off, check `[Game] UnlockBriefing` in the active game INI. Set it to
+false and fully restart the game. On 2026-09-11 this separate setting was still
+true from testing; turning it off fixed the menu, as confirmed by the user,
+without editing a save. It is now false in the installed INI. A game started
+while it was true can retain those flags in its save; the switch does not erase
+saved progress.
+
+`src/games/mgs1_patch_options.h` contains the exact filename/title/version/disc
+mapping and the tested loading plan. Unknown patch families remain untouched.
+The new config fields are read/logged by `m2config.cpp`; Ketchup applies the
+selected files and any validated per-byte overrides. The two grenade language
+PPFs are alternatives and may both be installed with this loader; raw grenade
+variants are explicitly skipped in the collection.
 
 ## Scope: what this port changes, and what it deliberately keeps
 
@@ -2166,20 +2306,43 @@ overwrite it.
 
 ### Numbers that differ between the two versions
 
-Three windows state different values in the two versions. Where the count of
-numbers matches, the USA sentence is taken and **Integral's numbers are
-substituted into it**, so the text never contradicts the disc it runs on:
+Three windows were measured (2026-09-07, static analysis of the stage data)
+to state different values in the two versions. Where the count of numbers
+matches, the USA sentence is taken and **Integral's numbers are substituted
+into it**, so the text never contradicts the disc it runs on:
 
-| window | Integral | USA |
-|---|---|---|
-| SNEAKING MODE / NO WEAPON LEVEL 10 | 25 | 35 |
-| SNEAKING MODE / SOCOM LEVEL 03 | 40 | 43 |
-| WEAPON MODE / GRENADE LEVEL 02 | 5 | 4 |
+| window | Integral | USA | on-screen, 2026-09-11 |
+|---|---|---|---|
+| SNEAKING MODE / NO WEAPON LEVEL 10 | 25 | 35 | **does not match** — the live window carries no number at all; the two games' text is identical |
+| SNEAKING MODE / SOCOM LEVEL 03 | 40 | 43 | **does not match** — the live window reads `Enemies 3` on both discs |
+| WEAPON MODE / GRENADE LEVEL 02 | 5 | 4 | **confirmed** — `Targets 3` is unchanged (identical on both); the substituted number is the fuse-timer sentence, `Grenades explode in 5 seconds` (Integral) against USA's own `4 seconds` |
 
-Three more differ in *count* and are left as USA wrote them, because a count
-mismatch means the digits are not the same quantity. Number matching ignores
-glyph codes (`<XXXX>`), skips the two title lines, and requires the digit to
-have no letter beside it — otherwise `C4` and `E3` are read as numbers.
+**Grenade exception, 2026-09-11:** that third row is now corrected to 4 by
+`vr_grenade.py`, including the original Japanese briefing. `vr_windows.py`
+applies the same correction after the normal number substitutions, changing
+only the five duplicate fuse digits. The other two cases retain their policy.
+See "Standalone VR grenade delay correction" above.
+
+**Only the third row is verified against what a player actually sees.** The
+first two were checked against a real gameplay window on both discs
+(SwanStation, both games, 2026-09-11) and neither shows the claimed numbers —
+GRENADE LEVEL 02's own count (`Targets`/`Enemies`) is unchanged in all three
+rows, which is what misled the original read: the differing digit for
+GRENADE LEVEL 02 sits inside the sentence, not the count line, and the other
+two rows' claimed digits do not appear on screen anywhere. Two explanations
+are open and neither is confirmed: the 2026-09-07 measurement may have read a
+non-live template copy of that key (Integral's stages carry every mission a
+stage family can host, not only the ones a real playthrough reaches — see
+"Integral's scripts are templates" above), or the figures may simply be
+wrong. **Treat the first two rows as unconfirmed until `vr_windows.py`'s own
+per-stage report is checked against which copy is actually reachable in
+play.**
+
+Three more windows differ in *count* and are left as USA wrote them, because a
+count mismatch means the digits are not the same quantity. Number matching
+ignores glyph codes (`<XXXX>`), skips the two title lines, and requires the
+digit to have no letter beside it — otherwise `C4` and `E3` are read as
+numbers.
 
 ### Deferred, with reasons
 
@@ -2808,17 +2971,11 @@ standing and is itself unattributed.
 
 ## Not tested
 
-- ~~The three item-text fixes on screen~~ **Done 2026-09-05 12:55** (user's
-  shots): SOCOM `Semi-automatic pistol.` on its own line, ID Card `level 7
-  security`, Mine Detector intact after the SOCOM; the log's audit silent,
-  `Applied 3755 bytes of RAM patches in 14 blocks (pass 1)`.
-- ~~The MISSION LOG slide after the sprite-width fix~~ **Done 2026-09-05 13:50**:
-  the user turned pages on the Comm Tower A log again and the slide is clean.
-- ~~The MISSION LOG on screen~~ **Done 2026-09-05** (the user's shots: both
-  pages of the Heliport and Comm Tower A logs, the controls, and the slide clean
-  at 13:50 after the sprite-width fix). Still unseen: a demo.gcx page, which
-  needs a disc-2 save, and a count-7 page, which also shows whether USA's `1/2`
-  on a single-screen page is wanted.
+- ~~The three item-text fixes on screen~~ **Done 2026-09-05.**
+- ~~The MISSION LOG slide after the sprite-width fix~~ **Done 2026-09-05.**
+- ~~The MISSION LOG on screen~~ **Done 2026-09-05.** Still unseen: a demo.gcx
+  page, which needs a disc-2 save, and a count-7 page, which also shows
+  whether USA's `1/2` on a single-screen page is wanted.
 - **Disc 2 in game.** Still never reached — and now it is known why the
   developer menu cannot get there: disc 2 is set only by `change.c`'s CD check,
   which only the real story swap runs, so every debug load stays `Disk ID 0`
@@ -2869,27 +3026,16 @@ standing and is itself unattributed.
   to LOAD DATA, and ideally a save; **run it before any achievements-off
   testing**, since with `DisableRAM = true` there is nothing to observe. See
   "The collection's RAM patches collide with `en_savemsg`".
-- ~~SCREEN and EXIT after the doorbell build~~ **Done 2026-09-04.** All three
-  branches of `case 8` behave: up → SCREEN shows the game's own brightness
-  screen, four lines, correctly placed; down → EXIT highlights and confirms out
-  of the menu; confirm → KEY CONFIG hands off to the collection's panel. The
-  doorbell fires only where it should.
-- ~~The save side of the memory-card messages~~ **Done 2026-09-04**, new game →
-  Mei Ling → save, then LOAD DATA with the file present. `セーブ中です` /
-  `セーブが完了しました` and `ロード中です` / `ロードが完了しました` showed — the
-  kept indices 9 and 1 of each table, where USA draws nothing — and nothing
-  else Japanese or garbled. The collection's STORAGE rename was visibly active
-  (`SELECT STORAGE`, `STORAGE 1 / 2`, `NEW FILE [ NEED 1 BLOCK ]`), so its RAM
-  family was applied during the run.
-- ~~`en_savemsg` with achievements live~~ **No collision observed, 2026-09-04.**
-  `Ketchup::Audit` ran every ~5 s across the whole save-and-load session above
-  with the rename active and logged nothing. The one `pass 2` in the log is
-  Ketchup itself: the reset back to the title re-initialised the machine
-  (`__SN_ENTRY_POINT`, `InitHeap`, new `[PSX] Machine` addresses), the emulator
-  discarded the memory Ketchup had just patched on setup, and Ketchup
-  re-applied 0.6 s later — the deferred-RAM case it exists for. Residual caveat:
-  a mid-run write followed within 30 frames by an unrelated re-apply would be
-  invisible to both checks; nothing suggests that happens.
+- ~~SCREEN and EXIT after the doorbell build~~ **Done 2026-09-04:** all three
+  branches of `case 8` behave correctly, and the doorbell fires only where it
+  should.
+- ~~The save side of the memory-card messages~~ **Done 2026-09-04:** save and
+  load both showed the correct English/Japanese mix, nothing garbled.
+- ~~`en_savemsg` with achievements live~~ **No collision observed, 2026-09-04**
+  (`Ketchup::Audit` ran every ~5 s across the whole save-and-load session above
+  with the rename active and logged nothing). Residual caveat: a mid-run write
+  followed within 30 frames by an unrelated re-apply would be invisible to both
+  checks; nothing suggests that happens.
 - **Whether the disc-swap prompt is reachable in the collection at all** (the
   three copies that ship). The collection swaps discs by itself, so the game's
   own prompt may never draw. Decided by the same disc-2 run above. See "The
@@ -2897,19 +3043,13 @@ standing and is itself unattributed.
   different way: the collection patches that block itself, so in the collection
   the text there is the collection's, not ours - see "Why `en_menu3` is raw-disc
   only".
-- ~~The other ~22 PHOTO ALBUM strings~~ **Done 2026-09-04.** PHOTO ALBUM →
-  SELECT MEMORY CARD → load and overwrite, with a photo on the card: `PHOTO
-  DATA`, `PHOTO 01`, `TIME`, `LOADING...`, `COMPLETE`, `OVERWRITE OK?`,
-  `YES`/`NO` all English. The deployed PPF was then applied to the extracted
-  overlay and every caption slot compared with USA: all 23 English strings
-  present and identical; the only Japanese left is the six slots USA itself
-  leaves blank, and the three seen on screen are exactly those — `ロード中です`
-  (0x65C), `ロードが完了しました` (0x63C), `変更内容を上書き保存しますか？`
-  (0x668). Verification gotcha: `int1_stage.dir` is the *unpatched* extraction,
-  so reading it shows Japanese everywhere — apply the deployed PPF first, or
-  the comparison is meaningless; and the three `addiu sp` function pointers at
-  0x6E0–0x6E8 decode as "text" and look like misses — they are code, the
-  documented camsave trap.
+- ~~The other ~22 PHOTO ALBUM strings~~ **Done 2026-09-04:** all 23 English
+  strings present and identical to USA; the only Japanese left is the six
+  slots USA itself leaves blank. Verification gotcha, still live: `int1_stage.dir`
+  is the *unpatched* extraction, so reading it shows Japanese everywhere —
+  apply the deployed PPF first, or the comparison is meaningless; and the
+  three `addiu sp` function pointers at 0x6E0–0x6E8 decode as "text" and look
+  like misses — they are code, the documented camsave trap.
 - **`[Patches] PreserveConfiguration` catching a real stale write.** Three clean
   runs; the race it guards is intermittent and has not been caught in the act.
   See `UPSTREAM.md`.

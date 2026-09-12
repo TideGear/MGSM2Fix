@@ -97,6 +97,13 @@ sense, and please report what you find.
 Some Japanese is retained on purpose, wherever the USA release has no English
 counterpart. No new translation has been made, and USA's spelling is kept.
 
+Of the text this port covers - menus, screens and the executable's own strings
+- nothing with a USA counterpart is still Japanese. This is not a complete
+translation of the disc: several megabytes of Integral-exclusive developer
+commentary and story narration (in RADIO.DAT, DEMO.DAT and VOX.DAT) have no
+English source and remain in Japanese by design. Producing English for them
+would be new translation, which this port does not do.
+
 
 CREDITS
 

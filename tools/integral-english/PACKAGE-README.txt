@@ -36,6 +36,13 @@ window, the save and load messages and the PHOTOGRAPHING memory-card messages
 have not. Some Japanese is retained on purpose because USA provides no English
 counterpart; no new translation has been made, and USA's spelling is kept.
 
+Of the text this port covers - menus, screens and the executable's own strings
+- nothing with a USA counterpart is still Japanese. This is not a complete
+translation of the disc: several megabytes of Integral-exclusive developer
+commentary and story narration (in RADIO.DAT, DEMO.DAT and VOX.DAT) have no
+English source and remain in Japanese by design. Producing English for them
+would be new translation, which this port does not do.
+
 
 CREDITS
 
@@ -55,3 +62,16 @@ been translated, and no game data is redistributed with these patches.
 Uninstall: remove the ten INTEGRAL_discN_en_*.ppf files from each numbered
 folder and the eight INTEGRAL_vr_en_*.ppf files from VR-DISK.
 SHA256SUMS.txt and build-report.json identify the packaged build and validation.
+
+OPTIONAL PATCH CONTROLS (current branch)
+[Patches] IntegralEnglishPatch and IntegralVREnglishPatch enable the installed
+story/VR English sets independently. EnglishText selects Integral's own language
+bit separately. Copy the VR mission PPF's .json companion too; it is part of this
+package. Missing/stale companions are reported in MGSM2Fix.log and the affected
+VR English set is skipped, rather than guessing where its grenade digits moved.
+GrenadeDelayFix controls the grenade briefing numeral and, when separately
+installed, its corrected texture. False restores 5 in English as well as Japanese.
+The standalone grenade builder installs both language variants and companions;
+this package does not include those texture assets. Restart after INI changes.
+UnlockVRMissions, UnlockVRExtras, UnlockVRMovies and UnlockTitleBonuses default
+false and gate separately installed test-aid PPFs. They are not in this package.
