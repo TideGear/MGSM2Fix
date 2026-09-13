@@ -1,8 +1,8 @@
 # Upstream PR allocation and final checks
 
-Reviewed 2026-09-13 against fetched upstream/master `97172f5`. The branch has
+Reviewed 2026-09-13 against fetched upstream/master `97172f5`. The original contribution had
 189 commits beyond that base and no missing upstream commits. The allocation
-below includes committed changes, working-tree fixes, and new source/docs.
+below includes the complete contribution, review fixes, and extracted native tests.
 Generated PPFs/ZIPs are not tracked; include the built distributions with the
 patch contribution rather than assuming a source PR contains those artifacts.
 
@@ -24,12 +24,10 @@ The former separate English/grenade PR boundary is unsafe as a file-only split:
 grenade functions. Keeping them in PR 6 preserves a coherent patch package.
 Testing aids and diagnostics get separate reviews instead. Nothing is excluded.
 
-Shared files must be split by feature hunks. Tests currently bundled in
-`test_patch_options.cpp` include RAM, range and planner checks: extract the RAM
-tests with PR 2 and range tests with PR 4; do not make earlier PRs depend on a
-test executable introduced only by PR 6. Likewise introduce CI dependencies only
-when their jobs/scripts exist. Historical documents can remain intact in PR 6;
-each earlier PR still needs concise current documentation for its own feature.
+Shared files are split by feature hunks. Standalone RAM tests arrive with PR 2
+and range tests with PR 4; neither depends on the Integral toolchain in PR 6.
+CI jobs arrive with their scripts. Earlier feature settings are documented in
+the INI; the complete current and historical documentation arrives in PR 6.
 
 ## Readiness
 
@@ -41,46 +39,48 @@ each earlier PR still needs concise current documentation for its own feature.
   validation are recorded in `tools/integral-english/NextSteps.md`.
 - Gameplay gaps remain intentionally open for testers. A fresh raw-disc build
   was not part of the maintenance validation.
-- No PR branches have been extracted or opened. Recent fixes are uncommitted.
-  Each extracted PR head still requires its own builds/tests before marking it
-  ready for merge; combined-tree success does not establish that.
-
-During extraction, compare the assembled final stack against the complete
-working-tree snapshot, including untracked source/docs. Reconcile every entry
-below; shared entries must be accounted for at hunk level. Any subsequent edits
-require refreshing this inventory.
+- All eight branches were extracted and passed Release x64/x86 builds with
+  the development installer disabled. Each available native test suite passed;
+  PRs 6 through 8 also passed all 52 Python self-tests.
+- The final stack tree exactly matches the complete source snapshot. Nothing
+  from the contribution was excluded. The inventory below records actual diffs.
+- PR descriptions provide the submission status, links and merge order. Each
+  draft targets upstream master, so later diffs are cumulative until earlier
+  steps land; use the linked incremental comparisons for focused review.
 
 ## File inventory
 
-
-125 changed/new files covered. Numbers refer to the PRs above.
+128 changed/new files covered. Numbers refer to the PRs above.
 
 | File | PR allocation |
 |---|---|
 | `.gitattributes` | 6 |
-| `.github/workflows/ci.yml` | 1, 2, 4, 6 |
+| `.github/workflows/ci.yml` | 1, 2, 6 |
 | `.gitignore` | 6 |
-| `MGSM2Fix.ini` | 2?8 |
+| `MGSM2Fix.ini` | 3, 4, 5, 6, 7 |
 | `MGSM2Fix.vcxproj` | 1, 2, 4, 6 |
-| `MGSM2Fix.vcxproj.filters` | 2, 4, 6 |
+| `MGSM2Fix.vcxproj.filters` | 1, 2, 4, 6 |
 | `README.md` | 6 |
-| `UPSTREAM-PRS.md` | 6 (allocation for all PRs) |
-| `UPSTREAM.md` | 6 (ledger for all PRs) |
+| `UPSTREAM-PRS.md` | 6 |
+| `UPSTREAM.md` | 6 |
 | `build_zydis.cmd` | 1 |
-| `src/games/mgs1.cpp` | 3, 7, 8 |
-| `src/games/mgs1.h` | 3, 4, 6, 7, 8 |
+| `src/games/mgs1.cpp` | 3, 7 |
+| `src/games/mgs1.h` | 3, 4, 7, 8 |
 | `src/games/mgs1_patch_options.h` | 6 |
 | `src/m2fix/ketchup.cpp` | 2, 4, 6, 8 |
 | `src/m2fix/ketchup.h` | 2, 4, 6, 8 |
-| `src/m2fix/m2config.cpp` | 3?8 |
-| `src/m2fix/m2config.h` | 3?8 |
-| `src/m2fix/m2game.h` | 3, 4 |
+| `src/m2fix/m2config.cpp` | 3, 4, 5, 6, 7 |
+| `src/m2fix/m2config.h` | 3, 4, 5, 6, 7 |
+| `src/m2fix/m2game.h` | 3, 4, 8 |
 | `src/m2fix/patch_range.h` | 4 |
 | `src/m2fix/ram_patch.h` | 2 |
 | `src/machines/psx.cpp` | 5 |
 | `src/machines/psx.h` | 5 |
 | `src/modules/sqhook.cpp` | 2, 3, 4, 8 |
-| `src/modules/sqhook.h` | 2, 3, 4, 8 |
+| `src/modules/sqhook.h` | 3, 4, 8 |
+| `tests/run_native_tests.cmd` | 2 |
+| `tests/test_patch_range.cpp` | 4 |
+| `tests/test_ram_patch.cpp` | 2 |
 | `tools/integral-english/BUILD-HISTORY.md` | 6 |
 | `tools/integral-english/BUILDING.md` | 6 |
 | `tools/integral-english/COVERAGE-RECORD.md` | 6 |
@@ -157,15 +157,15 @@ require refreshing this inventory.
 | `tools/integral-english/requirements.txt` | 6 |
 | `tools/integral-english/rowargs.py` | 6 |
 | `tools/integral-english/rows.py` | 6 |
-| `tools/integral-english/run_native_tests.cmd` | 2, 4, 6, 7 (split tests with consumers) |
+| `tools/integral-english/run_native_tests.cmd` | 6 |
 | `tools/integral-english/savemsg.py` | 6 |
 | `tools/integral-english/selftest.py` | 6 |
 | `tools/integral-english/shotcmp_brightness.py` | 6 |
-| `tools/integral-english/test_patch_options.cpp` | 2, 4, 6, 7 (split tests with consumers) |
+| `tools/integral-english/test_patch_options.cpp` | 6 |
 | `tools/integral-english/unlock_title.py` | 7 |
 | `tools/integral-english/verify_integral_option.py` | 6 |
 | `tools/integral-english/verify_patch_options.py` | 6 |
-| `tools/integral-english/verify_usa_brightness.py` | 4 (uses shared tool helpers from 6; extract needed helpers) |
+| `tools/integral-english/verify_usa_brightness.py` | 6 |
 | `tools/integral-english/vr_camera.py` | 6 |
 | `tools/integral-english/vr_exe.py` | 6 |
 | `tools/integral-english/vr_grenade.py` | 6 |
