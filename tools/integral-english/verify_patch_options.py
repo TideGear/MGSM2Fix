@@ -3,7 +3,7 @@
 Build test_patch_options.cpp with C++20 and the nlohmann/json include path,
 then run: py verify_patch_options.py <test.exe> <staged-mods-directory>.
 The staging directory needs the English set, both grenade layouts and JSON
-companions, and the three VR unlock PPFs. The native tests cover selection;
+companions. VR unlock PPFs are optional. The native tests cover selection;
 this verifies the final disc bytes, including the runtime numeral overrides.
 """
 import argparse

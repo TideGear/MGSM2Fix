@@ -22,6 +22,9 @@ import os
 import struct
 import sys
 import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -32,6 +35,37 @@ import pad2
 import pcx4
 import portio
 import widths
+import workdir
+
+
+class PathResolutionTests(unittest.TestCase):
+    def test_bad_explicit_paths_do_not_fall_back(self):
+        with tempfile.TemporaryDirectory() as temp:
+            missing = str(Path(temp) / 'missing')
+            with patch.dict(os.environ, {'INTEGRAL_ENGLISH_GAME': missing}):
+                with self.assertRaises(SystemExit): workdir.find_game()
+            with patch.dict(os.environ, {'INTEGRAL_ENGLISH_DECOMP': missing}):
+                with self.assertRaises(SystemExit): workdir.find_decomp()
+            with patch.dict(os.environ, {'INTEGRAL_ENGLISH_WORK': missing}):
+                with self.assertRaises(SystemExit): workdir._root()
+
+    def test_explicit_game_overrides_environment(self):
+        with tempfile.TemporaryDirectory() as temp:
+            game = Path(temp)
+            (game / 'windata').mkdir()
+            (game / 'windata/alldata.bin').touch()
+            with patch.dict(os.environ, {'INTEGRAL_ENGLISH_GAME': 'missing'}):
+                self.assertEqual(workdir.find_game(game), game.as_posix())
+
+    def test_decomp_requires_both_markers(self):
+        with tempfile.TemporaryDirectory() as temp:
+            decomp = Path(temp)
+            (decomp / 'source/main').mkdir(parents=True)
+            (decomp / 'source/main/main.c').touch()
+            with self.assertRaises(SystemExit): workdir.find_decomp(decomp)
+            (decomp / 'build').mkdir()
+            (decomp / 'build/build.py').touch()
+            self.assertEqual(workdir.find_decomp(decomp), decomp.as_posix())
 
 
 class Ppf(unittest.TestCase):

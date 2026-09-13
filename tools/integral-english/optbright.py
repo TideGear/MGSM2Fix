@@ -1,5 +1,8 @@
 #!/usr/bin/env python
-"""Option -> SCREEN: put USA's brightness paragraph into Integral's option stage.
+"""Historical brightness reconstruction; writes only WORK/legacy-optbright.
+
+Not used by rebuild.py. Reads installed patches for comparison but never
+overwrites them. Use optsctext.py through rebuild.py for the current patch.
 
 USA draws this paragraph as one 232x70 texture, `sc_text`, that Integral's DAR
 does not contain and Integral's overlay never names.  Integral draws it as font
@@ -42,7 +45,7 @@ from gcldec import chain_at
 
 BASE   = WORK + '/int1_stage.dir'            # retail, the PPF's base image
 SHIP   = WORK + '/int1_stage_opt11.dir'      # what the deployed option PPF contains
-OVL    = require_decomp() + '/obj/option.bin'   # the rebuilt option overlay
+OVL    = None  # resolved only by the historical tool's main(), never on import
 OUT    = WORK + '/int1_stage_bright.dir'
 
 # STAGE.DIR LBA per disc.  No Integral disc image is on disk, so these were
@@ -55,7 +58,7 @@ DISCS  = [(0, 136654, 'INTEGRAL_disc1_en_option.ppf'),
           (1, 105178, 'INTEGRAL_disc2_en_option.ppf')]
 BASELINE = WORK + '/option_ppf_baseline_disc%d.ppf'   # the SHIP-state PPF, for revert
 HDR    = 24                               # mode 2 form 1
-MODS   = require_game() + '/mods/INTEGRAL/INTEGRAL'
+MODS   = None
 DESC   = b'MGS Integral: option screen text'
 
 CIRCLE = b'\x90\x1b'    # the font's O glyph, mixed with ASCII exactly as
@@ -206,6 +209,9 @@ def build_ppf(recs, lba, desc, version):
 
 
 def main():
+    global OVL, MODS
+    OVL = require_decomp() + '/obj/option.bin'
+    MODS = require_game() + '/mods/INTEGRAL/INTEGRAL'
     retail = open(BASE, 'rb').read()
     buf    = bytearray(open(SHIP, 'rb').read())
     assert len(buf) == len(retail), 'STAGE.DIR size changed'
@@ -322,7 +328,9 @@ def main():
     new_recs = diff_records(retail, bytes(buf))
     print('diff vs retail: %d records, %d bytes' % (len(new_recs), sum(len(d) for _, d in new_recs)))
     for disc, _l, name in DISCS:
-        p = os.path.join(MODS, str(disc), name)
+        output = os.path.join(WORK, 'legacy-optbright', str(disc))
+        os.makedirs(output, exist_ok=True)
+        p = os.path.join(output, name)
         blob = build_ppf(new_recs, lbas[disc], DESC, version)
         open(p, 'wb').write(blob)
         print('disc %d -> %s (%d bytes)' % (disc + 1, p, len(blob)))

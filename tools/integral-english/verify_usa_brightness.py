@@ -1,8 +1,8 @@
-"""End-to-end static check of the USA brightness fix.
+"""Static payload/texture check for the USA brightness fix.
 
-Takes the 426 bytes out of the SHIPPED binary, puts them at the offset the
-shipped table names, over the collection's OWN unpatched data, and decodes the
-texture that results. Nothing here trusts the build tools' intent.
+Find the source-declared payload in a built ASI and decode its effect at the
+source-declared disc offsets. This does not inspect the compiled destination
+table or verify runtime filtering, mode selection, or execution in the game.
 """
 import os as _os, sys as _sys
 _sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
@@ -15,17 +15,16 @@ REPO = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__fil
 
 
 def _find_asi():
-    """The built .asi holding the shipped brightness table: $INTEGRAL_ENGLISH_ASI,
-    then this repo's own build output, then the author's Vortex staging folder
-    as a last resort (kept so this still runs unmodified on the author's
-    machine)."""
+    """Use an explicit ASI or this checkout's build output."""
     env = _os.environ.get('INTEGRAL_ENGLISH_ASI')
-    candidates = [env] if env else []
+    if env is not None:
+        if not _os.path.isfile(env):
+            raise SystemExit('INTEGRAL_ENGLISH_ASI is not a file: ' + env)
+        return env
+    candidates = []
     candidates += [
         REPO + '/x64/Release/MGSM2Fix.asi',
         REPO + '/Release/MGSM2Fix.asi',
-        r'C:/Users/Tideg/AppData/Roaming/Vortex/metalgearsolidmc/'
-        r'mods/MGSM2Fix-5-3-6-0-1774482213/MGSM2Fix64.asi',
     ]
     for c in candidates:
         if c and _os.path.isfile(c):
@@ -51,13 +50,13 @@ want = bytes(int(x, 16) for x in re.findall(r'0x([0-9A-Fa-f]{2}),', hdr[i:hdr.in
 assert len(want) == 426
 entries = re.findall(r'\{(\d+), "(\w+)", (\d), 0x([0-9A-Fa-f]+)ull, data,', hdr)
 assert len(entries) == 2, entries
-print('shipped table: %s' % [(int(t), v, int(d), '0x%s' % o.upper()) for t, v, d, o in entries])
+print('source destination table: %s' % [(int(t), v, int(d), '0x%s' % o.upper()) for t, v, d, o in entries])
 
 asi = open(ASI, 'rb').read()
 at = asi.find(want)
 assert at >= 0, 'the 426 bytes are not in the shipped binary'
 data = asi[at:at + 426]
-print('shipped binary: 426 bytes at 0x%X, %s the table in the header'
+print('built binary payload: 426 bytes at 0x%X, %s the table in the header'
       % (at, 'identical to' if data == want else 'DIFFERENT from'))
 print()
 
@@ -90,7 +89,7 @@ for no, path, lba, off_expect, alldata_base in DISCS:
     fo = sec * 2048 + payoff[1] + dar_pay + PAY_OFF
     got_off = image_off(lba, fo)
     entry = [e for e in entries if int(e[2]) == no - 1][0]
-    print('disc %d: fo %d -> image 0x%08X; shipped table says 0x%s  ->  %s'
+    print('disc %d: fo %d -> image 0x%08X; source table says 0x%s  ->  %s'
           % (no, fo, got_off, entry[3].upper(),
              'MATCH' if got_off == int(entry[3], 16) else 'MISMATCH'))
     assert got_off == int(entry[3], 16)
@@ -121,4 +120,4 @@ for no, path, lba, off_expect, alldata_base in DISCS:
     print('        patched texture: %dx%d, lines at %s, (8,8,8) filler %d/%d px,'
           ' rows 0..45 identical to the game\'s own, nothing below' % (w, h, starts, bar[0], bar[1]))
 print()
-print('OK on both disks.')
+print('Static payload/texture checks passed for both discs; runtime routing was not tested.')

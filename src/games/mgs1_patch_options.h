@@ -140,7 +140,7 @@ inline Plan prepare(const std::filesystem::path &root, unsigned title, const std
         } catch (const std::exception &error) {
             validEnglish = false;
             english = false;
-            plan.messages.push_back(std::string("VR English set skipped; rebuild its grenade companion: ") + error.what());
+            plan.messages.push_back(std::string("VR English missions skipped; reinstall the matching mission PPF and JSON companion: ") + error.what());
         }
     }
     for (const auto &path : files) {
@@ -148,7 +148,7 @@ inline Plan prepare(const std::filesystem::path &root, unsigned title, const std
         bool enabled = true;
         switch (kind) {
         case Kind::English: enabled = settings.english; break;
-        case Kind::VREnglish: enabled = settings.vrEnglish && validEnglish; break;
+        case Kind::VREnglish: enabled = settings.vrEnglish && (path != mission || validEnglish); break;
         case Kind::Missions: enabled = settings.missions; break;
         case Kind::Extras: enabled = settings.extras; break;
         case Kind::Movies: enabled = settings.movies; break;
@@ -174,7 +174,7 @@ inline Plan prepare(const std::filesystem::path &root, unsigned title, const std
                 }
                 if (kind == Kind::GrenadeEN && meta.at("base_fingerprint") != missionFingerprint) throw std::runtime_error("grenade addon does not match English base");
             } catch (const std::exception &error) {
-                plan.messages.push_back(std::string("grenade addon skipped; rebuild with vr_grenade.py --deploy: ") + error.what());
+                plan.messages.push_back(std::string("grenade addon skipped; reinstall the matching grenade PPF and JSON companion: ") + error.what());
                 continue;
             }
         }

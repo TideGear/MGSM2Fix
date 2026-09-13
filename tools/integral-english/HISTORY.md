@@ -1,7 +1,7 @@
 # Session history — MGS Integral English text port
 
 The dated, session-by-session account of how this port was built, split out of
-[`NextSteps.md`](NextSteps.md) on 2026-09-11. That file's §1–8 is the
+[`HANDOFF-ARCHIVE.md`](HANDOFF-ARCHIVE.md) on 2026-09-11. That file's §1–8 is the
 current-state reference — where things are, the user's rules, what remains,
 decisions to make; this file is the timeline: a short overview below, then the
 full numbered sections §9–27 it summarizes, moved here verbatim (same section
@@ -51,8 +51,8 @@ source in MGSM2Fix as `[Patches] ThinTexturedQuads`, then confirmed with every
 briefing unlocked, twenty pairs at 0.00% against USA (§26).
 
 Everything that used to live only in the assistant's private memory files
-(`~/.claude/projects/.../memory/*.md`) was merged into `README.md` and
-`NextSteps.md` on 2026-09-04. Those files may still exist, but **the repo
+(`~/.claude/projects/.../memory/*.md`) was merged into `REFERENCE.md` and
+`HANDOFF-ARCHIVE.md` on 2026-09-04. Those files may still exist, but **the repo
 documents are authoritative**; if they disagree with a memory file, the memory
 file is stale.
 
@@ -60,12 +60,12 @@ On 2026-09-11, `tools/integral-english`'s hardcoded references to the author's
 own drive letters and username were removed from every script that had them
 (`workdir.py`'s `WORK`/`GAME`/`DECOMP` resolution, already portable, was
 extended to the handful of standalone helpers that had not been wired to it —
-see `NextSteps.md` §1), a CI job was added that runs `selftest.py` and
+see `HANDOFF-ARCHIVE.md` §1), a CI job was added that runs `selftest.py` and
 compile-checks every script on a clean runner, `SCRIPTS.md` was generated as a
 one-line-per-script index, and this file was created holding the run-on intro
-paragraph split out of `NextSteps.md`. Later the same day `NextSteps.md`'s
+paragraph split out of `HANDOFF-ARCHIVE.md`. Later the same day `HANDOFF-ARCHIVE.md`'s
 own §9–27 — the session-by-session log making up 58% of that file's length —
-moved into this file too, and `README.md`'s "Not tested" section had its
+moved into this file too, and `REFERENCE.md`'s "Not tested" section had its
 long-resolved, strikethrough-marked entries trimmed to one line each, so a
 newcomer's first read is the map, not the changelog.
 
@@ -77,7 +77,7 @@ Commits `d988e1d` … `5b8d280`. In one evening the project went from "the
 deployed PPFs work but some were built by scripts that no longer exist" to a
 build anyone can reproduce and check:
 
-- **`rebuild.py` + `BUILDING.md`**: isolated, retail-input build of all eight
+- **`rebuild.py` + `BUILD-HISTORY.md`**: isolated, retail-input build of all eight
   families for both discs; PPF framing and sector-boundary validation; a
   cross-set overlap check; a ZIP with `SHA256SUMS.txt` and `build-report.json`
   (environment, SDK file hashes, every input and output). The clean run matched
@@ -88,7 +88,7 @@ build anyone can reproduce and check:
   output" hazard are gone; `preope_usa.py` builds both recaps from retail with
   an explicit `--deploy`; `brf_*` read the real USA stage and the row/quad
   constants were re-verified against it (all 16 row and 53 quad tuples match).
-- **`audit_text.py` + `COVERAGE.md`**: three-disc candidate inventory with its
+- **`audit_text.py` + `COVERAGE-RECORD.md`**: three-disc candidate inventory with its
   limits stated; the save-slot title is full-width in USA too, so it is
   branding/encoding, not a port target; one more retained camera caption noted.
 - **Stale guidance corrected**: `f924` stays `[8]` (growing it *causes* the
@@ -516,7 +516,7 @@ structural rather than careless.
   there is no English to copy and the standing rule leaves it alone. What
   changed is what the documents may claim: "nothing with a USA counterpart is
   still Japanese" is true of the text this port covers, and was being read as
-  true of the disc. `COVERAGE.md` now states both sentences.
+  true of the disc. `COVERAGE-RECORD.md` now states both sentences.
 - **The general lesson, and it is the same one as §13's.** When a claim of
   completeness is made, say what it ranges over. Every sweep here answered its
   question correctly inside a universe none of them named - shared stage names
@@ -996,7 +996,7 @@ true, in three places, and all three were added by this work:
 
 | what | why it counted | what now |
 |---|---|---|
-| `reference/keyconfig_*.jpg`, 6 files, 1.46 MB | photographs of both games running | deleted; `README.md` says how to reproduce them, and the label mapping they settled stays |
+| `reference/keyconfig_*.jpg`, 6 files, 1.46 MB | photographs of both games running | deleted; `REFERENCE.md` says how to reproduce them, and the label mapping they settled stays |
 | `keyconfig-textures.png`, 37 KB | eight of the game's own textures, rendered side by side | deleted, same |
 | `bank1-glyphs.tsv`, 104 KB | its `shape_hex` column was 1,214 raw 12x12 font bitmaps - the Japanese font itself, in hex | `shape_id`: a 64-bit digest of each bitmap (`jptext.shape_key`) |
 
@@ -1183,7 +1183,7 @@ this project does not ship.
 
 ### It also supplies the executables the build asks for
 
-`BUILDING.md` requires `int1.exe` and `int2.exe` as separately supplied inputs,
+`BUILD-HISTORY.md` requires `int1.exe` and `int2.exe` as separately supplied inputs,
 because extracting them from the collection yields zeros. Extracted from the
 Redump images instead, both hash to
 `4b8252b65953a02021486406cfcdca1c7670d1d1a8f3cf6e750ef6e360dc3a2f` — **the
@@ -2036,8 +2036,8 @@ actual data-level contradiction rather than a guess. WEAPON MODE / GRENADE LEVEL
 is the one that held up on screen and in the pool data alike: Targets 3 unchanged,
 the substituted number sitting inside the sentence (Grenades explode in 5 seconds,
 Integral, versus 4 seconds, USA) — which is itself how the fuse-timer investigation
-below started. README.md ("Numbers that differ between the two versions") and
-NextSteps.md §6 both carry this finding now.
+below started. REFERENCE.md ("Numbers that differ between the two versions") and
+HANDOFF-ARCHIVE.md §6 both carry this finding now.
 
 **Part two: is GRENADE LEVEL 02's "5 vs 4 seconds" claim even true of the game's own
 behaviour, or just its text?** Traced the fuse-timer mechanism through the decomp
@@ -2140,7 +2140,7 @@ model is shared, generic code this search did not find by name.
 
 **Session housekeeping the same evening:** the documentation was reorganised for a
 model handoff at the user's request — this section written for that purpose, and
-NextSteps.md §5 carries a short pointer into it.
+HANDOFF-ARCHIVE.md §5 carries a short pointer into it.
 
 ## 29. The grenade decal port completed, 2026-09-11
 

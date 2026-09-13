@@ -282,9 +282,9 @@ void SQHook<Q>::SetNativeCallHook(const char *name, SQFUNCTION<Q> func)
 }
 
 template <Squirk Q>
-void SQHook<Q>::SetPatchRangeBlacklist(uint64_t start, uint64_t end)
+void SQHook<Q>::SetPatchRangeBlacklist(unsigned title, unsigned disk, uint64_t start, uint64_t end)
 {
-    RangeBlacklist.push_back({ start, end });
+    RangeBlacklist.push_back({ title, disk, start, end });
 }
 
 template <Squirk Q>
@@ -662,10 +662,10 @@ SQInteger SQHook<Q>::SQNative_entryCdRomPatch(HSQUIRRELVM<Q> v)
     }
     for (auto &range : RangeBlacklist)
     {
-        if (offset < range.first || offset >= range.second) continue;
+        if (!range.matches(SQGlobals<Q>::GetTitle(), SQGlobals<Q>::GetDisk(), offset)) continue;
         spdlog::info("[SQ] [Patch] filtering CD-ROM patch {} at offset 0x{:x},"
             " inside blacklisted range 0x{:x}..0x{:x}.",
-            file.empty() ? "<data>" : file, offset, range.first, range.second);
+            file.empty() ? "<data>" : file, offset, range.start, range.end);
         return 1;
     }
 

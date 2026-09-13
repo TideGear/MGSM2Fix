@@ -60,15 +60,10 @@ public:
         }
 
         if (M2Config::eBrightnessText != M2BrightnessText::Collection) {
-            // Take the texture back from the collection. Two filters on purpose:
-            // the names are the four pieces observed on MGS1 (USA) disc 1, and
-            // the ranges cover the same archive entry on either disk without
-            // having to know what the collection called each piece there.
-            for (auto & MGS1_FileBlacklist_Brightness : MGS1_FileBlacklist_BrightnessText) {
-                SQHook<Squirk::Standard>::SetPatchFileBlacklist(MGS1_FileBlacklist_Brightness);
-            }
-            for (auto & range : MGS1_RangeBlacklist_BrightnessText) {
-                SQHook<Squirk::Standard>::SetPatchRangeBlacklist(range.first, range.second);
+            // Scope the collection replacement to USA and the selected disc.
+            for (unsigned disk = 0; disk < MGS1_RangeBlacklist_BrightnessText.size(); ++disk) {
+                const auto &range = MGS1_RangeBlacklist_BrightnessText[disk];
+                SQHook<Squirk::Standard>::SetPatchRangeBlacklist(981, disk, range.first, range.second);
             }
         }
 
@@ -327,8 +322,8 @@ private:
     // collection offers this title, exactly four fall anywhere inside the
     // 81-sector option stage and they are the four above; and across titles
     // 99 (Integral) and 980 (the Japanese MGS1), whose disc images do span
-    // these offsets, nothing falls inside either window. Registered without
-    // knowing the title, because Load() runs before there is one.
+    // these offsets, nothing falls inside either window. Registered with USA title 981 and a disc index; checked against the
+    // active title/disc when each collection patch is submitted.
     const std::vector<std::pair<uint64_t, uint64_t>> MGS1_RangeBlacklist_BrightnessText = {
         { 0x165A34CCull, 0x165A4F38ull },   // disk 0
         { 0x11EE2B7Cull, 0x11EE45E8ull },   // disk 1

@@ -1,6 +1,6 @@
 # Script index
 
-One line per script in this directory, pulled from its module docstring's first sentence by `gen_scripts_index.py`. Each script's own docstring has the full picture and usually a worked example; `README.md` has the mechanisms, and `NextSteps.md` has how the pieces fit together and what remains.
+One line per script in this directory, pulled from its module docstring's first sentence by `gen_scripts_index.py`. Each script's own docstring has the full picture and usually a worked example; `REFERENCE.md` has the mechanisms, and `NextSteps.md` has how the pieces fit together and what remains.
 
 | Script | What it does |
 |---|---|
@@ -40,7 +40,7 @@ One line per script in this directory, pulled from its module docstring's first 
 | `menu2.py` | Rebuild en_menu and en_menu2 from retail, preserving shipped payloads. |
 | `menu3.py` | Port the `title` stage's copy of the disc-swap messages (`en_menu3`). |
 | `mkimage.py` | Write a patched PSX disc image from a raw-variant patch set. |
-| `optbright.py` | Option -> SCREEN: put USA's brightness paragraph into Integral's option stage. |
+| `optbright.py` | Historical brightness reconstruction; writes only WORK/legacy-optbright. |
 | `optlabel2.py` | Rebuild the shipped option caption chain directly from retail. |
 | `optscan.py` | Inspect a stage's tags, DAR entries and GCL chain in either build. |
 | `optsctext.py` | Option -> SCREEN: draw USA's sc_text texture, making the brightness paragraph pixel-exact instead of re-wrapped font text. |
@@ -67,7 +67,7 @@ One line per script in this directory, pulled from its module docstring's first 
 | `unlock_title.py` | Force every title-screen unlock: a test aid, not part of the English port. |
 | `verify_integral_option.py` | Read the DEPLOYED Integral option PPFs back and prove what they install. |
 | `verify_patch_options.py` | Apply the native INI planner's four language/grenade plans to real VR stages. |
-| `verify_usa_brightness.py` | End-to-end static check of the USA brightness fix. |
+| `verify_usa_brightness.py` | Static payload/texture check for the USA brightness fix. |
 | `vr_camera.py` | Port the USA VR Missions ALBUM / SAVE PHOTO captions into Integral's VR `camera` overlay. |
 | `vr_exe.py` | Port the USA VR Missions executable's English into Integral's VR-DISC executable. |
 | `vr_grenade.py` | Correct Integral VR's grenade decal and briefing to USA's four-second delay. |
@@ -83,4 +83,4 @@ One line per script in this directory, pulled from its module docstring's first 
 | `vr_windows.py` | Port the USA VR Missions window text into Integral's VR-DISC stages. |
 | `vrlib.py` | Shared code for the Integral VR-DISC (SLPM-86249) English port. |
 | `widths.py` | How wide a ported line renders, and how wide it is allowed to be. |
-| `workdir.py` | Where the port's working data and the game live, resolved for every tool. |
+| `workdir.py` | Resolve build inputs: explicit arguments, environment overrides, then discovery. |

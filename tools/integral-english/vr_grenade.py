@@ -166,6 +166,43 @@ def raw_package_records(isd, usd, disc, missions):
     return records
 
 
+def collection_package(isd, usd, disc, folder):
+    """Build both collection layouts against the packaged mission PPF, read back each.
+
+    No installed mod or working-directory artifact participates in this build.
+    """
+    folder = Path(folder)
+    mission = folder / MISSION_NAME
+    found = {name for name in portio.entries(isd) if JP_LINE in v.stage_bytes(isd, name)}
+    assert found == set(BRIEFING_STAGES), ('unexpected briefing coverage', found)
+    original = v.stage_bytes(isd, STAGE)
+    modified = build_stage(original, v.stage_bytes(usd, STAGE))
+    lba = v.stage_lba(disc, isd, STAGE)
+    texture_records = v.inplace_records(lba, original, modified, merge_gap=0)
+    paths = []
+    for language in ('japanese', 'english'):
+        records = list(texture_records)
+        expected = [(lba, original, modified)]
+        digits = []
+        for name in BRIEFING_STAGES:
+            before = v.stage_bytes(isd, name)
+            stage_lba = v.stage_lba(disc, isd, name)
+            if language == 'english':
+                before = portio.patched_file(before, stage_lba, [mission])
+            pos = briefing_offset(before, language)
+            digits.append(portio.image_offset(stage_lba, pos))
+            records.extend(portio.map_runs(stage_lba, [(pos, b'4')]))
+            expected.append((stage_lba, before, correct_briefing(before, language)))
+        path = folder / (NAME if language == 'japanese' else Path(NAME).stem + '_english.ppf')
+        path.write_bytes(portio.ppf(records, 'Integral VR grenade: four-second decal and text'))
+        for stage_lba, before, after in expected:
+            assert portio.patched_file(before, stage_lba, [path]) == after
+        write_metadata(path, layout=language, grenade_digits=digits,
+                       base_fingerprint=fingerprint(mission.read_bytes()) if language == 'english' else '')
+        paths.append(path)
+    return paths
+
+
 def write_variant(out, records, expected, base_records=()):
     """Verify the payload PPF and raw parity against this variant's text base."""
     block = portio.blockcheck_of(v.INT_CONTAINER, v.INT_VR_BASE)

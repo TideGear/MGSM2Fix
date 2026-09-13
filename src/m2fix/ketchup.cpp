@@ -177,42 +177,14 @@ void Ketchup<Q>::Update()
 	// Mid disc swap - the image is being torn down, leave it alone.
 	if (SQHook<Q>::IsCdRomShellOpen()) return;
 
-	// The full read-only audit rides the same tick, at a slower cadence, and
-	// runs even when the cheap check below is satisfied - that is the point.
-	if (RamTick % RamAuditInterval == RamAuditInterval - 1) Audit();
-
-	// Back off if it refuses to stick, so a pathological case degrades into a
-	// slow retry instead of rewriting the image several times a second.
+	// Bound retries for recurring foreign writers. Inspect every byte, including
+	// interior bytes, but write only differences rather than the entire image.
 	unsigned int interval = RamCheckInterval * (RamApplies < 8 ? 1 : 16);
 	if (RamTick++ % interval != 0) return;
-
-	// Cheap check: one byte per run, the first. Anything wrong and we rewrite
-	// the lot. GetRamValue is masked because the value arrives widened, and
-	// comparing the raw result against a byte does not reliably hold.
-	//
-	// Known blind spot: a foreign write that lands INSIDE a run without
-	// touching its first byte is not seen, so it stands until something else
-	// disturbs the run. The collection's own RAM patches can do exactly that -
-	// six of its memory-card rewrites fall mid-run in the Integral port's
-	// caption pool. Checking every byte would close it, but a foreign writer
-	// that re-applies would then fight this loop and flicker; measure that
-	// before changing it.
-	bool intact = true;
-	for (auto &patch : RamPatches) {
-		if ((SQEmuTask<Q>::GetRamValue(CHAR_BIT, patch.address) & 0xFF) != patch.data.front()) {
-			intact = false;
-			break;
-		}
-	}
-	if (intact) return;
-
-	size_t bytes = 0;
-	for (auto &patch : RamPatches) {
-		for (size_t i = 0; i < patch.data.size(); i++) {
-			SQEmuTask<Q>::SetRamValue(CHAR_BIT, patch.address + i, patch.data[i]);
-		}
-		bytes += patch.data.size();
-	}
+	const size_t bytes = RepairRamPatches(RamPatches,
+		[](unsigned address) { return SQEmuTask<Q>::GetRamValue(CHAR_BIT, address); },
+		[](unsigned address, unsigned char value) { SQEmuTask<Q>::SetRamValue(CHAR_BIT, address, value); });
+	if (!bytes) return;
 
 	// Only worth logging the first few; after that it is a reapply loop and the
 	// log would drown in it.
@@ -488,7 +460,9 @@ bool Ketchup<Q>::Process(HSQUIRRELVM<Q> v)
 
 	for (auto &title : *titles) {
 		if (title.id != SQGlobals<Q>::GetTitle()) continue;
-		return ProcessTitle(v, title);
+		const bool result = ProcessTitle(v, title);
+		NormalizeRamPatches(RamPatches);
+		return result;
 	}
 
 	return false;

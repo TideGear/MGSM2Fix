@@ -50,7 +50,7 @@ def main():
             "One line per script in this directory, pulled from its module "
             "docstring's first sentence by `gen_scripts_index.py`. Each "
             "script's own docstring has the full picture and usually a "
-            "worked example; `README.md` has the mechanisms, and "
+            "worked example; `REFERENCE.md` has the mechanisms, and "
             "`NextSteps.md` has how the pieces fit together and what "
             "remains.\n\n")
         out.write('| Script | What it does |\n|---|---|\n')

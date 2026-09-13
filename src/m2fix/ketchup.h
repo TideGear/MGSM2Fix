@@ -2,6 +2,7 @@
 
 #include "stdafx.h"
 #include <map>
+#include "ram_patch.h"
 
 typedef struct {
 	unsigned int id;
@@ -20,10 +21,7 @@ typedef struct {
 	std::vector<Ketchup_VersionInfo> versions;
 } Ketchup_TitleInfo;
 
-typedef struct {
-	unsigned int address;
-	std::vector<unsigned char> data;
-} Ketchup_RamPatch;
+
 
 // A patch this fix carries itself, rather than reading from a PPF in the mods
 // folder. Same destination as a PPF record - an offset into the disc image -
@@ -90,12 +88,9 @@ private:
 	static inline unsigned int RamApplies = 0;
 	constexpr static unsigned int RamCheckInterval = 30;
 
-	// Read-only integrity report: every byte of every run, on a slow cadence,
-	// logging any run that differs from what was written. Never rewrites - the
-	// cheap first-byte check above owns that - so it cannot fight a foreign
-	// writer; it only makes one visible. See Audit() and the comment in Update().
+	// Explicit read-only diagnostic. Update independently verifies and repairs
+	// every byte at its bounded retry cadence.
 	static void Audit();
-	constexpr static unsigned int RamAuditInterval = 300;
 	static inline unsigned int RamAuditReports = 0;
 	static inline std::set<unsigned int> RamAuditSeen = {};
 

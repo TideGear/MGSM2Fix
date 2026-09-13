@@ -1,36 +1,12 @@
-"""Where the port's working data and the game live, resolved for every tool.
+"""Resolve build inputs: explicit arguments, environment overrides, then discovery.
 
-    from workdir import WORK          # .../work  - the directory itself
-    WORK + '/int1_stage.dir'          # the extracted STAGE.DIRs, exes, PPF backups
-
-`py workdir.py` prints everything this resolved and how, which is the first
-thing to run when a tool cannot find something.
-
-Resolution of WORK, first match wins:
-
-  1. INTEGRAL_ENGLISH_WORK          environment variable naming the ROOT that
-                                    holds work/ (not work/ itself)
-  2. D:/mgsbuild/integral-english-work   the author's machine, if it exists
-  3. the current directory          the old convention, kept so `cd <root>`
-                                    still works
-
-Until 2026-09-03 every tool opened 'work/...' relative to wherever it was run
-from, and the only copy of that data sat in a session scratchpad under Windows
-Temp. The data moved; this module is what lets the tools follow it without each
-one growing its own path logic.
-
-**GAME and DECOMP are searched for, not assumed.** They used to be two literal
-paths on the author's D: drive, which is fine for the author and wrong for
-everybody else: a first run on another machine failed pointing at a drive that
-may not exist. `find_game()` asks Steam where its libraries are - the registry,
-then `libraryfolders.vdf`, then the ordinary install locations on every drive -
-and accepts a directory only if it actually holds the collection's data files.
-If nothing is found the constant is empty rather than a lie, and
-`require_game()` raises with the flag and the variable to set.
+INTEGRAL_ENGLISH_WORK names an existing root containing work/ (created by
+builders as needed); otherwise use cwd/work. Game discovery uses Steam libraries;
+decomp discovery uses sibling checkouts. Invalid explicit overrides are errors.
+Run this module to print the resolved locations.
 """
 import os
 
-_DEFAULT_ROOT = r'D:/mgsbuild/integral-english-work'
 
 # The collection's MGS1 folder is recognised by its own data, never by name.
 _GAME_MARKERS = ('windata/alldata.bin', 'windata/dlc/dlc_japan.bin')
@@ -63,9 +39,9 @@ def pick(collection, raw):
 def _root():
     env = os.environ.get('INTEGRAL_ENGLISH_WORK')
     if env:
-        return env
-    if os.path.isdir(os.path.join(_DEFAULT_ROOT, 'work')):
-        return _DEFAULT_ROOT
+        if not os.path.isdir(env):
+            raise SystemExit('INTEGRAL_ENGLISH_WORK must name an existing root directory: ' + env)
+        return os.path.abspath(env)
     return os.getcwd()
 
 
@@ -123,20 +99,19 @@ def _steam_libraries():
 def find_game(explicit=None):
     """The collection's MGS1 directory, or '' if it cannot be found.
 
-    Order: what the caller passed, the environment variable, the author's own
-    path, then every Steam library. A candidate counts only if it holds the
+    Order: an explicit path, the environment variable, then Steam libraries. A candidate counts only if it holds the
     collection's data files - a directory called MGS1 is not evidence.
     """
     # A path the caller typed is a statement of intent: if it is wrong, say so
     # rather than quietly using a different install they did not ask for.
-    if explicit and not _looks_like(explicit, _GAME_MARKERS):
+    explicit = os.fspath(explicit) if explicit is not None else os.environ.get('INTEGRAL_ENGLISH_GAME')
+    if explicit is not None and not _looks_like(explicit, _GAME_MARKERS):
         raise SystemExit(
             '%s is not the collection\'s MGS1 directory.\n'
             '  Expected to find %s under it.\n'
             '  (Searching instead would use an install you did not name.)'
             % (explicit, ' or '.join(_GAME_MARKERS)))
-    candidates = [explicit, os.environ.get('INTEGRAL_ENGLISH_GAME'),
-                  'D:/Steam/SteamApps/common/MGS1']
+    candidates = [explicit]
     for library in _steam_libraries():
         candidates.append(library + '/steamapps/common/' + _STEAM_APP)
     for candidate in candidates:
@@ -147,19 +122,19 @@ def find_game(explicit=None):
 
 def find_decomp(explicit=None):
     """The MGS decomp checkout, or '' - same rules, checked by its own files."""
-    if explicit and not _looks_like(explicit, _DECOMP_MARKERS):
+    explicit = os.fspath(explicit) if explicit is not None else os.environ.get('INTEGRAL_ENGLISH_DECOMP')
+    if explicit is not None and not all(os.path.isfile(os.path.join(explicit, m)) for m in _DECOMP_MARKERS):
         raise SystemExit(
             '%s is not the MGS decomp checkout.\n'
             '  Expected to find %s under it.'
             % (explicit, ' and '.join(_DECOMP_MARKERS)))
-    candidates = [explicit, os.environ.get('INTEGRAL_ENGLISH_DECOMP'),
-                  'D:/mgsbuild/d']
+    candidates = [explicit]
     here = os.path.dirname(os.path.abspath(__file__))
     for up in (3, 4):                       # a sibling of the repo
         parent = os.path.abspath(os.path.join(here, *(['..'] * up)))
         candidates += [os.path.join(parent, n) for n in ('d', 'mgs', 'mgs-decomp')]
     for candidate in candidates:
-        if _looks_like(candidate, _DECOMP_MARKERS):
+        if candidate and all(os.path.isfile(os.path.join(candidate, m)) for m in _DECOMP_MARKERS):
             return candidate.replace('\\', '/').rstrip('/')
     return ''
 

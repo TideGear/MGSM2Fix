@@ -1,6 +1,7 @@
 #pragma once
 
 #include "m2fixbase.h"
+#include "../m2fix/patch_range.h"
 
 #include "sqhelper.h"
 
@@ -57,7 +58,7 @@ public:
     static void SetLoadScriptHook(const char *name, SQFUNCTION<Q> func);
     static void SetNativeCallHook(const char *name, SQFUNCTION<Q> func);
     static void SetPatchFileBlacklist(std::string file);
-    static void SetPatchRangeBlacklist(uint64_t start, uint64_t end);
+    static void SetPatchRangeBlacklist(unsigned title, unsigned disk, uint64_t start, uint64_t end);
     static void SetPatchWatch(uint64_t start, uint64_t end, std::string label);
     static void SetPatchDataBlacklist(std::vector<unsigned char> data);
     static void SetTextureWhitelist(unsigned int data);
@@ -145,7 +146,7 @@ private:
     // what its file is called, which is what you want for an asset whose patch
     // names differ per disk - the collection names each piece after its own
     // image offset, so one range covers every piece of one archive entry.
-    static inline std::vector<std::pair<uint64_t, uint64_t>> RangeBlacklist = {};
+    static inline std::vector<PatchRange> RangeBlacklist = {};
     // Ranges to REPORT rather than filter: a patch landing here is logged with
     // its length and leading bytes, then applied as normal. For watching what
     // the collection does to a region you care about - the thing you want when

@@ -16,6 +16,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v4
+      with:
+        submodules: recursive
 
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -33,6 +35,12 @@ jobs:
       run: |
         cd tools/integral-english
         py -m py_compile *.py
+
+    - name: Set up C++ compiler
+      uses: ilammy/msvc-dev-cmd@v1
+    - name: Native patch and repair tests
+      shell: cmd
+      run: tools\integral-english\run_native_tests.cmd
 
   make:
     runs-on: windows-latest
@@ -57,7 +65,7 @@ jobs:
         path: |
           .\src\extern\zydis\msvc\bin\ReleaseX64
           .\src\extern\zydis\msvc\bin\ReleaseX86
-        key: zydis-${{ runner.os }}-${{ steps.zydishash.outputs.hash }}
+        key: zydis-${{ runner.os }}-v143-${{ steps.zydishash.outputs.hash }}
 
     - name: Install Python dependencies
       uses: py-actions/py-dependency-install@v4
@@ -130,7 +138,7 @@ jobs:
         path: .\dist\
 
   preview:
-    needs: make
+    needs: [make, integral-english-tools]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: windows-latest
     permissions:
@@ -171,7 +179,7 @@ jobs:
         updateOnlyUnreleased: true
 
   release:
-    needs: make
+    needs: [make, integral-english-tools]
     if: github.event_name == 'workflow_dispatch'
     runs-on: windows-latest
     permissions:

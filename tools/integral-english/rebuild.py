@@ -57,6 +57,11 @@ def run(args, cwd, env, log):
         raise RuntimeError('Command failed; see '+str(log))
 
 
+def source_hashes():
+    return {p.name: sha256(p.read_bytes()) for p in sorted(TOOLS.iterdir())
+            if p.suffix in ('.py', '.patch', '.json') or p.name.startswith('PACKAGE-README')}
+
+
 def extract(game, work, executables):
     inputs = {}
     for prefix, container, bases, boots in (
@@ -161,7 +166,7 @@ def main():
     parser.add_argument('--psyq', type=Path,
                         help='the PSY-Q SDK tree (defaults to <decomp>/../psyq)')
     parser.add_argument('--executables', type=Path,
-                        help='the four retail executables (defaults to %s)' % WORK)
+                        help='the five retail executables (defaults to %s)' % WORK)
     parser.add_argument('--variant', choices=('collection', 'raw'), default='collection',
                         help='collection (the default, what mods/ gets) or raw, for a real PSX '
                              'disc image: SC_KEEP_LINES 6, OPTION_MC_CONTROL_SETTINGS 0, and '
@@ -184,6 +189,22 @@ def main():
         parser.error('--compare-deployed compares against mods/, which is the collection build')
     if len(str(output)) > 65 or ' ' in str(output):
         parser.error('use a short path without spaces for the PSYQ toolchain')
+    # Fail before creating output or compiling anything when inputs are missing.
+    errors = []
+    for relative in ('windata/alldata.bin', 'windata/dlc/dlc_japan.bin'):
+        if not (game / relative).is_file(): errors.append('missing game input: ' + str(game / relative))
+    for name, expected in {**EXE_HASHES, 'vrus.exe': VR_EXE_HASHES['vrus.exe']}.items():
+        path = args.executables / name
+        if not path.is_file(): errors.append('missing retail executable: ' + str(path))
+        elif sha256(path.read_bytes()) != expected: errors.append('unsupported retail executable: ' + str(path))
+    for directory in ('psyq_4.3', 'psyq_4.4', 'psyq_4.5', 'aspsx'):
+        if not (psyq / directory).is_dir(): errors.append('missing SDK directory: ' + str(psyq / directory))
+    for package in ('Pillow', 'ninja'):
+        try: importlib.metadata.version(package)
+        except importlib.metadata.PackageNotFoundError: errors.append('missing Python package: ' + package)
+    revision = subprocess.run(['git', '-C', str(source), 'cat-file', '-e', BASE + '^{commit}'], capture_output=True)
+    if revision.returncode: errors.append('decomp checkout lacks pinned commit ' + BASE)
+    if errors: parser.error('Build prerequisites failed:\n  ' + '\n  '.join(errors))
     output.mkdir(parents=True)
     work = output/'work'
     work.mkdir()
@@ -203,8 +224,7 @@ def main():
                       or 'unknown',
         python=sys.version, packages={n:importlib.metadata.version(n)
                                     for n in ('Pillow','ninja')}, inputs={}, outputs={})
-    report['sources'] = {p.name:sha256(p.read_bytes()) for p in sorted(TOOLS.iterdir())
-                         if p.suffix in ('.py','.patch','.json')}
+    report['sources'] = source_hashes()
     report['sdk_files'] = {p.relative_to(psyq).as_posix():sha256(p.read_bytes())
                            for p in sorted(psyq.rglob('*'))
                            if p.is_file() and '.git' not in p.relative_to(psyq).parts}
@@ -357,6 +377,14 @@ def main():
                 report['outputs'][name]['reference_effect_equal'] = not mismatch
                 report['outputs'][name]['difference_count'] = len(mismatch)
                 report['outputs'][name]['difference_addresses'] = [hex(p) for p in sorted(mismatch)[:12]]
+        if not raw:
+            from vr_grenade import collection_package
+            for path in collection_package((work/'vrint_stage.dir').read_bytes(),
+                                           (work/'vrus_stage.dir').read_bytes(), vrimage, vrmods):
+                problems, n, span, desc = check(path)
+                assert not problems, (path.name, problems)
+                report['outputs'][path.name] = dict(sha256=sha256(path.read_bytes()),
+                    bytes=path.stat().st_size, records=n, changed_bytes=len(effects(path, vrimage)))
         if raw:
             # Include the standalone correction in raw packages. Use payload
             # records only: the final shared ECC pass must include every English
@@ -437,6 +465,8 @@ def main():
                 item = report['outputs'].get(name)
                 if item and item.get('reference_effect_equal') is False:
                     item['reference_effect_equal'] = 'equal as a set (repartitioned 2026-09-07)'
+    if source_hashes() != report['sources']:
+        raise RuntimeError('Build scripts or package instructions changed during the build; rerun in a fresh output directory. No ZIP created.')
     (output/'build-report.json').write_text(json.dumps(report,indent=2)+'\n',encoding='utf-8')
     bad = [n for n,v in report['outputs'].items() if v.get('reference_effect_equal') is False]
     if report.get('vr_set_effect_equal') is False:

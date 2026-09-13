@@ -1,16 +1,11 @@
 Integral English text - Master Collection build (collection variant)
 
-Copy the mods folder into your MGS1 game folder. It holds three sets:
-  mods/INTEGRAL/INTEGRAL/0   Integral disc 1 - ten INTEGRAL_disc1_en_*.ppf
-  mods/INTEGRAL/INTEGRAL/1   Integral disc 2 - ten INTEGRAL_disc2_en_*.ppf
-  mods/INTEGRAL/VR-DISK      Integral's VR disc (SLPM-86249) - eight INTEGRAL_vr_en_*.ppf
-Replace older copies of the same files, and first remove any duplicate or
-experimental PPF from those folders, including any en_menu3, *_movie_e3 or
-*_unlock_* file. Every patch in this package writes its own bytes and no two of
-them overlap, so file order does not matter - but install a disc's files as a
-set, and if you are replacing an older package, replace
-INTEGRAL_vr_en_missions.ppf and INTEGRAL_vr_en_movie.ppf together: in packages
-before 2026-09-08 those two shared bytes and the pair is not interchangeable.
+Copy the mods folder into your MGS1 game folder. The generated inventory at
+the end of this README lists the exact files. Include all .ppf.json companions.
+Both grenade layouts are included; MGSM2Fix selects the matching language.
+Replace the previous package as a complete set, removing its files using its
+SHA256SUMS manifest first. Retain unrelated mods and your settings. Do not mix
+collection/raw variants or older experimental patches such as en_menu3.
 
 This package requires the MGSM2Fix integral-english-text branch (the deferred
 executable RAM mirror and EnglishText) with EnglishText = true. It does not
@@ -59,8 +54,8 @@ and the fix this port targets are MGSM2Fix by nuggslet:
 Every English string is copied verbatim from Konami's USA release. Nothing has
 been translated, and no game data is redistributed with these patches.
 
-Uninstall: remove the ten INTEGRAL_discN_en_*.ppf files from each numbered
-folder and the eight INTEGRAL_vr_en_*.ppf files from VR-DISK.
+Uninstall: remove this package's mods files listed in SHA256SUMS.txt, including
+JSON companions. Leave unrelated mods and saves alone.
 SHA256SUMS.txt and build-report.json identify the packaged build and validation.
 
 OPTIONAL PATCH CONTROLS (current branch)
@@ -68,10 +63,10 @@ OPTIONAL PATCH CONTROLS (current branch)
 story/VR English sets independently. EnglishText selects Integral's own language
 bit separately. Copy the VR mission PPF's .json companion too; it is part of this
 package. Missing/stale companions are reported in MGSM2Fix.log and the affected
-VR English set is skipped, rather than guessing where its grenade digits moved.
-GrenadeDelayFix controls the grenade briefing numeral and, when separately
-installed, its corrected texture. False restores 5 in English as well as Japanese.
-The standalone grenade builder installs both language variants and companions;
-this package does not include those texture assets. Restart after INI changes.
+VR English mission patch is skipped, rather than guessing where its grenade digits moved.
+GrenadeDelayFix controls the grenade briefing numeral and its corrected texture.
+False restores 5 in English as well as Japanese.
+This package includes both grenade texture/text variants and their companions.
+Other VR English screens remain active if the mission companion is invalid. Restart after INI changes.
 UnlockVRMissions, UnlockVRExtras, UnlockVRMovies and UnlockTitleBonuses default
 false and gate separately installed test-aid PPFs. They are not in this package.
