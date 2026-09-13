@@ -4423,12 +4423,36 @@ Two things fell out of it that were not the point:
   313 times, 313 times, and **308 times for `vrint.exe`, which is built from the
   decomp rather than copied**. Where its source is unchanged, the decomp's output
   *is* the disc.
-* **`us1.exe` is not the executable the collection's USA image was built with.**
-  The same check reproduces 8 of 318 tails. The file is a `SLUS` build by its own
-  strings and the image boots `slus_005.94`, so a different pressing is the
-  likeliest explanation, but it is not established. It does not affect the
-  Integral patches, and it is one more reason USA text is taken from
-  `usa1_stage.dir` rather than from this image.
+* **`us1.exe` is not the executable the collection's USA image was built with —
+  IDENTIFIED 2026-09-12.** The same check reproduces only 8 of 318 tails.
+  Redump catalogues two USA MGS1 pressings — "Metal Gear Solid (USA) (Disc 1)"
+  and "Metal Gear Solid (USA) (Disc 1) (Rev 1)" — and the two disagree over
+  **416,363 of 651,264 bytes** (64%), starting at offset 0x10, both built with
+  the same PSYQ library RCS ids (`bios.c` 1.86, `sys.c` 1.140), so this is a
+  real Konami source-level revision, not a different SDK. Extracting each
+  pressing's own `SLUS_005.94` and running the same zero-fill/parity check
+  against `windata/alldata.bin` gives a clean answer: the **base/"Rev 0"**
+  dump reproduces the collection's stored sector parity **318/318**, and the
+  **"Rev 1"** dump — which is byte-for-byte what `work/us1.exe` (and `us2.exe`)
+  already is, SHA-256 `615e1360…` — reproduces only **8/318**, the same figure
+  this section used to report as unexplained. So the collection's own USA
+  image was pressed from the base/Rev 0 disc, and this port's `us1.exe`/
+  `us2.exe` inputs have been the Rev 1 disc all along.
+
+  **This does not appear to have affected anything shipped.** `items.py` and
+  `savemsg.py` read USA text out of `us1.exe` directly (`rendertext.py`'s
+  `ITEM_TAB`/`WEAP_TAB` offsets), and every string those builders took from it
+  was independently confirmed on screen against real USA gameplay (the
+  34-of-34 item/weapon comparison, the memory-card captions) — so whatever the
+  Rev 0/Rev 1 difference actually changes in the executable, it does not touch
+  the item, weapon or save-message text tables those extractions depend on.
+  `usa1_stage.dir`/`usa2_stage.dir` (real disc dumps, not an executable) remain
+  the source for everything else, which is why this was never more than a
+  measurement worth keeping. What the Rev 0/Rev 1 difference actually *is* in
+  gameplay terms has not been investigated — the 64% byte churn starting at the
+  PS-EXE header suggests a code-size-changing edit rather than a handful of
+  patched bytes, consistent with a real bug-fix revision, but that is
+  unconfirmed.
 
 ## Line widths: what is an invariant here and what only looks like one
 

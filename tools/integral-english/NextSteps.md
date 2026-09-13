@@ -247,13 +247,13 @@ by name (5.8). What is left is of five kinds — and none of it is text to port:
 | kind | items |
 |---|---|
 | ~~**housekeeping**~~ | **DONE 2026-09-08 22:20.** The four `_unlock_` PPFs deleted, `GiveItems`/`GiveWeapons` emptied, `DisableRAM`/`DisableCDROM` back to `false`, the disjoint VR pair finally deployed, and the branch committed. §4's "Live at" paragraph is the current state |
-| **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the moved EXIT box of 5.4a, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
+| **needs you at the controller**, nothing to build | 5.1, 5.2, 5.5's list 1, the `en_pad2` subtitle (5.11, needs a pad in port 2) and the four `abst` location names (5.9, free with the 5.2 run) |
 | ~~**real engineering**~~ | **The briefing: FIXED 2026-09-10 late** - `ROW_H` was an R3000 **load-delay hazard**, `subu` reading `a1` in the slot right after `lbu a1`; one `nop` in place, no stub, and `hazards.py` now scans every rewritten block on every build (§24, top). Build `repro32raw`, images in `D:\mgsbuild\patched`. **Seen on screen 22:38, matching the MC set** for every reachable state; the six flag-gated items and their connectors still want a save with them earned on the raw disc. Still real work: **submit the pull request** (5.6), and look at the other two raw-only screens |
 | **needs a fresh pair of eyes** | the briefing's six flag-gated indented items and their L-connectors on the **raw disc** (a save with them earned, or a raw-disc unlock aid that does not exist yet). On the collection they were seen 2026-09-11 00:13-00:17 with `ThinTexturedQuads`, twenty pairs, 0.00% against USA (§26). **English grenade fix confirmed; Japanese visual check remains:** the VR weapon-select grenade model's `DELAY` texture — Integral's own authoring error, confirmed against real gameplay (§5.15, HISTORY.md §28) |
 | ~~**the one open task**~~ | **DONE 2026-09-10.** The count was never 1,813 - that figure came from a broken fragment map. 1,214 bank-1 shapes are named, the byte scanner is retired for a walk of the game's own records, and the export is complete, on all three discs: 68,242 lines, 3,923,944 kana/kanji, zero unresolved codes. §18 and §19 |
-| **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are**; and per-family verifiers where they are missing (5.14 step 3) |
-| ~~**held open on purpose**~~ | **All four of §6's 2026-09-07 items now decided.** The `abst` location names on 2026-09-08 (use USA's); the READ MISSION LOG? caption, the `1/2` counter, the VR number substitutions and VR EXTRA record 6 all on 2026-09-11, each keeping the current default. The VR number substitutions' underlying measurement needs a separate re-check — see §6 and README, "Numbers that differ between the two versions" |
-| **loose ends** | 5.7's remaining untested runtime features, 5.5's items 4 and 5, and the `us1.exe` parity mismatch in 5.13 |
+| **to investigate** | ~~5.14~~ swept and ~~5.8~~ closed on 2026-09-08 — but see §16: on 2026-09-09 both turned out to have been sweeping **one file**. `RADIO.DAT` holds 6.5 MB of Integral-exclusive Japanese developer commentary no tool here could see. That is translation, not porting, so the port's scope is unchanged; what needs redoing is any claim of completeness. Also left: what the 13 Integral-only `*r` stages **are** — new lead 2026-09-12, still not established, see below; and per-family verifiers where they are missing (5.14 step 3) |
+| ~~**held open on purpose**~~ | **All four of §6's 2026-09-07 items now decided.** The `abst` location names on 2026-09-08 (use USA's); the READ MISSION LOG? caption, the `1/2` counter, the VR number substitutions and VR EXTRA record 6 all on 2026-09-11, each keeping the current default. The VR number substitutions' underlying measurement was re-checked and resolved 2026-09-12 — see §6 |
+| **loose ends** | 5.7's remaining untested runtime features, 5.5's items 4 and 5, and — identified 2026-09-12, still not fully chased — what the Rev 0/Rev 1 pressing difference behind 5.13's `us1.exe` finding actually changes in play |
 
 ### 5.1 Still to be seen (needs the user; nothing to build)
 Everything built so far has been seen on screen except: a mission-log page from
@@ -502,8 +502,11 @@ nothing else could position the highlight, or USA's own would be wrong.
 
 Deployed 2026-09-07. Expected on the next look: the box 4 px higher, its
 highlight with it, and 3 rows of clearance under it instead of a 2-row overlap.
-**Not yet seen on screen** — that and the EXIT highlight when selected are the
-only things left to confirm here.
+
+**CONFIRMED ON SCREEN 2026-09-12.** The user verified the moved box works as
+intended. The EXIT highlight when selected was not separately called out and
+remains an edge worth a glance if anyone is looking anyway, but the box move
+itself — the thing that was asked and approved — is done.
 
 **If the whole thing ever has to come out**, the fallback is a file move, not a
 rebuild: put `work\INTEGRAL_vr_en_movie_e3.ppf.was-deployed` back in
@@ -598,7 +601,9 @@ yet seen). What is left, in rough order:
    version or disk subdirectory - confirmed in the log, `[Ketchup] base path is
    mods\VR-DISK_US`. There is no USA equivalent of `vr_unlock_movies` yet; USA's
    own EXTRA clips gate the same way and would need their own offsets.
-4. **The number substitutions** are decided; the two unconfirmed measurements still need a reachability check (see section 6).
+4. **The number substitutions** are decided, and the two previously-unconfirmed
+   measurements are now RESOLVED 2026-09-12 (see section 6): both were reading
+   inert pooled template windows, not the live mission's own copy.
 5. **Deferred edges**, each a small piece of work: the camera's EXORCISE
    textures, and whether anything in the mission windows overflows a line at
    240 px the way the main game's could. (The two TGS MOVIE captions were the
@@ -1120,13 +1125,27 @@ A 280-byte sum over 2048 bytes, matched 934 times. So the decomp's output is the
 disc's own bytes where its source is unchanged, and the raw-disc variant's
 assumption about these images holds.
 
-**`us1.exe` is not the executable the collection's USA image was built with.**
-The same check reproduces only **8 of 318** tails there. The file is a genuine
-`SLUS` build by its own strings and the image's `SYSTEM.CNF` boots
-`slus_005.94`, so the likeliest explanation is a different pressing — but it is
-not established, and it is one more reason the port takes USA text from
-`usa1_stage.dir` (real USA discs) rather than from this image. It does not touch
-the Integral patches, which is why it is recorded rather than chased.
+**`us1.exe` is not the executable the collection's USA image was built with —
+IDENTIFIED 2026-09-12.** The same check reproduces only **8 of 318** tails
+there. The user pointed at two real Redump dumps (`C:\Users\Tideg\Desktop\MGS1
+USA`): "Metal Gear Solid (USA) (Disc 1)" (base/"Rev 0") and "... (Rev 1)",
+416,363 of 651,264 bytes apart. `work/us1.exe` and `us2.exe` are both
+byte-identical to the **Rev 1** dump (SHA-256 `615e1360…`, the hash
+`rebuild.py` already required). Extracting the **Rev 0** dump's own
+`SLUS_005.94` and running the same zero-fill parity check against the
+collection's `windata/alldata.bin` reproduces **318/318** sector tails — so the
+collection was pressed from Rev 0, and this port's four-executable input set
+has been Rev 1 for `us1.exe`/`us2.exe` since the beginning. `items.py`,
+`savemsg.py` and `rendertext.py` do read USA text out of `us1.exe` directly
+(not only `usa1_stage.dir`), but every string they took from it was
+independently confirmed on screen already (the 34/34 item and weapon
+comparison, the memory-card captions), so the Rev 0/Rev 1 difference does not
+appear to touch those text tables — whatever it changes, it hasn't produced a
+visible fault. What it actually changes in play is still unconfirmed; the 64%
+byte churn starting at the PS-EXE header looks like a code-size-changing
+revision rather than a few patched bytes, consistent with a real bug-fix
+pressing, but nobody has disassembled the difference. See README, "Audit
+against the decomp" for the check and the numbers.
 
 ### 5.14 Where else does Integral's own English differ from USA's? — SWEPT 2026-09-08
 Raised by the user 2026-09-07, immediately after the `SCARF` case: *"if there are
@@ -1409,19 +1428,38 @@ an explicit answer before anything changes.
   fuse is now the explicit authoring-error exception (section 5.15): after normal
   substitutions the shared grenade-fix helper corrects its five copies to 4.
 
-  **But only one of the three claimed cases is confirmed against a real
-  gameplay window, checked 2026-09-11 (README, "Numbers that differ between
-  the two versions"):** WEAPON MODE / GRENADE LEVEL 02 is right, and the
-  differing number turned out to be the fuse-timer sentence, not the
-  target count as first assumed. SNEAKING MODE / NO WEAPON LEVEL 10 and
-  SNEAKING MODE / SOCOM LEVEL 03 do **not** match what either disc's live
-  window actually shows — on screen both read identically to each other, with
-  none of the four claimed digits (25/35, 40/43) appearing anywhere. The
-  original 2026-09-07 measurement may have read a non-live template copy of
-  that key rather than the one a real playthrough reaches (Integral's stages
-  carry every mission a stage family can host, not only the reachable ones);
-  this is not established. **`vr_windows.py`'s per-stage report needs checking
-  against which copy is actually live before those two rows can be trusted.**
+  **All three claimed cases are now accounted for.** WEAPON MODE / GRENADE
+  LEVEL 02 was confirmed against a real gameplay window on 2026-09-11 (README,
+  "Numbers that differ between the two versions"); the differing number turned
+  out to be the fuse-timer sentence, not the target count as first assumed.
+  SNEAKING MODE / NO WEAPON LEVEL 10 and SNEAKING MODE / SOCOM LEVEL 03 did
+  **not** match what either disc's live window showed on 2026-09-11 — on
+  screen both read identically to each other, with none of the four claimed
+  digits (25/35, 40/43) appearing anywhere.
+
+  **RESOLVED 2026-09-12, by running `vr_windows.py`'s own stage-by-stage report
+  instead of just its de-duplicated summary.** The summary print only shows one
+  line per distinct (key, Integral-numbers, USA-numbers) triple, which hid
+  *which* stage each one came from. Reproducing the loop and keeping `name`
+  showed that the numbered stage each title names as its own — `vr_sud10` for
+  "NO WEAPON LEVEL 10", `vr_scm03` for "SOCOM LEVEL 03" — reports **zero**
+  number diffs and **zero** kept-Japanese windows for all 20 of its own
+  windows. Both flagged diffs instead come from *other* stage files that
+  merely carry a pooled duplicate of that exact titled window as leftover
+  template content never shown under that title in play:
+
+  | title | flagged in (pooled duplicates) | owning ("stage") copy | the live numbered stage |
+  |---|---|---|---|
+  | NO WEAPON LEVEL 10 | `vr_sud05,06,07,12,14` | `vr_sud08` | `vr_sud10` — 0 diffs |
+  | SOCOM LEVEL 03 | `vr_sud01,02,04,05` | `vr_sud03` | `vr_scm03` — 0 diffs |
+
+  This is exactly what "Integral's stages carry every mission a stage family
+  can host, not only the reachable ones" predicted, and it independently
+  matches the 2026-09-11 on-screen read word for word: no number in the live
+  NO WEAPON window, `Enemies 3` identical on both discs in the live SOCOM
+  window. **Nothing needs fixing** — the numbers `vr_windows.py` substitutes on
+  `vr_sud01,02,04,05,06,07,08,12,14` are inert data inside stages the mission
+  menu never opens under those titles, not text a player can ever see wrong.
 - **The VR KEY CONFIG's `key_syukan` +11 shift**, carried over from the main
   game's 2026-09-03 approval rather than asked again.
 - **The VR MOVIE EXIT box, moved up 4 px — ASKED AND APPROVED 2026-09-07.** With

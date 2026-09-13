@@ -759,6 +759,32 @@ Each main disc has 82 shared stage names and 13 Integral-only names:
 universe**, which is the two discs' shared names; `s07br` is the one so far known
 to hold portable text, and `en_pad2` covers it. What the `*r` stages are for has
 not been established - `s07br`'s overlay source is byte-identical to `s07b`'s.
+
+**A new lead, 2026-09-12, still not a conclusion.** The decomp's C source never
+references any of these thirteen names as string literals — `game/loader.c`'s
+`NewLoader(const char *dir)` just takes whatever name it is handed, so the
+choice of destination is made by the *caller's* GCL script data, not by C code
+the decomp covers. Byte-searching `int1_stage.dir` for each of the 13 names
+found where they are referenced: `s07br` appears inside `s07a`, `s07c`, `s09a`,
+`s07cr`, `s09ar` and `select2`, always as the identical 26-byte run
+`c8 bb 09 07 06 "s07br\0" 50 6d 04 06 7d f9 50 73 03 02` — the same opcode,
+argument count and string byte-for-byte in every owner. That uniformity across
+five unrelated rooms is the opposite of what a hand-authored, room-specific
+story branch would look like, and is instead what a **shared/common data table
+compiled into multiple overlays** looks like — e.g. the developer stage-select
+menu (`game/select.c`'s `NewSelect`/`isStageSelectionMenu`, which walks a GCL
+list of stage-name strings for QA jump-to-any-stage) linked into several
+builds. That would make at least this appearance of `s07br` a debug-tooling
+artefact rather than proof of in-story reachability — but the opcode `c8 bb`
+has not been identified against any known GCL command, so this is a
+lead to disassemble further, not a finding. The same search also turned up two
+`*r` names that are **not** Integral-exclusive — `s08br` and `s17ar` are
+referenced the same way and evidently exist on the USA disc too — which means
+the `r` suffix is a general MGS1 pattern (present in the original game) and
+Integral's 13 are additions to an existing convention, not an invention of
+their own. Whoever picks this up next should identify the `c8 bb` opcode (by
+finding the same byte pattern near a command the decomp *does* cover) before
+concluding either way.
 Integral's VR ISO was located by its PVD and `SLPM_862.49` path at container
 base `0x57592000`; USA VR is at `0xD39B7000`. The older 106-stage count included
 one more than the 105 named entries actually enumerated; use 105 for inventory.
